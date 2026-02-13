@@ -1,0 +1,95 @@
+syntax = "proto3";
+
+package tfclassify;
+
+option go_package = "github.com/jokarl/tfclassify/proto/gen";
+
+// PluginService is called by the host to interact with plugins.
+service PluginService {
+    // ApplyConfig sends plugin-specific configuration.
+    rpc ApplyConfig(ApplyConfigRequest) returns (ApplyConfigResponse);
+
+    // Analyze runs all analyzers in the plugin.
+    // The plugin calls back to RunnerService during analysis.
+    rpc Analyze(AnalyzeRequest) returns (AnalyzeResponse);
+}
+
+// RunnerService is called by plugins to interact with the host.
+service RunnerService {
+    // GetResourceChanges returns resource changes matching the patterns.
+    rpc GetResourceChanges(GetResourceChangesRequest) returns (GetResourceChangesResponse);
+
+    // GetResourceChange returns a specific resource change by address.
+    rpc GetResourceChange(GetResourceChangeRequest) returns (GetResourceChangeResponse);
+
+    // EmitDecision records a classification decision.
+    rpc EmitDecision(EmitDecisionRequest) returns (EmitDecisionResponse);
+}
+
+// ResourceChange represents a resource change from a Terraform plan.
+message ResourceChange {
+    string address = 1;
+    string type = 2;
+    string provider_name = 3;
+    string mode = 4;
+    repeated string actions = 5;
+    bytes before = 6;           // JSON-encoded map
+    bytes after = 7;            // JSON-encoded map
+    bytes before_sensitive = 8; // JSON-encoded sensitive markers
+    bytes after_sensitive = 9;  // JSON-encoded sensitive markers
+}
+
+// Decision represents a classification decision from an analyzer.
+message Decision {
+    string classification = 1;
+    string reason = 2;
+    int32 severity = 3;
+    bytes metadata = 4; // JSON-encoded map
+}
+
+// ApplyConfigRequest contains plugin configuration.
+message ApplyConfigRequest {
+    bytes config = 1; // Raw HCL bytes
+}
+
+// ApplyConfigResponse is empty on success.
+message ApplyConfigResponse {}
+
+// AnalyzeRequest starts the analysis.
+message AnalyzeRequest {
+    // broker_id is used by the plugin to dial back to the Runner server.
+    uint32 broker_id = 1;
+}
+
+// AnalyzeResponse indicates analysis completion.
+message AnalyzeResponse {}
+
+// GetResourceChangesRequest queries for matching resources.
+message GetResourceChangesRequest {
+    repeated string patterns = 1;
+}
+
+// GetResourceChangesResponse contains matching resource changes.
+message GetResourceChangesResponse {
+    repeated ResourceChange changes = 1;
+}
+
+// GetResourceChangeRequest queries for a specific resource.
+message GetResourceChangeRequest {
+    string address = 1;
+}
+
+// GetResourceChangeResponse contains the requested resource change.
+message GetResourceChangeResponse {
+    ResourceChange change = 1;
+}
+
+// EmitDecisionRequest records a decision for a resource.
+message EmitDecisionRequest {
+    string analyzer_name = 1;
+    ResourceChange change = 2;
+    Decision decision = 3;
+}
+
+// EmitDecisionResponse is empty on success.
+message EmitDecisionResponse {}
