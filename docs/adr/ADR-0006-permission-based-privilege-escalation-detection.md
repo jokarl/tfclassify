@@ -42,7 +42,7 @@ Chosen option: "Permission-based analysis with an embedded role database refresh
 
 ### Embedded Role Database
 
-Azure built-in role definitions are fetched via `az role definition list --custom-role-only false` and stored as a JSON file in the plugin source tree at `plugins/azurerm/roledata/roles.json`. This file is embedded into the plugin binary at compile time using `//go:embed`. A Makefile target regenerates the file, and a nightly CI job commits updates when Azure role definitions change.
+Azure built-in role definitions (with full permission sets) are fetched from [AzAdvertizer](https://www.azadvertizer.net/azrolesadvertizer_all.html), a publicly available dataset that requires no Azure authentication. A small Go tool downloads the CSV (`https://www.azadvertizer.net/azrolesadvertizer-comma.csv`) and transforms it to a compact JSON format stored at `plugins/azurerm/roledata/roles.json`. This file is embedded into the plugin binary at compile time using `//go:embed`. A Makefile target regenerates the file, and a nightly CI job commits updates when Azure role definitions change.
 
 Each role entry contains the full permission set:
 
@@ -148,13 +148,13 @@ For de-escalation (privileged to less-privileged), a fixed low severity (40) is 
 * A role not found in the database or plan is flagged with moderate severity and metadata indicating `"role_source": "unknown"`
 * All existing tests continue to pass (backward-compatible config)
 * `go test ./...` in `plugins/azurerm/` passes with new scoring, scope, and cross-reference tests
-* The `roledata/roles.json` file can be regenerated from `az role definition list` output
+* The `roledata/roles.json` file can be regenerated from the AzAdvertizer CSV without Azure credentials
 
 ## Pros and Cons of the Options
 
 ### Permission-based analysis with an embedded role database refreshed via CI
 
-Azure built-in role definitions (including full permission sets) are fetched via Azure CLI, transformed to a compact JSON format, and committed to the plugin source tree. The JSON is embedded into the binary at compile time. A scoring algorithm computes risk from effective permissions. Custom roles from the plan are cross-referenced and scored identically.
+Azure built-in role definitions (including full permission sets) are fetched from a publicly available source (AzAdvertizer CSV), transformed to a compact JSON format, and committed to the plugin source tree. The JSON is embedded into the binary at compile time. A scoring algorithm computes risk from effective permissions. Custom roles from the plan are cross-referenced and scored identically.
 
 * Good, because scoring is based on what roles can actually do, not human-curated name lists
 * Good, because `notActions` are correctly handled — Contributor's `Microsoft.Authorization/*` exclusion is reflected in the score
@@ -162,7 +162,7 @@ Azure built-in role definitions (including full permission sets) are fetched via
 * Good, because custom roles are analyzed without any configuration — their permissions are right there in the plan
 * Good, because works offline and in air-gapped environments — all data is embedded at build time
 * Good, because the scoring algorithm is deterministic and testable — given a role definition, the score is always the same
-* Neutral, because someone with Azure CLI access must run the initial generation and CI must have credentials for nightly refresh
+* Neutral, because the data source (AzAdvertizer) is a third-party project — if it becomes unavailable, the existing committed data remains valid and generation can be switched to an alternative source
 * Neutral, because pattern matching for Azure action strings (wildcards, provider namespaces) adds implementation complexity but is well-defined
 * Bad, because the embedded JSON grows with Azure's role catalog — currently ~400 built-in roles, likely to grow
 * Bad, because Azure could in theory change a built-in role's permissions between refreshes, creating a brief window of inaccuracy (mitigated by nightly refresh)
@@ -209,9 +209,11 @@ For the scoring algorithm, this means we score each role definition in isolation
 
 ### Data Source: Azure Built-in Role Definitions
 
-Azure publishes built-in role definitions through the ARM REST API. The `az role definition list --custom-role-only false` command returns all ~400 built-in roles with their full permission sets. This data changes infrequently — Microsoft adds new roles for new services and occasionally modifies existing roles.
+The primary data source is [AzAdvertizer](https://www.azadvertizer.net/azrolesadvertizer_all.html), which publishes all Azure built-in role definitions with full permission sets as a publicly downloadable CSV at `https://www.azadvertizer.net/azrolesadvertizer-comma.csv`. The CSV includes Actions, NotActions, DataActions, and NotDataActions for each role. No authentication is required — the data can be fetched with a simple HTTP GET, making it usable in any CI environment without Azure credentials or service principals.
 
-The `microsoft/azure-roles` GitHub repository provides a name-to-GUID mapping that is updated daily via GitHub Actions, but it does not include permission sets. The full permission data must come from the REST API or CLI.
+Azure also publishes built-in role definitions through the ARM REST API (`az role definition list --custom-role-only false`), but this requires Azure CLI authentication which adds credential management overhead and prevents contributors without Azure subscriptions from regenerating the data.
+
+The `microsoft/azure-roles` GitHub repository provides a name-to-GUID mapping that is updated daily via GitHub Actions, but it does not include permission sets — insufficient for permission-based scoring.
 
 Reference: TFLint's `tflint-ruleset-azurerm` uses a similar pattern — it pulls Azure API specifications from `Azure/azure-rest-api-specs` as a git submodule and regenerates validation rules from them.
 
