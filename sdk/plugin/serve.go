@@ -11,7 +11,7 @@ import (
 var HandshakeConfig = goplugin.HandshakeConfig{
 	ProtocolVersion:  1,
 	MagicCookieKey:   "TFCLASSIFY_PLUGIN",
-	MagicCookieValue: "tfclassify",
+	MagicCookieValue: "8kP2mXqR7vNwJ4tL9bYcF6gHsE3dA5uZoK1iWxCjT0lDfBnMrQpSaUhVeOyGI",
 }
 
 // PluginName is the name used to identify the plugin in the go-plugin system.

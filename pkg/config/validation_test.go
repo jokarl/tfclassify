@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 )
@@ -85,5 +86,97 @@ func TestValidate_ValidConfig(t *testing.T) {
 	err := Validate(cfg)
 	if err != nil {
 		t.Errorf("unexpected validation error: %v", err)
+	}
+}
+
+func TestWarnRedundantNotResource_FullyRedundant(t *testing.T) {
+	cfg := &Config{
+		Classifications: []ClassificationConfig{
+			{
+				Name:        "critical",
+				Description: "Critical",
+				Rules: []RuleConfig{
+					{Resource: []string{"*_role_*", "*_iam_*"}},
+				},
+			},
+			{
+				Name:        "standard",
+				Description: "Standard",
+				Rules: []RuleConfig{
+					// This not_resource list is fully covered by critical's resource patterns
+					{NotResource: []string{"*_role_*", "*_iam_*"}},
+				},
+			},
+		},
+		Precedence: []string{"critical", "standard"},
+	}
+
+	var buf bytes.Buffer
+	WarnRedundantNotResource(cfg, &buf)
+
+	if !strings.Contains(buf.String(), "Warning: classification \"standard\" rule 1") {
+		t.Errorf("expected warning for standard rule 1, got: %q", buf.String())
+	}
+	if !strings.Contains(buf.String(), "resource = [\"*\"]") {
+		t.Errorf("expected suggestion to use resource = [\"*\"], got: %q", buf.String())
+	}
+}
+
+func TestWarnRedundantNotResource_PartiallyNew(t *testing.T) {
+	cfg := &Config{
+		Classifications: []ClassificationConfig{
+			{
+				Name:        "critical",
+				Description: "Critical",
+				Rules: []RuleConfig{
+					{Resource: []string{"*_role_*"}},
+				},
+			},
+			{
+				Name:        "standard",
+				Description: "Standard",
+				Rules: []RuleConfig{
+					// This not_resource list has patterns not in critical
+					{NotResource: []string{"*_role_*", "*_custom_*"}},
+				},
+			},
+		},
+		Precedence: []string{"critical", "standard"},
+	}
+
+	var buf bytes.Buffer
+	WarnRedundantNotResource(cfg, &buf)
+
+	if buf.Len() != 0 {
+		t.Errorf("expected no warning when not_resource has unique patterns, got: %q", buf.String())
+	}
+}
+
+func TestWarnRedundantNotResource_NoNotResource(t *testing.T) {
+	cfg := &Config{
+		Classifications: []ClassificationConfig{
+			{
+				Name:        "critical",
+				Description: "Critical",
+				Rules: []RuleConfig{
+					{Resource: []string{"*_role_*"}},
+				},
+			},
+			{
+				Name:        "standard",
+				Description: "Standard",
+				Rules: []RuleConfig{
+					{Resource: []string{"*"}},
+				},
+			},
+		},
+		Precedence: []string{"critical", "standard"},
+	}
+
+	var buf bytes.Buffer
+	WarnRedundantNotResource(cfg, &buf)
+
+	if buf.Len() != 0 {
+		t.Errorf("expected no warning when no not_resource rules exist, got: %q", buf.String())
 	}
 }

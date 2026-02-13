@@ -26,7 +26,8 @@ classification "standard" {
   description = "Standard change process"
 
   rule {
-    not_resource = ["*_role_*", "*_iam_*"]
+    resource = ["*"]
+    # Catches everything not matched by critical or review above.
   }
 }
 
@@ -133,7 +134,7 @@ Three changes: a role assignment deletion, a role assignment update, and a stora
 tfclassify \
   -p docs/examples/action-filtering/plan.json \
   -c docs/examples/action-filtering/.tfclassify.hcl \
-  --no-plugins -v
+  -v
 ```
 
 ## Expected Output
@@ -153,7 +154,7 @@ Resources: 3
 
 [standard] (1 resources)
   - azurerm_storage_account.data (azurerm_storage_account) [update]
-    Rule: standard rule 1 (not_resource: *_role_*, ...)
+    Rule: standard rule 1 (resource: *)
 ```
 
 Exit code **3** corresponds to `critical` in a 4-level precedence list.

@@ -22,7 +22,6 @@ var (
 	configPath         string
 	outputFmt          string
 	verbose            bool
-	noPlugins          bool
 	actAsBundledPlugin bool
 )
 
@@ -50,16 +49,36 @@ workflows by categorizing changes as critical, standard, or auto-approved.`,
 	RunE: run,
 }
 
+var initCmd = &cobra.Command{
+	Use:   "init",
+	Short: "Install plugins declared in configuration",
+	Long: `Downloads and installs plugin binaries from their declared sources.
+
+Reads plugin declarations from .tfclassify.hcl and downloads external plugins
+from their GitHub release pages. Bundled plugins (like terraform) need no
+installation.
+
+The GITHUB_TOKEN environment variable is supported for authenticated
+requests (to avoid rate limits).`,
+	RunE: runInit,
+}
+
 func init() {
-	rootCmd.Flags().StringVarP(&planPath, "plan", "p", "", "Path to Terraform plan JSON file (required)")
+	// Root command flags
+	rootCmd.Flags().StringVarP(&planPath, "plan", "p", "", "Path to Terraform plan file (JSON or binary)")
 	rootCmd.Flags().StringVarP(&configPath, "config", "c", "", "Path to configuration file")
 	rootCmd.Flags().StringVarP(&outputFmt, "output", "o", "text", "Output format: json, text, github")
 	rootCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose output")
-	rootCmd.Flags().BoolVar(&noPlugins, "no-plugins", false, "Disable plugin loading")
 	rootCmd.Flags().BoolVar(&actAsBundledPlugin, "act-as-bundled-plugin", false, "Run as bundled plugin (internal use)")
 	rootCmd.Flags().MarkHidden("act-as-bundled-plugin")
 
 	rootCmd.MarkFlagRequired("plan")
+
+	// Init command flags
+	initCmd.Flags().StringVarP(&configPath, "config", "c", "", "Path to configuration file")
+
+	// Add subcommands
+	rootCmd.AddCommand(initCmd)
 }
 
 func run(cmd *cobra.Command, args []string) error {
@@ -67,6 +86,11 @@ func run(cmd *cobra.Command, args []string) error {
 	cfg, err := config.Load(configPath)
 	if err != nil {
 		return fmt.Errorf("failed to load configuration: %w", err)
+	}
+
+	// Warn about redundant not_resource usage in verbose mode
+	if verbose {
+		config.WarnRedundantNotResource(cfg, os.Stderr)
 	}
 
 	// Parse plan
@@ -84,30 +108,32 @@ func run(cmd *cobra.Command, args []string) error {
 	// Classify changes using core rules
 	result := classifier.Classify(planResult.Changes)
 
-	// Run plugins unless disabled
-	if !noPlugins {
-		selfPath, err := os.Executable()
-		if err != nil {
-			return fmt.Errorf("failed to determine executable path: %w", err)
+	// Run plugins
+	selfPath, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("failed to determine executable path: %w", err)
+	}
+
+	host := plugin.NewHost(cfg)
+	defer host.Shutdown()
+
+	if err := host.DiscoverAndStart(selfPath); err != nil {
+		// Check if this is a missing external plugin error
+		if missingErr, ok := err.(*plugin.PluginNotInstalledError); ok {
+			return fmt.Errorf("plugin %q is enabled but not installed.\nRun \"tfclassify init\" to install plugins declared in your configuration", missingErr.PluginName)
 		}
-
-		host := plugin.NewHost(cfg)
-		defer host.Shutdown()
-
-		if err := host.DiscoverAndStart(selfPath); err != nil {
-			// Log warning but continue with core-only classification
+		// Log warning for other errors but continue with core-only classification
+		if verbose {
+			fmt.Fprintf(os.Stderr, "Warning: plugin discovery failed: %v\n", err)
+		}
+	} else {
+		pluginDecisions, err := host.RunAnalysis(planResult.Changes)
+		if err != nil {
 			if verbose {
-				fmt.Fprintf(os.Stderr, "Warning: plugin discovery failed: %v\n", err)
+				fmt.Fprintf(os.Stderr, "Warning: plugin analysis failed: %v\n", err)
 			}
-		} else {
-			pluginDecisions, err := host.RunAnalysis(planResult.Changes)
-			if err != nil {
-				if verbose {
-					fmt.Fprintf(os.Stderr, "Warning: plugin analysis failed: %v\n", err)
-				}
-			} else if len(pluginDecisions) > 0 {
-				classifier.AddPluginDecisions(result, pluginDecisions)
-			}
+		} else if len(pluginDecisions) > 0 {
+			classifier.AddPluginDecisions(result, pluginDecisions)
 		}
 	}
 
@@ -121,6 +147,17 @@ func run(cmd *cobra.Command, args []string) error {
 	// Exit with appropriate code
 	os.Exit(result.OverallExitCode)
 	return nil
+}
+
+func runInit(cmd *cobra.Command, args []string) error {
+	// Load configuration
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		return fmt.Errorf("failed to load configuration: %w", err)
+	}
+
+	fmt.Println("Installing plugins...")
+	return plugin.InstallPlugins(cfg, os.Stdout)
 }
 
 // runBundledPlugin runs this binary as the bundled terraform plugin.

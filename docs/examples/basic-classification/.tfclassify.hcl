@@ -4,7 +4,7 @@
 # Resources are classified solely by their type name — no action filtering.
 #
 # Run:
-#   tfclassify -p plan.json -c .tfclassify.hcl --no-plugins -v
+#   tfclassify -p plan.json -c .tfclassify.hcl -v
 
 # "critical" — any change to identity/access resources, regardless of action.
 #
@@ -17,7 +17,8 @@ classification "critical" {
   description = "Requires security team approval"
 
   rule {
-    resource = ["*_role_*", "*_iam_*"]
+    description = "Role and IAM changes require security review"
+    resource    = ["*_role_*", "*_iam_*"]
     # Matches: azurerm_role_assignment, aws_iam_policy, google_project_iam_member, ...
     # Does NOT match: azurerm_virtual_network, azurerm_storage_account, ...
   }
@@ -25,16 +26,21 @@ classification "critical" {
 
 # "standard" — everything that isn't identity/access.
 #
-# "not_resource" is the inverse of "resource": a resource matches this rule
-# if its type does NOT match any of the listed patterns. This is useful as
-# a catch-all for "everything else" without listing every resource type.
+# Since the classifier evaluates rules in precedence order and returns on the
+# first match, using resource = ["*"] for the catch-all is safe: higher-precedence
+# classifications (critical) are checked first, so "standard" only catches
+# resources that didn't match anything above.
+#
+# This is simpler and less error-prone than maintaining a not_resource list
+# that must be updated every time a new pattern is added to a higher-precedence
+# classification.
 classification "standard" {
   description = "Standard change process"
 
   rule {
-    not_resource = ["*_role_*", "*_iam_*"]
-    # Matches: azurerm_virtual_network, azurerm_resource_group, aws_s3_bucket, ...
-    # Does NOT match: azurerm_role_assignment, aws_iam_policy, ...
+    resource = ["*"]
+    # Catches everything not matched by critical above.
+    # Precedence-ordered evaluation ensures critical resources are classified first.
   }
 }
 

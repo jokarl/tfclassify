@@ -5,7 +5,7 @@
 # resources from their children (e.g. key vaults vs. key vault secrets).
 #
 # Run:
-#   tfclassify -p plan.json -c .tfclassify.hcl --no-plugins -v
+#   tfclassify -p plan.json -c .tfclassify.hcl -v
 
 # "critical" — destructive changes to sensitive resource types.
 #
@@ -58,21 +58,19 @@ classification "review" {
 
 # "standard" — everything not covered above.
 #
-# The not_resource list must include ALL patterns from higher-precedence
-# classifications to avoid accidentally catching those resources here.
-# If a resource matches both "critical" and "standard" rules, precedence
-# ensures "critical" wins — but it's cleaner to exclude them explicitly.
+# Using resource = ["*"] as a catch-all is safe because the classifier evaluates
+# rules in precedence order. Critical and review rules are checked first, so
+# this rule only matches resources that didn't match anything above.
+#
+# This is simpler than maintaining a not_resource list that must be updated
+# every time a new pattern is added to a higher-precedence classification.
 classification "standard" {
   description = "Standard change process"
 
   rule {
-    not_resource = [
-      "*_role_*",         # covered by critical
-      "*_iam_*",          # covered by critical
-      "*_key_vault*",     # note: trailing * catches both _key_vault and _key_vault_secret
-      "*_security_rule",  # covered by review
-      "*_firewall_*",     # covered by review
-    ]
+    resource = ["*"]
+    # Catches everything not matched by critical or review above.
+    # Precedence-ordered evaluation ensures higher-level resources are classified first.
   }
 }
 

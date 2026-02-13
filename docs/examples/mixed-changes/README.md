@@ -35,7 +35,8 @@ classification "standard" {
   description = "Standard change process"
 
   rule {
-    not_resource = ["*_role_*", "*_iam_*", "*_key_vault*", "*_security_rule", "*_firewall_*"]
+    resource = ["*"]
+    # Catches everything not matched by critical or review above.
   }
 }
 
@@ -60,7 +61,7 @@ Key design choices:
 - `*_key_vault` (no trailing wildcard) matches the vault resource itself; `*_key_vault_*` matches child resources like secrets and keys
 - Deleting a vault is `critical`; modifying a secret is `review`
 - Security rules and firewall rules always require `review` regardless of action
-- Everything else is `standard` via `not_resource` exclusion
+- Everything else is `standard` using `resource = ["*"]` as a catch-all (precedence handles the hierarchy)
 
 ## Terraform Plan
 
@@ -225,7 +226,7 @@ Six resources representing a typical infrastructure change:
 tfclassify \
   -p docs/examples/mixed-changes/plan.json \
   -c docs/examples/mixed-changes/.tfclassify.hcl \
-  --no-plugins -v
+  -v
 ```
 
 ## Expected Output
@@ -247,11 +248,11 @@ Resources: 6
 
 [standard] (3 resources)
   - azurerm_subnet.backend (azurerm_subnet) [delete create]
-    Rule: standard rule 1 (not_resource: *_role_*, ...)
+    Rule: standard rule 1 (resource: *)
   - azurerm_storage_account.logs (azurerm_storage_account) [update]
-    Rule: standard rule 1 (not_resource: *_role_*, ...)
+    Rule: standard rule 1 (resource: *)
   - azurerm_resource_group.monitoring (azurerm_resource_group) [create]
-    Rule: standard rule 1 (not_resource: *_role_*, ...)
+    Rule: standard rule 1 (resource: *)
 ```
 
 JSON output (`-o json`):
@@ -281,14 +282,14 @@ JSON output (`-o json`):
       "type": "azurerm_subnet",
       "actions": ["delete", "create"],
       "classification": "standard",
-      "matched_rule": "standard rule 1 (not_resource: *_role_*, ...)"
+      "matched_rule": "standard rule 1 (resource: *)"
     },
     {
       "address": "azurerm_storage_account.logs",
       "type": "azurerm_storage_account",
       "actions": ["update"],
       "classification": "standard",
-      "matched_rule": "standard rule 1 (not_resource: *_role_*, ...)"
+      "matched_rule": "standard rule 1 (resource: *)"
     },
     {
       "address": "azurerm_key_vault_secret.db_password",
@@ -302,7 +303,7 @@ JSON output (`-o json`):
       "type": "azurerm_resource_group",
       "actions": ["create"],
       "classification": "standard",
-      "matched_rule": "standard rule 1 (not_resource: *_role_*, ...)"
+      "matched_rule": "standard rule 1 (resource: *)"
     }
   ]
 }

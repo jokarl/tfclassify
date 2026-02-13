@@ -2,10 +2,12 @@
 package plan
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"strings"
 
 	tfjson "github.com/hashicorp/terraform-json"
@@ -19,14 +21,79 @@ var supportedFormatVersions = map[string]bool{
 	"1.2": true,
 }
 
-// ParseFile reads and parses a Terraform plan JSON file.
+// BinaryPlanMagicBytes is the magic bytes prefix for Terraform binary plan files.
+// Terraform binary plans are zip files containing plan.tfplan and other files.
+var BinaryPlanMagicBytes = []byte("PK") // ZIP file magic bytes
+
+// ParseFile reads and parses a Terraform plan file (JSON or binary).
 func ParseFile(path string) (*ParseResult, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open plan file: %w", err)
 	}
 	defer f.Close()
+
+	// Read first few bytes to detect format
+	header := make([]byte, 4)
+	n, err := f.Read(header)
+	if err != nil && err != io.EOF {
+		return nil, fmt.Errorf("failed to read plan header: %w", err)
+	}
+
+	// Reset file position
+	if _, err := f.Seek(0, 0); err != nil {
+		return nil, fmt.Errorf("failed to seek plan file: %w", err)
+	}
+
+	// Check if it's a binary plan (ZIP format)
+	if n >= 2 && bytes.HasPrefix(header, BinaryPlanMagicBytes) {
+		return parseBinaryPlan(path)
+	}
+
+	// Try to parse as JSON
 	return Parse(f)
+}
+
+// parseBinaryPlan converts a binary Terraform plan to JSON using `terraform show -json`.
+func parseBinaryPlan(path string) (*ParseResult, error) {
+	// Find terraform binary
+	terraformPath, err := findTerraform()
+	if err != nil {
+		return nil, fmt.Errorf("binary plan detected but terraform CLI not found: %w", err)
+	}
+
+	// Run terraform show -json
+	cmd := exec.Command(terraformPath, "show", "-json", path)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("failed to convert binary plan: %s (stderr: %s)", err, stderr.String())
+	}
+
+	return Parse(bytes.NewReader(stdout.Bytes()))
+}
+
+// findTerraform finds the terraform binary in PATH.
+func findTerraform() (string, error) {
+	// Check for TERRAFORM_PATH env var first
+	if envPath := os.Getenv("TERRAFORM_PATH"); envPath != "" {
+		if _, err := os.Stat(envPath); err == nil {
+			return envPath, nil
+		}
+	}
+
+	// Look in PATH
+	path, err := exec.LookPath("terraform")
+	if err != nil {
+		// Also check for tofu (OpenTofu)
+		path, err = exec.LookPath("tofu")
+		if err != nil {
+			return "", fmt.Errorf("terraform or tofu not found in PATH")
+		}
+	}
+	return path, nil
 }
 
 // Parse reads and parses Terraform plan JSON from a reader.

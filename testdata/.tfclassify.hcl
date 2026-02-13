@@ -30,7 +30,8 @@ classification "standard" {
   description = "Standard change process"
 
   rule {
-    not_resource = ["*_role_*", "*_iam_*"]
+    resource = ["*"]
+    # Catches everything not matched by critical above.
   }
 }
 

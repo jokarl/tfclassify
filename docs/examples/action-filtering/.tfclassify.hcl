@@ -5,7 +5,7 @@
 # depending on whether the action is a delete or an update.
 #
 # Run:
-#   tfclassify -p plan.json -c .tfclassify.hcl --no-plugins -v
+#   tfclassify -p plan.json -c .tfclassify.hcl -v
 
 # "critical" — deleting identity/access resources.
 #
@@ -47,12 +47,16 @@ classification "review" {
 }
 
 # "standard" — everything that isn't identity/access.
+#
+# Using resource = ["*"] as a catch-all is safe because the classifier evaluates
+# rules in precedence order. Critical and review rules are checked first, so
+# this rule only matches resources that didn't match anything above.
 classification "standard" {
   description = "Standard change process"
 
   rule {
-    not_resource = ["*_role_*", "*_iam_*"]
-    # Matches any resource whose type does NOT contain "_role_" or "_iam_".
+    resource = ["*"]
+    # Catches everything not matched by critical or review above.
   }
 }
 

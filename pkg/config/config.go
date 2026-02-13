@@ -37,6 +37,7 @@ type ClassificationConfig struct {
 
 // RuleConfig represents a classification rule.
 type RuleConfig struct {
+	Description string   `hcl:"description,optional"`
 	Resource    []string `hcl:"resource,optional"`
 	NotResource []string `hcl:"not_resource,optional"`
 	Actions     []string `hcl:"actions,optional"`

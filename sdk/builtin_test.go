@@ -95,3 +95,65 @@ func TestDefaultAnalyzer_ResourcePatterns(t *testing.T) {
 		t.Errorf("expected nil patterns, got %v", patterns)
 	}
 }
+
+func TestBuiltinPluginSet_VersionConstraint_Empty(t *testing.T) {
+	ps := &BuiltinPluginSet{
+		Name:    "test",
+		Version: "1.0.0",
+	}
+
+	constraint := ps.VersionConstraint()
+	if constraint != "" {
+		t.Errorf("expected empty version constraint by default, got %q", constraint)
+	}
+}
+
+func TestBuiltinPluginSet_VersionConstraint_Set(t *testing.T) {
+	ps := &BuiltinPluginSet{
+		Name:                  "test",
+		Version:               "1.0.0",
+		HostVersionConstraint: ">= 0.1.0",
+	}
+
+	constraint := ps.VersionConstraint()
+	if constraint != ">= 0.1.0" {
+		t.Errorf("expected version constraint '>= 0.1.0', got %q", constraint)
+	}
+}
+
+func TestBuiltinPluginSet_ConfigSchema_Nil(t *testing.T) {
+	ps := &BuiltinPluginSet{
+		Name:    "test",
+		Version: "1.0.0",
+	}
+
+	schema := ps.ConfigSchema()
+	if schema != nil {
+		t.Errorf("expected nil config schema by default, got %v", schema)
+	}
+}
+
+func TestBuiltinPluginSet_ConfigSchema_Set(t *testing.T) {
+	ps := &BuiltinPluginSet{
+		Name:    "test",
+		Version: "1.0.0",
+		Schema: &ConfigSchemaSpec{
+			Attributes: []ConfigAttribute{
+				{Name: "privileged_roles", Type: "list(string)", Required: false},
+			},
+		},
+	}
+
+	schema := ps.ConfigSchema()
+	if schema == nil {
+		t.Fatal("expected non-nil config schema")
+	}
+
+	if len(schema.Attributes) != 1 {
+		t.Fatalf("expected 1 attribute, got %d", len(schema.Attributes))
+	}
+
+	if schema.Attributes[0].Name != "privileged_roles" {
+		t.Errorf("expected attribute name 'privileged_roles', got %q", schema.Attributes[0].Name)
+	}
+}

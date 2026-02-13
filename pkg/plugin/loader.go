@@ -19,6 +19,10 @@ import (
 	sdkplugin "github.com/jokarl/tfclassify/sdk/plugin"
 )
 
+// SDKVersionConstraints specifies which SDK versions this host is compatible with.
+// Plugins built against an SDK version that doesn't satisfy this constraint will be rejected.
+const SDKVersionConstraints = ">= 0.1.0"
+
 // Host manages plugin lifecycle and communication.
 type Host struct {
 	cfg       *config.Config

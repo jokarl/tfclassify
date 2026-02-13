@@ -12,6 +12,17 @@ import (
 // PluginBinaryPrefix is the prefix for plugin binary names.
 const PluginBinaryPrefix = "tfclassify-plugin-"
 
+// PluginNotInstalledError indicates an enabled external plugin is not installed.
+type PluginNotInstalledError struct {
+	PluginName string
+	Source     string
+	Version    string
+}
+
+func (e *PluginNotInstalledError) Error() string {
+	return fmt.Sprintf("plugin %q is not installed (source: %s, version: %s)", e.PluginName, e.Source, e.Version)
+}
+
 // DiscoveredPlugin contains information about a discovered plugin.
 type DiscoveredPlugin struct {
 	Name      string
@@ -33,7 +44,7 @@ func DiscoverPlugins(cfg *config.Config, selfPath string) (map[string]*Discovere
 
 		discovered, err := discoverPlugin(pluginCfg, cfg, selfPath)
 		if err != nil {
-			return nil, fmt.Errorf("failed to discover plugin %q: %w", pluginCfg.Name, err)
+			return nil, err
 		}
 
 		result[pluginCfg.Name] = discovered
@@ -70,6 +81,15 @@ func discoverPlugin(pluginCfg *config.PluginConfig, cfg *config.Config, selfPath
 		}
 	}
 
+	// External plugin not found - return typed error if it has a source
+	if pluginCfg.Source != "" {
+		return nil, &PluginNotInstalledError{
+			PluginName: pluginCfg.Name,
+			Source:     pluginCfg.Source,
+			Version:    pluginCfg.Version,
+		}
+	}
+
 	return nil, fmt.Errorf("plugin binary %q not found in search paths: %v", binaryName, paths)
 }
 
@@ -97,4 +117,16 @@ func searchPaths() []string {
 	}
 
 	return paths
+}
+
+// DefaultPluginDir returns the default plugin installation directory.
+// Uses TFCLASSIFY_PLUGIN_DIR env var if set, otherwise .tfclassify/plugins/ in cwd.
+func DefaultPluginDir() string {
+	if envDir := os.Getenv("TFCLASSIFY_PLUGIN_DIR"); envDir != "" {
+		return envDir
+	}
+	if cwd, err := os.Getwd(); err == nil {
+		return filepath.Join(cwd, ".tfclassify", "plugins")
+	}
+	return ".tfclassify/plugins"
 }

@@ -3,6 +3,7 @@ package config
 
 import (
 	"fmt"
+	"io"
 )
 
 // Validate checks that the configuration is valid.
@@ -91,4 +92,56 @@ func validateRules(cfg *Config) error {
 		}
 	}
 	return nil
+}
+
+// WarnRedundantNotResource emits a warning to w when a not_resource rule
+// contains only patterns that are already present in higher-precedence
+// resource rules. In such cases, using resource = ["*"] is simpler and
+// less error-prone because the precedence-ordered evaluation already
+// ensures higher-priority classifications match first.
+//
+// This function is intended to be called with verbose mode enabled.
+func WarnRedundantNotResource(cfg *Config, w io.Writer) {
+	// Build a map of classifications by name for quick lookup
+	classificationByName := make(map[string]*ClassificationConfig)
+	for i := range cfg.Classifications {
+		classificationByName[cfg.Classifications[i].Name] = &cfg.Classifications[i]
+	}
+
+	// Collect resource patterns from each classification in precedence order
+	higherPatterns := make(map[string]bool)
+
+	for _, classificationName := range cfg.Precedence {
+		classification, ok := classificationByName[classificationName]
+		if !ok {
+			continue
+		}
+
+		for ruleIdx, rule := range classification.Rules {
+			// Check if this not_resource list is fully covered by higher-precedence patterns
+			if len(rule.NotResource) > 0 && allPatternsKnown(rule.NotResource, higherPatterns) {
+				fmt.Fprintf(w, "Warning: classification %q rule %d uses not_resource with patterns "+
+					"already covered by higher-precedence rules. Consider using resource = [\"*\"] instead.\n",
+					classificationName, ruleIdx+1)
+			}
+
+			// Accumulate resource patterns for lower-precedence checks
+			for _, pattern := range rule.Resource {
+				higherPatterns[pattern] = true
+			}
+		}
+	}
+}
+
+// allPatternsKnown returns true if every pattern in patterns exists in known.
+func allPatternsKnown(patterns []string, known map[string]bool) bool {
+	if len(patterns) == 0 {
+		return false
+	}
+	for _, p := range patterns {
+		if !known[p] {
+			return false
+		}
+	}
+	return true
 }

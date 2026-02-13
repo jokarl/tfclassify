@@ -1,6 +1,8 @@
 # Basic Classification
 
-Demonstrates resource type pattern matching using glob rules. Resources matching `*_role_*` or `*_iam_*` are classified as **critical**, while all other resources fall into **standard** via a `not_resource` exclusion rule.
+Demonstrates resource type pattern matching using glob rules. Resources matching `*_role_*` or `*_iam_*` are classified as **critical**, while all other resources fall into **standard** using a simple `resource = ["*"]` catch-all pattern.
+
+The catch-all pattern works because the classifier evaluates rules in precedence order: higher-precedence classifications (critical) are checked first, so the **standard** rule only matches resources that didn't match anything above.
 
 ## Configuration
 
@@ -17,7 +19,8 @@ classification "standard" {
   description = "Standard change process"
 
   rule {
-    not_resource = ["*_role_*", "*_iam_*"]
+    resource = ["*"]
+    # Catches everything not matched by critical above.
   }
 }
 
@@ -114,7 +117,7 @@ The plan creates three resources: a role assignment, a virtual network, and a re
 tfclassify \
   -p docs/examples/basic-classification/plan.json \
   -c docs/examples/basic-classification/.tfclassify.hcl \
-  --no-plugins -v
+  -v
 ```
 
 ## Expected Output
@@ -130,9 +133,9 @@ Resources: 3
 
 [standard] (2 resources)
   - azurerm_virtual_network.main (azurerm_virtual_network) [create]
-    Rule: standard rule 1 (not_resource: *_role_*, ...)
+    Rule: standard rule 1 (resource: *)
   - azurerm_resource_group.production (azurerm_resource_group) [create]
-    Rule: standard rule 1 (not_resource: *_role_*, ...)
+    Rule: standard rule 1 (resource: *)
 ```
 
 Exit code **2** corresponds to `critical` (highest precedence = highest exit code).
@@ -142,6 +145,7 @@ Exit code **2** corresponds to `critical` (highest precedence = highest exit cod
 | Concept | Detail |
 |---------|--------|
 | `resource` glob matching | `*_role_*` matches `azurerm_role_assignment` |
-| `not_resource` exclusion | Anything not matching `*_role_*` or `*_iam_*` falls to `standard` |
+| `resource = ["*"]` catch-all | Matches everything not already classified by higher-precedence rules |
+| Precedence-ordered evaluation | Rules are checked in precedence order; first match wins |
 | Precedence | `critical` (index 0) gets exit code 2, `standard` (index 1) gets 1, `auto` (index 2) gets 0 |
 | Overall classification | The highest-precedence classification across all resources wins |

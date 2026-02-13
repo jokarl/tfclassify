@@ -8,9 +8,10 @@ import (
 
 // Classifier applies config rules to plan changes.
 type Classifier struct {
-	config        *config.Config
-	matchers      map[string][]compiledRule // classification name -> compiled rules
-	precedenceMap map[string]int            // classification name -> precedence index (lower is higher precedence)
+	config             *config.Config
+	matchers           map[string][]compiledRule // classification name -> compiled rules
+	precedenceMap      map[string]int            // classification name -> precedence index (lower is higher precedence)
+	descriptionMap     map[string]string         // classification name -> description
 }
 
 // New creates a new Classifier from a config.
@@ -20,16 +21,21 @@ func New(cfg *config.Config) (*Classifier, error) {
 		return nil, err
 	}
 
-	// Build precedence map
+	// Build precedence map and description map
 	precedenceMap := make(map[string]int)
+	descriptionMap := make(map[string]string)
 	for i, name := range cfg.Precedence {
 		precedenceMap[name] = i
 	}
+	for _, classification := range cfg.Classifications {
+		descriptionMap[classification.Name] = classification.Description
+	}
 
 	return &Classifier{
-		config:        cfg,
-		matchers:      matchers,
-		precedenceMap: precedenceMap,
+		config:         cfg,
+		matchers:       matchers,
+		precedenceMap:  precedenceMap,
+		descriptionMap: descriptionMap,
 	}, nil
 }
 
@@ -43,6 +49,7 @@ func (c *Classifier) Classify(changes []plan.ResourceChange) *Result {
 	if len(changes) == 0 {
 		result.NoChanges = true
 		result.Overall = c.config.Defaults.NoChanges
+		result.OverallDescription = c.descriptionMap[result.Overall]
 		result.OverallExitCode = c.getExitCode(result.Overall)
 		return result
 	}
@@ -58,6 +65,7 @@ func (c *Classifier) Classify(changes []plan.ResourceChange) *Result {
 		if highestPrecedence == -1 || precedence < highestPrecedence {
 			highestPrecedence = precedence
 			result.Overall = decision.Classification
+			result.OverallDescription = c.descriptionMap[result.Overall]
 		}
 	}
 
@@ -80,6 +88,7 @@ func (c *Classifier) classifyResource(change plan.ResourceChange) ResourceDecisi
 		for _, rule := range rules {
 			if rule.matchesResource(change.Type) && rule.matchesActions(change.Actions) {
 				decision.Classification = classificationName
+				decision.ClassificationDescription = rule.classificationDescription
 				decision.MatchedRule = rule.ruleDescription
 				return decision
 			}

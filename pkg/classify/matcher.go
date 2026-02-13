@@ -10,11 +10,12 @@ import (
 
 // compiledRule is a pre-compiled classification rule.
 type compiledRule struct {
-	classification   string
-	resourceGlobs    []glob.Glob
-	notResourceGlobs []glob.Glob
-	actions          []string
-	ruleDescription  string
+	classification            string
+	classificationDescription string
+	resourceGlobs             []glob.Glob
+	notResourceGlobs          []glob.Glob
+	actions                   []string
+	ruleDescription           string
 }
 
 // compileRules compiles all rules from a config into compiled rules.
@@ -25,10 +26,17 @@ func compileRules(cfg *config.Config) (map[string][]compiledRule, error) {
 		rules := make([]compiledRule, 0, len(classification.Rules))
 
 		for i, rule := range classification.Rules {
+			// Use user-provided description if present, otherwise auto-generate
+			ruleDesc := rule.Description
+			if ruleDesc == "" {
+				ruleDesc = formatRuleDescription(classification.Name, i+1, rule)
+			}
+
 			compiled := compiledRule{
-				classification:  classification.Name,
-				actions:         rule.Actions,
-				ruleDescription: formatRuleDescription(classification.Name, i+1, rule),
+				classification:            classification.Name,
+				classificationDescription: classification.Description,
+				actions:                   rule.Actions,
+				ruleDescription:           ruleDesc,
 			}
 
 			// Compile resource globs
