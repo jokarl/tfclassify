@@ -715,3 +715,44 @@ func TestHasTargetedRoleAssignmentWrite_Wildcard(t *testing.T) {
 		t.Error("expected true for roleAssignments/*")
 	}
 }
+
+func TestComputeEffectiveActions_WildcardOnly(t *testing.T) {
+	// Test the special case where actions is exactly ["*"]
+	// This should return ["*"] unchanged even with notActions
+	actions := []string{"*"}
+	notActions := []string{"Microsoft.Authorization/*"}
+
+	effective := computeEffectiveActions(actions, notActions)
+
+	if len(effective) != 1 || effective[0] != "*" {
+		t.Errorf("expected [\"*\"], got %v", effective)
+	}
+}
+
+func TestComputeEffectiveActions_EmptyNotActions(t *testing.T) {
+	actions := []string{"Microsoft.Compute/virtualMachines/read"}
+	notActions := []string{}
+
+	effective := computeEffectiveActions(actions, notActions)
+
+	if len(effective) != 1 || effective[0] != "Microsoft.Compute/virtualMachines/read" {
+		t.Errorf("expected original actions, got %v", effective)
+	}
+}
+
+func TestComputeEffectiveActions_FilteredOut(t *testing.T) {
+	actions := []string{
+		"Microsoft.Compute/virtualMachines/read",
+		"Microsoft.Authorization/roleAssignments/write",
+	}
+	notActions := []string{"Microsoft.Authorization/*"}
+
+	effective := computeEffectiveActions(actions, notActions)
+
+	if len(effective) != 1 {
+		t.Fatalf("expected 1 action, got %d", len(effective))
+	}
+	if effective[0] != "Microsoft.Compute/virtualMachines/read" {
+		t.Errorf("expected Compute action, got %v", effective[0])
+	}
+}

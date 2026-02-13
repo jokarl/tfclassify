@@ -1334,3 +1334,196 @@ func TestScopeFromBeforeState(t *testing.T) {
 		t.Errorf("expected scope from before state, got %v", runner.decisions[0].Metadata["scope"])
 	}
 }
+
+func TestResolveRole_IDWithNameOverride(t *testing.T) {
+	// Test the case where we resolve by ID but also have a roleName provided,
+	// which should prefer the roleName for display
+	config := DefaultConfig()
+	analyzer := NewPrivilegeEscalationAnalyzer(config)
+
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			{
+				Address: "azurerm_role_assignment.test",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					// Both ID and name - but name doesn't match a known role
+					// ID does match Owner, but we should use the provided name for display
+					"role_definition_id":   "8e3af657-a8ff-443c-a75c-2fe8c4bcb635", // Owner
+					"role_definition_name": "My Custom Owner Alias",
+					"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
+				},
+			},
+		},
+	}
+
+	err := analyzer.Analyze(runner)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(runner.decisions) != 1 {
+		t.Fatalf("expected 1 decision, got %d", len(runner.decisions))
+	}
+
+	// The name lookup fails, but ID lookup succeeds - the name in assignment
+	// should be preserved for display
+	if runner.decisions[0].Metadata["role_source"] != "builtin" {
+		t.Errorf("expected role_source builtin, got %v", runner.decisions[0].Metadata["role_source"])
+	}
+	// Should use the provided name (not "Owner" from the database)
+	if runner.decisions[0].Metadata["after_role"] != "My Custom Owner Alias" {
+		t.Errorf("expected after_role 'My Custom Owner Alias', got %v", runner.decisions[0].Metadata["after_role"])
+	}
+	// Should still have Owner's score (95)
+	if runner.decisions[0].Severity != 95 {
+		t.Errorf("expected severity 95 (Owner), got %d", runner.decisions[0].Severity)
+	}
+}
+
+func TestResolveRole_NoRoleIdentifiers(t *testing.T) {
+	// Test when neither roleName nor roleID is specified
+	config := DefaultConfig()
+	analyzer := NewPrivilegeEscalationAnalyzer(config)
+
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			{
+				Address: "azurerm_role_assignment.before",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"create"},
+				Before:  nil,
+				After: map[string]interface{}{
+					// Scope only, no role - edge case
+					"scope": "/subscriptions/00000000-0000-0000-0000-000000000000",
+				},
+			},
+		},
+	}
+
+	err := analyzer.Analyze(runner)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// No decision should be emitted because score is 0 for no role
+	if len(runner.decisions) != 0 {
+		t.Errorf("expected 0 decisions (no role specified), got %d", len(runner.decisions))
+	}
+}
+
+func TestAnalyze_NilRoleDatabase(t *testing.T) {
+	// Test when config has nil RoleDatabase (should use DefaultRoleDatabase)
+	config := &PluginConfig{
+		PrivilegeEnabled:          true,
+		RoleDatabase:              nil, // Explicitly nil
+		UnknownPrivilegedSeverity: 80,
+		UnknownRoleSeverity:       50,
+		CrossReferenceCustomRoles: true,
+	}
+	analyzer := NewPrivilegeEscalationAnalyzer(config)
+
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			{
+				Address: "azurerm_role_assignment.test",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"role_definition_name": "Owner",
+					"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
+				},
+			},
+		},
+	}
+
+	err := analyzer.Analyze(runner)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Should still work - falls back to DefaultRoleDatabase
+	if len(runner.decisions) != 1 {
+		t.Fatalf("expected 1 decision, got %d", len(runner.decisions))
+	}
+	if runner.decisions[0].Metadata["role_source"] != "builtin" {
+		t.Errorf("expected role_source builtin, got %v", runner.decisions[0].Metadata["role_source"])
+	}
+	if runner.decisions[0].Severity != 95 {
+		t.Errorf("expected severity 95 (Owner), got %d", runner.decisions[0].Severity)
+	}
+}
+
+func TestAnalyze_EmitDecisionError(t *testing.T) {
+	config := DefaultConfig()
+	analyzer := NewPrivilegeEscalationAnalyzer(config)
+
+	runner := &mockRunnerWithEmitError{
+		mockRunner: mockRunner{
+			changes: []*sdk.ResourceChange{
+				{
+					Address: "azurerm_role_assignment.test",
+					Type:    "azurerm_role_assignment",
+					Actions: []string{"create"},
+					After: map[string]interface{}{
+						"role_definition_name": "Owner",
+						"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
+					},
+				},
+			},
+		},
+	}
+
+	err := analyzer.Analyze(runner)
+	if err == nil {
+		t.Fatal("expected error from EmitDecision, got nil")
+	}
+	if !errors.Is(err, errMockEmit) {
+		t.Errorf("expected errMockEmit, got %v", err)
+	}
+}
+
+var errMockEmit = errors.New("mock emit decision error")
+
+type mockRunnerWithEmitError struct {
+	mockRunner
+}
+
+func (r *mockRunnerWithEmitError) EmitDecision(analyzer sdk.Analyzer, change *sdk.ResourceChange, decision *sdk.Decision) error {
+	return errMockEmit
+}
+
+func TestAnalyze_EmitDecisionError_Deescalation(t *testing.T) {
+	// Test emit error on de-escalation path
+	config := DefaultConfig()
+	analyzer := NewPrivilegeEscalationAnalyzer(config)
+
+	runner := &mockRunnerWithEmitError{
+		mockRunner: mockRunner{
+			changes: []*sdk.ResourceChange{
+				{
+					Address: "azurerm_role_assignment.test",
+					Type:    "azurerm_role_assignment",
+					Actions: []string{"update"},
+					Before: map[string]interface{}{
+						"role_definition_name": "Owner",
+						"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
+					},
+					After: map[string]interface{}{
+						"role_definition_name": "Reader",
+						"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
+					},
+				},
+			},
+		},
+	}
+
+	err := analyzer.Analyze(runner)
+	if err == nil {
+		t.Fatal("expected error from EmitDecision on de-escalation, got nil")
+	}
+	if !errors.Is(err, errMockEmit) {
+		t.Errorf("expected errMockEmit, got %v", err)
+	}
+}

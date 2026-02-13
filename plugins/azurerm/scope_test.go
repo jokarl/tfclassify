@@ -380,3 +380,12 @@ func TestScopeLevel_String_InvalidValue(t *testing.T) {
 		t.Errorf("ScopeLevel(99).String() = %q, want %q", got, "unknown")
 	}
 }
+
+func TestScopeMultiplier_InvalidValue(t *testing.T) {
+	// Test that invalid ScopeLevel values return the default 0.9 multiplier
+	invalid := ScopeLevel(99)
+	got := ScopeMultiplier(invalid)
+	if got != 0.9 {
+		t.Errorf("ScopeMultiplier(ScopeLevel(99)) = %v, want 0.9", got)
+	}
+}
