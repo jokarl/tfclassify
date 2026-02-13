@@ -11,6 +11,13 @@ import (
 	sdkplugin "github.com/jokarl/tfclassify/sdk/plugin"
 )
 
+// Compile-time interface assertions to verify our analyzers implement sdk.Analyzer.
+var (
+	_ sdk.Analyzer = (*DeletionAnalyzer)(nil)
+	_ sdk.Analyzer = (*SensitiveAnalyzer)(nil)
+	_ sdk.Analyzer = (*ReplaceAnalyzer)(nil)
+)
+
 // Version is the bundled terraform plugin version.
 const Version = "0.1.0"
 

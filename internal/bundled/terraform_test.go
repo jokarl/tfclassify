@@ -1,10 +1,56 @@
 package bundled
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/jokarl/tfclassify/sdk"
 )
+
+// mockRunner implements sdk.Runner for testing.
+type mockRunner struct {
+	changes   []*sdk.ResourceChange
+	decisions []*emittedDecision
+	err       error
+	emitErr   error
+}
+
+type emittedDecision struct {
+	analyzer sdk.Analyzer
+	change   *sdk.ResourceChange
+	decision *sdk.Decision
+}
+
+func (m *mockRunner) GetResourceChanges(patterns []string) ([]*sdk.ResourceChange, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	return m.changes, nil
+}
+
+func (m *mockRunner) GetResourceChange(address string) (*sdk.ResourceChange, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	for _, c := range m.changes {
+		if c.Address == address {
+			return c, nil
+		}
+	}
+	return nil, nil
+}
+
+func (m *mockRunner) EmitDecision(analyzer sdk.Analyzer, change *sdk.ResourceChange, decision *sdk.Decision) error {
+	if m.emitErr != nil {
+		return m.emitErr
+	}
+	m.decisions = append(m.decisions, &emittedDecision{
+		analyzer: analyzer,
+		change:   change,
+		decision: decision,
+	})
+	return nil
+}
 
 func TestNewTerraformPluginSet(t *testing.T) {
 	ps := NewTerraformPluginSet()
@@ -166,6 +212,36 @@ func TestFindSensitiveChanges(t *testing.T) {
 			},
 			expected: 1,
 		},
+		{
+			name: "multiple sensitive attributes with one new",
+			change: &sdk.ResourceChange{
+				Before:          map[string]interface{}{"password": "old1", "api_key": "old2"},
+				After:           map[string]interface{}{"password": "new1", "api_key": "new2"},
+				BeforeSensitive: map[string]interface{}{"password": true},
+				AfterSensitive:  map[string]interface{}{"password": true, "api_key": true},
+			},
+			expected: 2,
+		},
+		{
+			name: "sensitive not a bool (false value)",
+			change: &sdk.ResourceChange{
+				Before:          map[string]interface{}{"password": "old"},
+				After:           map[string]interface{}{"password": "new"},
+				BeforeSensitive: map[string]interface{}{"password": false},
+				AfterSensitive:  map[string]interface{}{"password": false},
+			},
+			expected: 0,
+		},
+		{
+			name: "no duplicate when attr in both before and after sensitive",
+			change: &sdk.ResourceChange{
+				Before:          map[string]interface{}{"password": "old"},
+				After:           map[string]interface{}{"password": "new"},
+				BeforeSensitive: map[string]interface{}{"password": true},
+				AfterSensitive:  map[string]interface{}{"password": true},
+			},
+			expected: 1,
+		},
 	}
 
 	for _, tt := range tests {
@@ -306,5 +382,308 @@ func TestHasAttributeChanged(t *testing.T) {
 				t.Errorf("hasAttributeChanged() = %v, expected %v", result, tt.expected)
 			}
 		})
+	}
+}
+
+func TestDeletionAnalyzer_Analyze(t *testing.T) {
+	tests := []struct {
+		name           string
+		changes        []*sdk.ResourceChange
+		expectedCount  int
+		expectedReason string
+	}{
+		{
+			name: "emits decision for standalone delete",
+			changes: []*sdk.ResourceChange{
+				{Address: "aws_instance.foo", Actions: []string{"delete"}},
+			},
+			expectedCount:  1,
+			expectedReason: "Resource aws_instance.foo is being deleted",
+		},
+		{
+			name: "does not emit for replace",
+			changes: []*sdk.ResourceChange{
+				{Address: "aws_instance.foo", Actions: []string{"delete", "create"}},
+			},
+			expectedCount: 0,
+		},
+		{
+			name: "does not emit for create",
+			changes: []*sdk.ResourceChange{
+				{Address: "aws_instance.foo", Actions: []string{"create"}},
+			},
+			expectedCount: 0,
+		},
+		{
+			name: "emits for multiple deletes",
+			changes: []*sdk.ResourceChange{
+				{Address: "aws_instance.foo", Actions: []string{"delete"}},
+				{Address: "aws_instance.bar", Actions: []string{"delete"}},
+			},
+			expectedCount: 2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := &PluginConfig{DeletionEnabled: true}
+			analyzer := NewDeletionAnalyzer(config)
+			runner := &mockRunner{changes: tt.changes}
+
+			err := analyzer.Analyze(runner)
+			if err != nil {
+				t.Fatalf("Analyze() returned error: %v", err)
+			}
+
+			if len(runner.decisions) != tt.expectedCount {
+				t.Errorf("expected %d decisions, got %d", tt.expectedCount, len(runner.decisions))
+			}
+
+			if tt.expectedCount > 0 && tt.expectedReason != "" {
+				if runner.decisions[0].decision.Reason != tt.expectedReason {
+					t.Errorf("expected reason %q, got %q", tt.expectedReason, runner.decisions[0].decision.Reason)
+				}
+			}
+		})
+	}
+}
+
+func TestDeletionAnalyzer_Analyze_Error(t *testing.T) {
+	config := &PluginConfig{DeletionEnabled: true}
+	analyzer := NewDeletionAnalyzer(config)
+	runner := &mockRunner{err: errors.New("test error")}
+
+	err := analyzer.Analyze(runner)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestDeletionAnalyzer_Analyze_EmitError(t *testing.T) {
+	config := &PluginConfig{DeletionEnabled: true}
+	analyzer := NewDeletionAnalyzer(config)
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			{Address: "aws_instance.foo", Actions: []string{"delete"}},
+		},
+		emitErr: errors.New("emit error"),
+	}
+
+	err := analyzer.Analyze(runner)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestSensitiveAnalyzer_Analyze(t *testing.T) {
+	tests := []struct {
+		name          string
+		changes       []*sdk.ResourceChange
+		expectedCount int
+	}{
+		{
+			name: "emits decision for sensitive attribute change",
+			changes: []*sdk.ResourceChange{
+				{
+					Address:         "aws_db_instance.main",
+					Actions:         []string{"update"},
+					Before:          map[string]interface{}{"password": "old"},
+					After:           map[string]interface{}{"password": "new"},
+					BeforeSensitive: map[string]interface{}{"password": true},
+					AfterSensitive:  map[string]interface{}{"password": true},
+				},
+			},
+			expectedCount: 1,
+		},
+		{
+			name: "does not emit for non-sensitive change",
+			changes: []*sdk.ResourceChange{
+				{
+					Address:         "aws_db_instance.main",
+					Actions:         []string{"update"},
+					Before:          map[string]interface{}{"name": "old"},
+					After:           map[string]interface{}{"name": "new"},
+					BeforeSensitive: nil,
+					AfterSensitive:  nil,
+				},
+			},
+			expectedCount: 0,
+		},
+		{
+			name: "does not emit when sensitive attribute unchanged",
+			changes: []*sdk.ResourceChange{
+				{
+					Address:         "aws_db_instance.main",
+					Actions:         []string{"update"},
+					Before:          map[string]interface{}{"password": "same"},
+					After:           map[string]interface{}{"password": "same"},
+					BeforeSensitive: map[string]interface{}{"password": true},
+					AfterSensitive:  map[string]interface{}{"password": true},
+				},
+			},
+			expectedCount: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := &PluginConfig{SensitiveEnabled: true}
+			analyzer := NewSensitiveAnalyzer(config)
+			runner := &mockRunner{changes: tt.changes}
+
+			err := analyzer.Analyze(runner)
+			if err != nil {
+				t.Fatalf("Analyze() returned error: %v", err)
+			}
+
+			if len(runner.decisions) != tt.expectedCount {
+				t.Errorf("expected %d decisions, got %d", tt.expectedCount, len(runner.decisions))
+			}
+		})
+	}
+}
+
+func TestSensitiveAnalyzer_Analyze_Error(t *testing.T) {
+	config := &PluginConfig{SensitiveEnabled: true}
+	analyzer := NewSensitiveAnalyzer(config)
+	runner := &mockRunner{err: errors.New("test error")}
+
+	err := analyzer.Analyze(runner)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestSensitiveAnalyzer_Analyze_EmitError(t *testing.T) {
+	config := &PluginConfig{SensitiveEnabled: true}
+	analyzer := NewSensitiveAnalyzer(config)
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			{
+				Address:         "aws_db_instance.main",
+				Actions:         []string{"update"},
+				Before:          map[string]interface{}{"password": "old"},
+				After:           map[string]interface{}{"password": "new"},
+				BeforeSensitive: map[string]interface{}{"password": true},
+				AfterSensitive:  map[string]interface{}{"password": true},
+			},
+		},
+		emitErr: errors.New("emit error"),
+	}
+
+	err := analyzer.Analyze(runner)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestReplaceAnalyzer_Analyze(t *testing.T) {
+	tests := []struct {
+		name           string
+		changes        []*sdk.ResourceChange
+		expectedCount  int
+		expectedReason string
+	}{
+		{
+			name: "emits decision for replace",
+			changes: []*sdk.ResourceChange{
+				{Address: "aws_instance.foo", Actions: []string{"delete", "create"}},
+			},
+			expectedCount:  1,
+			expectedReason: "Resource aws_instance.foo will be replaced (destroy and recreate)",
+		},
+		{
+			name: "does not emit for standalone delete",
+			changes: []*sdk.ResourceChange{
+				{Address: "aws_instance.foo", Actions: []string{"delete"}},
+			},
+			expectedCount: 0,
+		},
+		{
+			name: "does not emit for create only",
+			changes: []*sdk.ResourceChange{
+				{Address: "aws_instance.foo", Actions: []string{"create"}},
+			},
+			expectedCount: 0,
+		},
+		{
+			name: "emits for multiple replaces",
+			changes: []*sdk.ResourceChange{
+				{Address: "aws_instance.foo", Actions: []string{"delete", "create"}},
+				{Address: "aws_instance.bar", Actions: []string{"create", "delete"}},
+			},
+			expectedCount: 2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := &PluginConfig{ReplaceEnabled: true}
+			analyzer := NewReplaceAnalyzer(config)
+			runner := &mockRunner{changes: tt.changes}
+
+			err := analyzer.Analyze(runner)
+			if err != nil {
+				t.Fatalf("Analyze() returned error: %v", err)
+			}
+
+			if len(runner.decisions) != tt.expectedCount {
+				t.Errorf("expected %d decisions, got %d", tt.expectedCount, len(runner.decisions))
+			}
+
+			if tt.expectedCount > 0 && tt.expectedReason != "" {
+				if runner.decisions[0].decision.Reason != tt.expectedReason {
+					t.Errorf("expected reason %q, got %q", tt.expectedReason, runner.decisions[0].decision.Reason)
+				}
+			}
+		})
+	}
+}
+
+func TestReplaceAnalyzer_Analyze_Error(t *testing.T) {
+	config := &PluginConfig{ReplaceEnabled: true}
+	analyzer := NewReplaceAnalyzer(config)
+	runner := &mockRunner{err: errors.New("test error")}
+
+	err := analyzer.Analyze(runner)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestReplaceAnalyzer_Analyze_EmitError(t *testing.T) {
+	config := &PluginConfig{ReplaceEnabled: true}
+	analyzer := NewReplaceAnalyzer(config)
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			{Address: "aws_instance.foo", Actions: []string{"delete", "create"}},
+		},
+		emitErr: errors.New("emit error"),
+	}
+
+	err := analyzer.Analyze(runner)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestAnalyzer_ResourcePatterns(t *testing.T) {
+	config := &PluginConfig{
+		DeletionEnabled:  true,
+		SensitiveEnabled: true,
+		ReplaceEnabled:   true,
+	}
+
+	analyzers := []sdk.Analyzer{
+		NewDeletionAnalyzer(config),
+		NewSensitiveAnalyzer(config),
+		NewReplaceAnalyzer(config),
+	}
+
+	for _, a := range analyzers {
+		patterns := a.ResourcePatterns()
+		if len(patterns) != 1 || patterns[0] != "*" {
+			t.Errorf("analyzer %s: expected patterns [*], got %v", a.Name(), patterns)
+		}
 	}
 }
