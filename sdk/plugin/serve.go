@@ -4,6 +4,7 @@ package plugin
 import (
 	goplugin "github.com/hashicorp/go-plugin"
 	"github.com/jokarl/tfclassify/sdk"
+	"google.golang.org/grpc"
 )
 
 // HandshakeConfig is used for initial plugin-host verification.
@@ -53,15 +54,41 @@ type GRPCPluginImpl struct {
 }
 
 // GRPCServer registers the plugin with the gRPC server.
-// This will be fully implemented in CR-0006 when the proto definitions are created.
-func (p *GRPCPluginImpl) GRPCServer(broker *goplugin.GRPCBroker, s interface{}) error {
-	// TODO: Register gRPC server in CR-0006
+// This creates the PluginServiceServer that handles host requests.
+func (p *GRPCPluginImpl) GRPCServer(broker *goplugin.GRPCBroker, s *grpc.Server) error {
+	// The plugin service server handles ApplyConfig and Analyze calls from the host.
+	// It uses the broker to establish bidirectional communication with the Runner service.
+	RegisterPluginServiceServer(s, NewPluginServiceServer(p.Impl, broker))
 	return nil
 }
 
 // GRPCClient creates a client that can communicate with the plugin.
-// This will be fully implemented in CR-0006 when the proto definitions are created.
-func (p *GRPCPluginImpl) GRPCClient(ctx interface{}, broker *goplugin.GRPCBroker, c interface{}) (interface{}, error) {
-	// TODO: Create gRPC client in CR-0006
-	return nil, nil
+// This is called by the host to get a client for making RPC calls.
+func (p *GRPCPluginImpl) GRPCClient(ctx interface{}, broker *goplugin.GRPCBroker, c *grpc.ClientConn) (interface{}, error) {
+	// Return a client that wraps the gRPC connection for host-side use
+	return NewPluginClient(c, broker), nil
+}
+
+// PluginClient wraps a gRPC client connection for host-side plugin communication.
+type PluginClient struct {
+	conn   *grpc.ClientConn
+	broker *goplugin.GRPCBroker
+}
+
+// NewPluginClient creates a new plugin client.
+func NewPluginClient(conn *grpc.ClientConn, broker *goplugin.GRPCBroker) *PluginClient {
+	return &PluginClient{
+		conn:   conn,
+		broker: broker,
+	}
+}
+
+// Conn returns the underlying gRPC client connection.
+func (c *PluginClient) Conn() *grpc.ClientConn {
+	return c.conn
+}
+
+// Broker returns the GRPCBroker for bidirectional communication.
+func (c *PluginClient) Broker() *goplugin.GRPCBroker {
+	return c.broker
 }

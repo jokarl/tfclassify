@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/jokarl/tfclassify/sdk"
+	"google.golang.org/grpc"
 )
 
 func TestHandshakeConfig(t *testing.T) {
@@ -55,8 +56,11 @@ func TestGRPCPluginImpl_GRPCServer(t *testing.T) {
 		Impl: &mockPluginSet{},
 	}
 
-	// GRPCServer should not error (TODO implementation)
-	err := impl.GRPCServer(nil, nil)
+	// Create a real gRPC server to test registration
+	s := grpc.NewServer()
+	defer s.Stop()
+
+	err := impl.GRPCServer(nil, s)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -67,13 +71,21 @@ func TestGRPCPluginImpl_GRPCClient(t *testing.T) {
 		Impl: &mockPluginSet{},
 	}
 
-	// GRPCClient should not error (TODO implementation)
+	// GRPCClient returns a PluginClient wrapper
 	result, err := impl.GRPCClient(nil, nil, nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if result != nil {
-		t.Error("expected nil result from TODO implementation")
+	// With nil connection, we still get a client wrapper
+	if result == nil {
+		t.Error("expected non-nil result")
+	}
+	client, ok := result.(*PluginClient)
+	if !ok {
+		t.Errorf("expected *PluginClient, got %T", result)
+	}
+	if client.Conn() != nil {
+		t.Error("expected nil Conn() with nil input")
 	}
 }
 
@@ -165,22 +177,142 @@ func TestServeOpts_NilPluginSet(t *testing.T) {
 }
 
 func TestGRPCPluginImpl_NilImpl(t *testing.T) {
-	// Test GRPCPluginImpl with nil Impl doesn't panic on method calls
+	// Test GRPCPluginImpl with nil Impl
 	impl := &GRPCPluginImpl{
 		Impl: nil,
 	}
 
-	// Should not panic even with nil Impl
-	err := impl.GRPCServer(nil, nil)
+	// Create a real gRPC server
+	s := grpc.NewServer()
+	defer s.Stop()
+
+	// GRPCServer with nil Impl should not panic
+	err := impl.GRPCServer(nil, s)
 	if err != nil {
 		t.Errorf("GRPCServer with nil Impl should not error: %v", err)
 	}
 
+	// GRPCClient with nil Impl should still return a client wrapper
 	result, err := impl.GRPCClient(nil, nil, nil)
 	if err != nil {
 		t.Errorf("GRPCClient with nil Impl should not error: %v", err)
 	}
-	if result != nil {
-		t.Error("expected nil result")
+	if result == nil {
+		t.Error("expected non-nil result")
+	}
+}
+
+func TestPluginClient_Methods(t *testing.T) {
+	client := NewPluginClient(nil, nil)
+
+	if client.Conn() != nil {
+		t.Error("expected nil Conn()")
+	}
+
+	if client.Broker() != nil {
+		t.Error("expected nil Broker()")
+	}
+}
+
+func TestPluginServiceServer_GetPluginInfo(t *testing.T) {
+	ps := &mockPluginSet{}
+	server := NewPluginServiceServer(ps, nil)
+
+	resp, err := server.GetPluginInfo(nil, &GetPluginInfoRequest{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if resp.Name != "test" {
+		t.Errorf("expected name 'test', got %q", resp.Name)
+	}
+
+	if resp.Version != "1.0.0" {
+		t.Errorf("expected version '1.0.0', got %q", resp.Version)
+	}
+
+	if resp.SDKVersion != sdk.SDKVersion {
+		t.Errorf("expected SDKVersion %q, got %q", sdk.SDKVersion, resp.SDKVersion)
+	}
+}
+
+func TestPluginServiceServer_GetConfigSchema_Nil(t *testing.T) {
+	ps := &mockPluginSet{}
+	server := NewPluginServiceServer(ps, nil)
+
+	resp, err := server.GetConfigSchema(nil, &GetConfigSchemaRequest{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if resp.Attributes != nil {
+		t.Errorf("expected nil attributes, got %v", resp.Attributes)
+	}
+}
+
+func TestPluginServiceServer_ApplyConfig(t *testing.T) {
+	ps := &mockPluginSet{}
+	server := NewPluginServiceServer(ps, nil)
+
+	resp, err := server.ApplyConfig(nil, &ApplyConfigRequest{Config: []byte("test")})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if resp == nil {
+		t.Error("expected non-nil response")
+	}
+}
+
+func TestProtoConversions(t *testing.T) {
+	// Test nil conversions
+	if protoToSDKResourceChange(nil) != nil {
+		t.Error("expected nil for nil proto")
+	}
+
+	if sdkToProtoResourceChange(nil) != nil {
+		t.Error("expected nil for nil sdk")
+	}
+
+	if sdkToProtoDecision(nil) != nil {
+		t.Error("expected nil for nil decision")
+	}
+
+	// Test actual conversion
+	sdkChange := &sdk.ResourceChange{
+		Address:      "test.resource",
+		Type:         "test_resource",
+		ProviderName: "test",
+		Mode:         "managed",
+		Actions:      []string{"create"},
+		Before:       nil,
+		After:        map[string]interface{}{"key": "value"},
+	}
+
+	protoChange := sdkToProtoResourceChange(sdkChange)
+	if protoChange.Address != "test.resource" {
+		t.Errorf("expected address 'test.resource', got %q", protoChange.Address)
+	}
+
+	// Convert back
+	converted := protoToSDKResourceChange(protoChange)
+	if converted.Address != sdkChange.Address {
+		t.Errorf("round-trip failed: expected %q, got %q", sdkChange.Address, converted.Address)
+	}
+
+	// Test decision conversion
+	sdkDecision := &sdk.Decision{
+		Classification: "critical",
+		Reason:         "test reason",
+		Severity:       90,
+		Metadata:       map[string]interface{}{"key": "value"},
+	}
+
+	protoDecision := sdkToProtoDecision(sdkDecision)
+	if protoDecision.Classification != "critical" {
+		t.Errorf("expected classification 'critical', got %q", protoDecision.Classification)
+	}
+	if protoDecision.Severity != 90 {
+		t.Errorf("expected severity 90, got %d", protoDecision.Severity)
 	}
 }
