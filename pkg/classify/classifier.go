@@ -135,15 +135,21 @@ func (c *Classifier) AddPluginDecisions(result *Result, pluginDecisions []Resour
 
 	// Process plugin decisions
 	for _, pluginDecision := range pluginDecisions {
-		// Skip decisions with empty classification - these are invalid
-		if pluginDecision.Classification == "" {
-			continue
+		classification := pluginDecision.Classification
+
+		// Handle empty classification - use defaults.unclassified as fallback
+		// (Future: map based on severity thresholds from config)
+		if classification == "" {
+			classification = c.config.Defaults.Unclassified
 		}
 
 		// Skip decisions with unknown classifications not in precedence map
-		if _, known := c.precedenceMap[pluginDecision.Classification]; !known {
+		if _, known := c.precedenceMap[classification]; !known {
 			continue
 		}
+
+		// Update the decision with resolved classification
+		pluginDecision.Classification = classification
 
 		existing, ok := decisionMap[pluginDecision.Address]
 		if !ok {

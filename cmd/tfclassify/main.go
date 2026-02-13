@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/jokarl/tfclassify/internal/bundled"
 	"github.com/jokarl/tfclassify/pkg/classify"
 	"github.com/jokarl/tfclassify/pkg/config"
 	"github.com/jokarl/tfclassify/pkg/output"
@@ -163,8 +164,5 @@ func runInit(cmd *cobra.Command, args []string) error {
 // runBundledPlugin runs this binary as the bundled terraform plugin.
 // This is called when --act-as-bundled-plugin is passed.
 func runBundledPlugin() {
-	// Import the bundled plugin module and serve it
-	// This will be implemented in CR-0007
-	fmt.Fprintln(os.Stderr, "Error: bundled plugin not available (this is a tfclassify plugin, not a standalone executable)")
-	os.Exit(1)
+	bundled.ServeTerraform()
 }
