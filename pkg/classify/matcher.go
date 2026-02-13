@@ -2,6 +2,8 @@
 package classify
 
 import (
+	"fmt"
+
 	"github.com/gobwas/glob"
 	"github.com/jokarl/tfclassify/pkg/config"
 )
@@ -101,7 +103,7 @@ func (r *compiledRule) matchesActions(changeActions []string) bool {
 
 // formatRuleDescription creates a human-readable description of a rule.
 func formatRuleDescription(classification string, ruleIndex int, rule config.RuleConfig) string {
-	desc := classification + " rule " + string(rune('0'+ruleIndex))
+	desc := fmt.Sprintf("%s rule %d", classification, ruleIndex)
 
 	if len(rule.Resource) > 0 {
 		desc += " (resource: " + rule.Resource[0]
