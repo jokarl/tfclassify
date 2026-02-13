@@ -2,9 +2,7 @@ module github.com/jokarl/tfclassify/sdk
 
 go 1.24.0
 
-require (
-	github.com/hashicorp/go-plugin v1.7.0
-)
+require github.com/hashicorp/go-plugin v1.7.0
 
 require (
 	github.com/fatih/color v1.13.0 // indirect
