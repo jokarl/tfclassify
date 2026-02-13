@@ -1,6 +1,6 @@
 ---
 id: "CR-0002"
-status: proposed
+status: approved
 date: 2026-02-13
 requestor: Johan
 stakeholders: Johan
