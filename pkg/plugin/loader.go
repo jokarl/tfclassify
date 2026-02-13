@@ -3,7 +3,6 @@ package plugin
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -225,40 +224,4 @@ func toSDKResourceChange(change *plan.ResourceChange) *sdk.ResourceChange {
 		BeforeSensitive: change.BeforeSensitive,
 		AfterSensitive:  change.AfterSensitive,
 	}
-}
-
-// toProtoResourceChange converts a plan.ResourceChange to proto format.
-func toProtoResourceChange(change *plan.ResourceChange) ([]byte, []byte, []byte, []byte, error) {
-	var before, after, beforeSens, afterSens []byte
-	var err error
-
-	if change.Before != nil {
-		before, err = json.Marshal(change.Before)
-		if err != nil {
-			return nil, nil, nil, nil, err
-		}
-	}
-
-	if change.After != nil {
-		after, err = json.Marshal(change.After)
-		if err != nil {
-			return nil, nil, nil, nil, err
-		}
-	}
-
-	if change.BeforeSensitive != nil {
-		beforeSens, err = json.Marshal(change.BeforeSensitive)
-		if err != nil {
-			return nil, nil, nil, nil, err
-		}
-	}
-
-	if change.AfterSensitive != nil {
-		afterSens, err = json.Marshal(change.AfterSensitive)
-		if err != nil {
-			return nil, nil, nil, nil, err
-		}
-	}
-
-	return before, after, beforeSens, afterSens, nil
 }
