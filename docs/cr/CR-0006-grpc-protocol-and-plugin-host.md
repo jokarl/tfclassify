@@ -92,10 +92,13 @@ sequenceDiagram
 10. The Runner server **MUST** implement `EmitDecision` by collecting decisions and associating them with the calling analyzer
 11. The host **MUST** aggregate plugin decisions with core classification decisions using the config's precedence rules
 12. When a plugin decision conflicts with a core decision for the same resource, the higher-precedence classification **MUST** win
-13. The host **MUST** enforce a configurable timeout per plugin (from `defaults.plugin_timeout`)
-14. The host **MUST** gracefully handle plugin crashes without crashing itself
-15. The host **MUST** skip disabled plugins (where `enabled = false` in config)
-16. The `--no-plugins` CLI flag **MUST** skip all plugin loading and use only core rules
+13. When a plugin emits a Decision with an empty `Classification` field, the host **MUST** treat it as metadata-only augmentation: the core classification is preserved and the plugin's `Reason`, `Severity`, and `Metadata` are appended to the resource decision
+14. When multiple plugins emit conflicting classifications for the same resource, the host **MUST** resolve the conflict using precedence order — the highest-precedence classification wins, regardless of which plugin emitted it
+15. When a plugin emits a `Classification` value that is not in the config's precedence list, the host **MUST** log a warning and discard that classification (keeping the existing classification for the resource)
+16. The host **MUST** enforce a configurable timeout per plugin (from `defaults.plugin_timeout`)
+17. The host **MUST** gracefully handle plugin crashes without crashing itself
+18. The host **MUST** skip disabled plugins (where `enabled = false` in config)
+19. The `--no-plugins` CLI flag **MUST** skip all plugin loading and use only core rules
 
 ### Non-Functional Requirements
 
@@ -277,6 +280,9 @@ flowchart LR
 | `pkg/plugin/loader_test.go` | `TestNoPluginsFlag` | --no-plugins skips all loading | --no-plugins flag set | No plugins started |
 | `pkg/classify/classifier_test.go` | `TestClassify_WithPluginDecisions` | Plugin decisions aggregated with core | Core: "standard", plugin: "critical" | Overall: "critical" |
 | `pkg/classify/classifier_test.go` | `TestClassify_PluginDecisionPrecedence` | Higher precedence wins in aggregation | Plugin and core both classify same resource | Higher precedence classification wins |
+| `pkg/classify/classifier_test.go` | `TestClassify_PluginMetadataOnly` | Empty classification preserves core decision | Plugin emits Decision with empty Classification | Core classification kept, plugin Reason/Metadata appended |
+| `pkg/classify/classifier_test.go` | `TestClassify_MultiPluginConflict` | Multiple plugins disagree on classification | Plugin A: "critical", Plugin B: "review" | "critical" wins (higher precedence) |
+| `pkg/classify/classifier_test.go` | `TestClassify_PluginUnknownClassification` | Plugin emits classification not in precedence | Plugin emits "unknown-level" | Warning logged, core classification kept |
 
 ### Tests to Modify
 
@@ -359,7 +365,37 @@ Then the "example" plugin is not started
   And no discovery is attempted for it
 ```
 
-### AC-8: No-plugins flag disables all plugins
+### AC-8: Metadata-only plugin decisions augment without reclassifying
+
+```gherkin
+Given a core classification of "standard" for azurerm_storage_account
+  And a plugin emits a Decision with empty Classification, Reason "sensitive attribute changed", and Severity 70
+When decisions are aggregated
+Then the resource's final classification remains "standard"
+  And the resource decision includes the plugin's Reason and Severity
+```
+
+### AC-9: Multiple plugins resolve conflicts via precedence
+
+```gherkin
+Given two plugins emit decisions for the same resource
+  And plugin A classifies it as "critical"
+  And plugin B classifies it as "review"
+  And the config precedence has "critical" before "review"
+When decisions are aggregated
+Then the resource's final classification is "critical"
+```
+
+### AC-10: Unknown plugin classification is discarded
+
+```gherkin
+Given a plugin emits a Decision with Classification "emergency" (not in precedence list)
+When decisions are aggregated
+Then a warning is logged mentioning "emergency" is not a known classification
+  And the resource's core classification is preserved unchanged
+```
+
+### AC-11: No-plugins flag disables all plugins
 
 ```gherkin
 Given the --no-plugins CLI flag is set
