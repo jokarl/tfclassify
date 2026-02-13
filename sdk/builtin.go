@@ -4,11 +4,11 @@ package sdk
 // BuiltinPluginSet provides a default PluginSet implementation.
 // Plugin authors can embed this struct and configure it to create a PluginSet.
 type BuiltinPluginSet struct {
-	Name              string
-	Version           string
-	Analyzers         []Analyzer
-	HostVersionConstraint string          // Optional: semver constraint on tfclassify version
-	Schema            *ConfigSchemaSpec // Optional: config schema for validation
+	Name                  string
+	Version               string
+	Analyzers             []Analyzer
+	HostVersionConstraint string            // Optional: semver constraint on tfclassify version
+	Schema                *ConfigSchemaSpec // Optional: config schema for validation
 }
 
 // PluginSetName returns the name of this plugin set.

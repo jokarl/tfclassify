@@ -8,10 +8,10 @@ import (
 
 // Classifier applies config rules to plan changes.
 type Classifier struct {
-	config             *config.Config
-	matchers           map[string][]compiledRule // classification name -> compiled rules
-	precedenceMap      map[string]int            // classification name -> precedence index (lower is higher precedence)
-	descriptionMap     map[string]string         // classification name -> description
+	config         *config.Config
+	matchers       map[string][]compiledRule // classification name -> compiled rules
+	precedenceMap  map[string]int            // classification name -> precedence index (lower is higher precedence)
+	descriptionMap map[string]string         // classification name -> description
 }
 
 // New creates a new Classifier from a config.

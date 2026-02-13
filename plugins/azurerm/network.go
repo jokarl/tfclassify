@@ -80,11 +80,11 @@ func (a *NetworkExposureAnalyzer) Analyze(runner sdk.Runner) error {
 				Reason:         fmt.Sprintf("inbound allow rule with overly permissive source %q", source),
 				Severity:       85,
 				Metadata: map[string]interface{}{
-					"analyzer":    "network-exposure",
-					"direction":   direction,
-					"access":      access,
-					"source":      source,
-					"rule_name":   stringField(after, "name"),
+					"analyzer":  "network-exposure",
+					"direction": direction,
+					"access":    access,
+					"source":    source,
+					"rule_name": stringField(after, "name"),
 				},
 			}
 

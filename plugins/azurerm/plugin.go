@@ -26,9 +26,9 @@ type PluginConfig struct {
 	DestructiveKVPermissions []string
 
 	// Enabled flags for each analyzer
-	PrivilegeEnabled  bool
-	NetworkEnabled    bool
-	KeyVaultEnabled   bool
+	PrivilegeEnabled bool
+	NetworkEnabled   bool
+	KeyVaultEnabled  bool
 }
 
 // DefaultConfig returns the default configuration.
