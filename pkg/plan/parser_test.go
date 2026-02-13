@@ -340,3 +340,83 @@ func TestExtractMajorMinor(t *testing.T) {
 		})
 	}
 }
+
+func TestParse_MissingVersion(t *testing.T) {
+	json := `{"resource_changes": []}`
+	reader := strings.NewReader(json)
+	_, err := Parse(reader)
+	if err == nil {
+		t.Error("expected error for missing format_version, got nil")
+	}
+	// The error can come from our validation or from terraform-json library
+	if !strings.Contains(err.Error(), "format version") && !strings.Contains(err.Error(), "format_version") {
+		t.Errorf("expected error to mention format version, got: %v", err)
+	}
+}
+
+func TestConvertToMap(t *testing.T) {
+	// Test nil returns nil
+	if result := convertToMap(nil); result != nil {
+		t.Errorf("convertToMap(nil) should return nil, got %v", result)
+	}
+
+	// Test map returns same map
+	m := map[string]interface{}{"key": "value"}
+	if result := convertToMap(m); result["key"] != "value" {
+		t.Errorf("convertToMap(map) should return the map, got %v", result)
+	}
+
+	// Test non-map returns nil
+	if result := convertToMap("string"); result != nil {
+		t.Errorf("convertToMap(string) should return nil, got %v", result)
+	}
+
+	if result := convertToMap(42); result != nil {
+		t.Errorf("convertToMap(int) should return nil, got %v", result)
+	}
+
+	if result := convertToMap([]string{"a", "b"}); result != nil {
+		t.Errorf("convertToMap(slice) should return nil, got %v", result)
+	}
+}
+
+func TestActionsToStrings(t *testing.T) {
+	// Test empty actions
+	result := actionsToStrings(nil)
+	if len(result) != 0 {
+		t.Errorf("expected empty slice, got %v", result)
+	}
+
+	// Test with actions (requires import of tfjson)
+	// This is already covered indirectly by other tests
+}
+
+func TestExtractResourceChanges_NilChanges(t *testing.T) {
+	// Parse a plan with resource_changes: null
+	json := `{"format_version": "1.2", "resource_changes": null}`
+	reader := strings.NewReader(json)
+	result, err := Parse(reader)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if result.Changes == nil {
+		t.Error("expected Changes to be non-nil empty slice")
+	}
+
+	if len(result.Changes) != 0 {
+		t.Errorf("expected 0 changes, got %d", len(result.Changes))
+	}
+}
+
+func TestParseFile_SeekError(t *testing.T) {
+	// This is difficult to test without mocking, but we can at least verify
+	// normal files work correctly through the seek
+	result, err := ParseFile("testdata/valid_plan.json")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result.Changes) != 2 {
+		t.Errorf("expected 2 changes, got %d", len(result.Changes))
+	}
+}
