@@ -322,10 +322,10 @@ func TestScorePermissions_Deterministic(t *testing.T) {
 
 func TestScorePermissions_ProviderWildcards(t *testing.T) {
 	tests := []struct {
-		name      string
-		actions   []string
-		wantMin   int
-		wantMax   int
+		name    string
+		actions []string
+		wantMin int
+		wantMax int
 	}{
 		{
 			name:    "single provider",

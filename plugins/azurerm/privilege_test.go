@@ -606,9 +606,9 @@ func TestCustomRoleCrossReference(t *testing.T) {
 					"name": "Custom Deployer",
 					"permissions": []interface{}{
 						map[string]interface{}{
-							"actions":         []interface{}{"Microsoft.Authorization/roleAssignments/write"},
-							"not_actions":     []interface{}{},
-							"data_actions":    []interface{}{},
+							"actions":          []interface{}{"Microsoft.Authorization/roleAssignments/write"},
+							"not_actions":      []interface{}{},
+							"data_actions":     []interface{}{},
 							"not_data_actions": []interface{}{},
 						},
 					},
@@ -717,9 +717,9 @@ func TestCustomRoleCrossReference_WildcardActions(t *testing.T) {
 					"name": "Super Admin",
 					"permissions": []interface{}{
 						map[string]interface{}{
-							"actions":         []interface{}{"*"},
-							"not_actions":     []interface{}{},
-							"data_actions":    []interface{}{},
+							"actions":          []interface{}{"*"},
+							"not_actions":      []interface{}{},
+							"data_actions":     []interface{}{},
 							"not_data_actions": []interface{}{},
 						},
 					},
