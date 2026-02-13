@@ -31,3 +31,24 @@ func stringField(m map[string]interface{}, key string) string {
 	}
 	return ""
 }
+
+// toStringSlice converts an interface{} to []string for parsing permission arrays from plan JSON.
+// Handles nil, non-slice, and mixed-type inputs gracefully.
+func toStringSlice(v interface{}) []string {
+	if v == nil {
+		return nil
+	}
+
+	slice, ok := v.([]interface{})
+	if !ok {
+		return nil
+	}
+
+	result := make([]string, 0, len(slice))
+	for _, item := range slice {
+		if s, ok := item.(string); ok {
+			result = append(result, s)
+		}
+	}
+	return result
+}

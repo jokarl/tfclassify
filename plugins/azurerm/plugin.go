@@ -17,6 +17,7 @@ type AzurermPluginSet struct {
 // PluginConfig holds the configuration for the azurerm plugin.
 type PluginConfig struct {
 	// PrivilegedRoles are roles that trigger privilege escalation detection.
+	// These serve as a fallback when the role is not found in the built-in database.
 	PrivilegedRoles []string
 
 	// PermissiveSources are network sources that trigger network exposure detection.
@@ -29,6 +30,22 @@ type PluginConfig struct {
 	PrivilegeEnabled bool
 	NetworkEnabled   bool
 	KeyVaultEnabled  bool
+
+	// RoleDatabase is the built-in Azure role database for permission-based scoring.
+	// If nil, DefaultRoleDatabase() is used.
+	RoleDatabase *RoleDatabase
+
+	// UnknownPrivilegedSeverity is the severity for roles in PrivilegedRoles but not in DB.
+	// Default: 80
+	UnknownPrivilegedSeverity int
+
+	// UnknownRoleSeverity is the severity for completely unknown roles.
+	// Default: 50
+	UnknownRoleSeverity int
+
+	// CrossReferenceCustomRoles enables lookup of azurerm_role_definition resources in the plan.
+	// Default: true
+	CrossReferenceCustomRoles bool
 }
 
 // DefaultConfig returns the default configuration.
@@ -48,9 +65,13 @@ func DefaultConfig() *PluginConfig {
 			"delete",
 			"purge",
 		},
-		PrivilegeEnabled: true,
-		NetworkEnabled:   true,
-		KeyVaultEnabled:  true,
+		PrivilegeEnabled:          true,
+		NetworkEnabled:            true,
+		KeyVaultEnabled:           true,
+		RoleDatabase:              DefaultRoleDatabase(),
+		UnknownPrivilegedSeverity: 80,
+		UnknownRoleSeverity:       50,
+		CrossReferenceCustomRoles: true,
 	}
 }
 

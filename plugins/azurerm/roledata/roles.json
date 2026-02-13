@@ -1,0 +1,482 @@
+[
+  {
+    "id": "acdd72a7-3385-48ef-bd42-f606fba81ae7",
+    "roleName": "Reader",
+    "description": "Lets you view everything, but not make any changes.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": ["*/read"],
+        "notActions": [],
+        "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "b24988ac-6180-42a0-ab88-20f7382dd24c",
+    "roleName": "Contributor",
+    "description": "Lets you manage everything except access to resources.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": ["*"],
+        "notActions": [
+          "Microsoft.Authorization/*/Delete",
+          "Microsoft.Authorization/*/Write",
+          "Microsoft.Authorization/elevateAccess/Action",
+          "Microsoft.Blueprint/blueprintAssignments/write",
+          "Microsoft.Blueprint/blueprintAssignments/delete",
+          "Microsoft.Compute/galleries/share/action",
+          "Microsoft.Purview/consents/write",
+          "Microsoft.Purview/consents/delete"
+        ],
+        "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "8e3af657-a8ff-443c-a75c-2fe8c4bcb635",
+    "roleName": "Owner",
+    "description": "Lets you manage everything, including access to resources.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": ["*"],
+        "notActions": [],
+        "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "18d7d88d-d35e-4fb5-a5c3-7773c20a72d9",
+    "roleName": "User Access Administrator",
+    "description": "Lets you manage user access to Azure resources.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "*/read",
+          "Microsoft.Authorization/*",
+          "Microsoft.Support/*"
+        ],
+        "notActions": [],
+        "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "9980e02c-c2be-4d73-94e8-173b1dc7cf3c",
+    "roleName": "Virtual Machine Contributor",
+    "description": "Lets you manage virtual machines, but not access to them, and not the virtual network or storage account they're connected to.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.Authorization/*/read",
+          "Microsoft.Compute/availabilitySets/*",
+          "Microsoft.Compute/locations/*",
+          "Microsoft.Compute/virtualMachines/*",
+          "Microsoft.Compute/virtualMachineScaleSets/*",
+          "Microsoft.Compute/cloudServices/*",
+          "Microsoft.Compute/disks/write",
+          "Microsoft.Compute/disks/read",
+          "Microsoft.Compute/disks/delete",
+          "Microsoft.DevTestLab/schedules/*",
+          "Microsoft.Insights/alertRules/*",
+          "Microsoft.Network/applicationGateways/backendAddressPools/join/action",
+          "Microsoft.Network/loadBalancers/backendAddressPools/join/action",
+          "Microsoft.Network/loadBalancers/inboundNatPools/join/action",
+          "Microsoft.Network/loadBalancers/inboundNatRules/join/action",
+          "Microsoft.Network/loadBalancers/probes/join/action",
+          "Microsoft.Network/loadBalancers/read",
+          "Microsoft.Network/locations/*",
+          "Microsoft.Network/networkInterfaces/*",
+          "Microsoft.Network/networkSecurityGroups/join/action",
+          "Microsoft.Network/networkSecurityGroups/read",
+          "Microsoft.Network/publicIPAddresses/join/action",
+          "Microsoft.Network/publicIPAddresses/read",
+          "Microsoft.Network/virtualNetworks/read",
+          "Microsoft.Network/virtualNetworks/subnets/join/action",
+          "Microsoft.RecoveryServices/locations/*",
+          "Microsoft.RecoveryServices/Vaults/backupFabrics/backupProtectionIntent/write",
+          "Microsoft.RecoveryServices/Vaults/backupFabrics/protectionContainers/protectedItems/*/read",
+          "Microsoft.RecoveryServices/Vaults/backupFabrics/protectionContainers/protectedItems/read",
+          "Microsoft.RecoveryServices/Vaults/backupFabrics/protectionContainers/protectedItems/write",
+          "Microsoft.RecoveryServices/Vaults/backupPolicies/read",
+          "Microsoft.RecoveryServices/Vaults/backupPolicies/write",
+          "Microsoft.RecoveryServices/Vaults/read",
+          "Microsoft.RecoveryServices/Vaults/usages/read",
+          "Microsoft.RecoveryServices/Vaults/write",
+          "Microsoft.ResourceHealth/availabilityStatuses/read",
+          "Microsoft.Resources/deployments/*",
+          "Microsoft.Resources/subscriptions/resourceGroups/read",
+          "Microsoft.SerialConsole/serialPorts/connect/action",
+          "Microsoft.SqlVirtualMachine/*",
+          "Microsoft.Storage/storageAccounts/listKeys/action",
+          "Microsoft.Storage/storageAccounts/read",
+          "Microsoft.Support/*"
+        ],
+        "notActions": [],
+        "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "ba92f5b4-2d11-453d-a403-e96b0029c9fe",
+    "roleName": "Storage Blob Data Contributor",
+    "description": "Read, write, and delete Azure Storage containers and blobs.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.Storage/storageAccounts/blobServices/containers/delete",
+          "Microsoft.Storage/storageAccounts/blobServices/containers/read",
+          "Microsoft.Storage/storageAccounts/blobServices/containers/write",
+          "Microsoft.Storage/storageAccounts/blobServices/generateUserDelegationKey/action"
+        ],
+        "notActions": [],
+        "dataActions": [
+          "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/delete",
+          "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read",
+          "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write",
+          "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/move/action",
+          "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/add/action"
+        ],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "2a2b9908-6ea1-4ae2-8e65-a410df84e7d1",
+    "roleName": "Storage Blob Data Reader",
+    "description": "Read and list Azure Storage containers and blobs.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.Storage/storageAccounts/blobServices/containers/read",
+          "Microsoft.Storage/storageAccounts/blobServices/generateUserDelegationKey/action"
+        ],
+        "notActions": [],
+        "dataActions": [
+          "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read"
+        ],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "00482a5a-887f-4fb3-b363-3b7fe8e74483",
+    "roleName": "Key Vault Administrator",
+    "description": "Perform all data plane operations on a key vault and all objects in it, including certificates, keys, and secrets.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.Authorization/*/read",
+          "Microsoft.Insights/alertRules/*",
+          "Microsoft.KeyVault/checkNameAvailability/read",
+          "Microsoft.KeyVault/deletedVaults/read",
+          "Microsoft.KeyVault/locations/*/read",
+          "Microsoft.KeyVault/vaults/*/read",
+          "Microsoft.KeyVault/operations/read",
+          "Microsoft.Resources/deployments/*",
+          "Microsoft.Resources/subscriptions/resourceGroups/read",
+          "Microsoft.Support/*"
+        ],
+        "notActions": [],
+        "dataActions": [
+          "Microsoft.KeyVault/vaults/*"
+        ],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "f25e0fa2-a7c8-4377-a976-54943a77a395",
+    "roleName": "Key Vault Reader",
+    "description": "Read metadata of key vaults and its certificates, keys, and secrets.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.Authorization/*/read",
+          "Microsoft.Insights/alertRules/*",
+          "Microsoft.KeyVault/checkNameAvailability/read",
+          "Microsoft.KeyVault/deletedVaults/read",
+          "Microsoft.KeyVault/locations/*/read",
+          "Microsoft.KeyVault/vaults/*/read",
+          "Microsoft.KeyVault/operations/read",
+          "Microsoft.Resources/deployments/*",
+          "Microsoft.Resources/subscriptions/resourceGroups/read",
+          "Microsoft.Support/*"
+        ],
+        "notActions": [],
+        "dataActions": [
+          "Microsoft.KeyVault/vaults/*/read",
+          "Microsoft.KeyVault/vaults/secrets/readMetadata/action"
+        ],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "4633458b-17de-408a-b874-0445c86b69e6",
+    "roleName": "Key Vault Secrets Officer",
+    "description": "Perform any action on the secrets of a key vault, except manage permissions.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.Authorization/*/read",
+          "Microsoft.Insights/alertRules/*",
+          "Microsoft.KeyVault/checkNameAvailability/read",
+          "Microsoft.KeyVault/deletedVaults/read",
+          "Microsoft.KeyVault/locations/*/read",
+          "Microsoft.KeyVault/vaults/*/read",
+          "Microsoft.KeyVault/operations/read",
+          "Microsoft.Resources/deployments/*",
+          "Microsoft.Resources/subscriptions/resourceGroups/read",
+          "Microsoft.Support/*"
+        ],
+        "notActions": [],
+        "dataActions": [
+          "Microsoft.KeyVault/vaults/secrets/*"
+        ],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "a4417e6f-fecd-4de8-b567-7b0420556985",
+    "roleName": "Key Vault Secrets User",
+    "description": "Read secret contents.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [],
+        "notActions": [],
+        "dataActions": [
+          "Microsoft.KeyVault/vaults/secrets/getSecret/action",
+          "Microsoft.KeyVault/vaults/secrets/readMetadata/action"
+        ],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "b86a8fe4-44ce-4948-aee5-eccb2c155cd7",
+    "roleName": "Network Contributor",
+    "description": "Lets you manage networks, but not access to them.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.Authorization/*/read",
+          "Microsoft.Insights/alertRules/*",
+          "Microsoft.Network/*",
+          "Microsoft.ResourceHealth/availabilityStatuses/read",
+          "Microsoft.Resources/deployments/*",
+          "Microsoft.Resources/subscriptions/resourceGroups/read",
+          "Microsoft.Support/*"
+        ],
+        "notActions": [],
+        "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "17d1049b-9a84-46fb-8f53-869881c3d3ab",
+    "roleName": "Storage Account Contributor",
+    "description": "Permits management of storage accounts. Provides access to the account key, which can be used to access data via Shared Key authorization.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.Authorization/*/read",
+          "Microsoft.Insights/alertRules/*",
+          "Microsoft.Insights/diagnosticSettings/*",
+          "Microsoft.Network/virtualNetworks/subnets/joinViaServiceEndpoint/action",
+          "Microsoft.ResourceHealth/availabilityStatuses/read",
+          "Microsoft.Resources/deployments/*",
+          "Microsoft.Resources/subscriptions/resourceGroups/read",
+          "Microsoft.Storage/storageAccounts/*",
+          "Microsoft.Support/*"
+        ],
+        "notActions": [],
+        "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "de139f84-1756-47ae-9be6-808fbbe84772",
+    "roleName": "Website Contributor",
+    "description": "Lets you manage websites (not web plans), but not access to them.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.Authorization/*/read",
+          "Microsoft.Insights/alertRules/*",
+          "Microsoft.Insights/components/*",
+          "Microsoft.ResourceHealth/availabilityStatuses/read",
+          "Microsoft.Resources/deployments/*",
+          "Microsoft.Resources/subscriptions/resourceGroups/read",
+          "Microsoft.Support/*",
+          "Microsoft.Web/certificates/*",
+          "Microsoft.Web/listSitesAssignedToHostName/read",
+          "Microsoft.Web/serverFarms/join/action",
+          "Microsoft.Web/serverFarms/read",
+          "Microsoft.Web/sites/*"
+        ],
+        "notActions": [],
+        "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "9b895d92-2cd3-44c7-9d02-a6ac2d5ea5c3",
+    "roleName": "Application Insights Component Contributor",
+    "description": "Can manage Application Insights components.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.Authorization/*/read",
+          "Microsoft.Insights/alertRules/*",
+          "Microsoft.Insights/generateLiveToken/read",
+          "Microsoft.Insights/metricAlerts/*",
+          "Microsoft.Insights/components/*",
+          "Microsoft.Insights/scheduledqueryrules/*",
+          "Microsoft.Insights/topology/read",
+          "Microsoft.Insights/transactions/read",
+          "Microsoft.Insights/webtests/*",
+          "Microsoft.ResourceHealth/availabilityStatuses/read",
+          "Microsoft.Resources/deployments/*",
+          "Microsoft.Resources/subscriptions/resourceGroups/read",
+          "Microsoft.Support/*"
+        ],
+        "notActions": [],
+        "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "749f88d5-cbae-40b8-bcfc-e573ddc772fa",
+    "roleName": "Monitoring Contributor",
+    "description": "Can read all monitoring data and edit monitoring settings.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "*/read",
+          "Microsoft.AlertsManagement/alerts/*",
+          "Microsoft.AlertsManagement/alertsSummary/*",
+          "Microsoft.Insights/actiongroups/*",
+          "Microsoft.Insights/activityLogAlerts/*",
+          "Microsoft.Insights/AlertRules/*",
+          "Microsoft.Insights/components/*",
+          "Microsoft.Insights/createNotifications/*",
+          "Microsoft.Insights/dataCollectionEndpoints/*",
+          "Microsoft.Insights/dataCollectionRules/*",
+          "Microsoft.Insights/dataCollectionRuleAssociations/*",
+          "Microsoft.Insights/DiagnosticSettings/*",
+          "Microsoft.Insights/eventtypes/*",
+          "Microsoft.Insights/LogDefinitions/*",
+          "Microsoft.Insights/metricalerts/*",
+          "Microsoft.Insights/MetricDefinitions/*",
+          "Microsoft.Insights/Metrics/*",
+          "Microsoft.Insights/notificationStatus/*",
+          "Microsoft.Insights/Register/Action",
+          "Microsoft.Insights/scheduledqueryrules/*",
+          "Microsoft.Insights/webtests/*",
+          "Microsoft.Insights/workbooks/*",
+          "Microsoft.Insights/workbooktemplates/*",
+          "Microsoft.Insights/privateLinkScopes/*",
+          "Microsoft.Insights/privateLinkScopeOperationStatuses/*",
+          "Microsoft.OperationalInsights/workspaces/write",
+          "Microsoft.OperationalInsights/workspaces/intelligencepacks/*",
+          "Microsoft.OperationalInsights/workspaces/savedSearches/*",
+          "Microsoft.OperationalInsights/workspaces/search/action",
+          "Microsoft.OperationalInsights/workspaces/sharedKeys/action",
+          "Microsoft.OperationalInsights/workspaces/storageinsightconfigs/*",
+          "Microsoft.Support/*",
+          "Microsoft.WorkloadMonitor/monitors/*",
+          "Microsoft.AlertsManagement/smartDetectorAlertRules/*",
+          "Microsoft.AlertsManagement/actionRules/*",
+          "Microsoft.AlertsManagement/smartGroups/*",
+          "Microsoft.AlertsManagement/migrateFromSmartDetection/*",
+          "Microsoft.AlertsManagement/investigations/*"
+        ],
+        "notActions": [],
+        "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "43d0d8ad-25c7-4714-9be4-a2c0d9c80c8a",
+    "roleName": "Monitoring Reader",
+    "description": "Can read all monitoring data.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "*/read",
+          "Microsoft.OperationalInsights/workspaces/search/action",
+          "Microsoft.Support/*"
+        ],
+        "notActions": [],
+        "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "ab8e14d6-4a74-4a29-9ba8-549422addade",
+    "roleName": "Role Based Access Control Administrator",
+    "description": "Manage access to Azure resources by assigning roles using Azure RBAC.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.Authorization/roleAssignments/write",
+          "Microsoft.Authorization/roleAssignments/delete",
+          "*/read",
+          "Microsoft.Support/*"
+        ],
+        "notActions": [],
+        "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "f58310d9-a9f6-439a-9e8d-f62e7b41a168",
+    "roleName": "Role Based Access Control Administrator (Preview)",
+    "description": "Manage access to Azure resources by assigning roles using Azure RBAC.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.Authorization/roleAssignments/write",
+          "Microsoft.Authorization/roleAssignments/delete",
+          "*/read",
+          "Microsoft.Support/*"
+        ],
+        "notActions": [],
+        "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  }
+]
