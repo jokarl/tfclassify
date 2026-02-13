@@ -138,3 +138,21 @@ func TestMatchesActions_MultipleActions(t *testing.T) {
 		t.Error("expected update NOT to match rule with actions=[delete,create]")
 	}
 }
+
+func TestMatchesResource_NoGlobsSpecified(t *testing.T) {
+	// A rule with neither resource nor not_resource globs should not match anything.
+	// This is an edge case that shouldn't occur in valid configs (validation should catch it),
+	// but the behavior should be well-defined.
+	rule := compiledRule{
+		resourceGlobs:    nil,
+		notResourceGlobs: nil,
+	}
+
+	if rule.matchesResource("azurerm_virtual_network") {
+		t.Error("expected a rule with no globs to NOT match any resource")
+	}
+
+	if rule.matchesResource("azurerm_role_assignment") {
+		t.Error("expected a rule with no globs to NOT match any resource")
+	}
+}

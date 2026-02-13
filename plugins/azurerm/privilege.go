@@ -107,4 +107,3 @@ func (a *PrivilegeEscalationAnalyzer) Analyze(runner sdk.Runner) error {
 
 	return nil
 }
-

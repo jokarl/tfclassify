@@ -189,6 +189,55 @@ func TestClassify_Unclassified(t *testing.T) {
 	}
 }
 
+func TestClassify_UnclassifiedWithDescription(t *testing.T) {
+	cfg := &config.Config{
+		Classifications: []config.ClassificationConfig{
+			{
+				Name: "critical",
+				Rules: []config.RuleConfig{
+					{Resource: []string{"*_role_*"}},
+				},
+			},
+			{
+				Name:        "standard",
+				Description: "Standard changes requiring review",
+				Rules:       []config.RuleConfig{}, // No rules - used as fallback
+			},
+		},
+		Precedence: []string{"critical", "standard"},
+		Defaults: &config.DefaultsConfig{
+			Unclassified: "standard",
+			NoChanges:    "auto",
+		},
+	}
+
+	classifier, err := New(cfg)
+	if err != nil {
+		t.Fatalf("failed to create classifier: %v", err)
+	}
+
+	changes := []plan.ResourceChange{
+		{
+			Address: "azurerm_virtual_network.main",
+			Type:    "azurerm_virtual_network",
+			Actions: []string{"update"},
+		},
+	}
+
+	result := classifier.Classify(changes)
+
+	// Should get the default unclassified value with description
+	if result.ResourceDecisions[0].Classification != "standard" {
+		t.Errorf("expected unclassified resource to get 'standard', got '%s'",
+			result.ResourceDecisions[0].Classification)
+	}
+
+	if result.ResourceDecisions[0].ClassificationDescription != "Standard changes requiring review" {
+		t.Errorf("expected unclassified resource to have description, got '%s'",
+			result.ResourceDecisions[0].ClassificationDescription)
+	}
+}
+
 func TestClassify_NoChanges(t *testing.T) {
 	cfg := newTestConfig()
 	classifier, err := New(cfg)

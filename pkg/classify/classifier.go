@@ -97,6 +97,7 @@ func (c *Classifier) classifyResource(change plan.ResourceChange) ResourceDecisi
 
 	// No rule matched, use default
 	decision.Classification = c.config.Defaults.Unclassified
+	decision.ClassificationDescription = c.descriptionMap[decision.Classification]
 	decision.MatchedRule = "default (no rule matched)"
 	return decision
 }
