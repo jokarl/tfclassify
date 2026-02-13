@@ -54,8 +54,8 @@ func (a *SensitiveAnalyzer) Analyze(runner sdk.Runner) error {
 				Reason:         reason,
 				Severity:       70,
 				Metadata: map[string]interface{}{
-					"analyzer":            "sensitive",
-					"sensitive_attrs":     sensitiveAttrs,
+					"analyzer":             "sensitive",
+					"sensitive_attrs":      sensitiveAttrs,
 					"sensitive_attr_count": len(sensitiveAttrs),
 				},
 			}

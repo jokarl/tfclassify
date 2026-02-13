@@ -51,10 +51,10 @@ func (f *Formatter) Format(result *classify.Result) error {
 
 // JSONOutput represents the JSON output structure.
 type JSONOutput struct {
-	Overall   string           `json:"overall"`
-	ExitCode  int              `json:"exit_code"`
-	NoChanges bool             `json:"no_changes"`
-	Resources []JSONResource   `json:"resources"`
+	Overall   string         `json:"overall"`
+	ExitCode  int            `json:"exit_code"`
+	NoChanges bool           `json:"no_changes"`
+	Resources []JSONResource `json:"resources"`
 }
 
 // JSONResource represents a single resource in JSON output.

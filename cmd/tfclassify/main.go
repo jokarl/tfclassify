@@ -18,12 +18,12 @@ import (
 var Version = "dev"
 
 var (
-	planPath            string
-	configPath          string
-	outputFmt           string
-	verbose             bool
-	noPlugins           bool
-	actAsBundledPlugin  bool
+	planPath           string
+	configPath         string
+	outputFmt          string
+	verbose            bool
+	noPlugins          bool
+	actAsBundledPlugin bool
 )
 
 func main() {

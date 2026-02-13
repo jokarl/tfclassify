@@ -16,18 +16,18 @@ type TerraformPluginSet struct {
 
 // PluginConfig holds the configuration for the terraform plugin.
 type PluginConfig struct {
-	DeletionEnabled   bool
-	SensitiveEnabled  bool
-	ReplaceEnabled    bool
+	DeletionEnabled  bool
+	SensitiveEnabled bool
+	ReplaceEnabled   bool
 }
 
 // NewTerraformPluginSet creates a new TerraformPluginSet with default configuration.
 func NewTerraformPluginSet() *TerraformPluginSet {
 	ps := &TerraformPluginSet{
 		config: &PluginConfig{
-			DeletionEnabled:   true,
-			SensitiveEnabled:  true,
-			ReplaceEnabled:    true,
+			DeletionEnabled:  true,
+			SensitiveEnabled: true,
+			ReplaceEnabled:   true,
 		},
 	}
 

@@ -14,10 +14,10 @@ const PluginBinaryPrefix = "tfclassify-plugin-"
 
 // DiscoveredPlugin contains information about a discovered plugin.
 type DiscoveredPlugin struct {
-	Name       string
-	Path       string
-	IsBundled  bool
-	PluginCfg  *config.PluginConfig
+	Name      string
+	Path      string
+	IsBundled bool
+	PluginCfg *config.PluginConfig
 }
 
 // DiscoverPlugins finds plugin binaries for each enabled plugin in the config.
