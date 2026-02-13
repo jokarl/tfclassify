@@ -10,6 +10,7 @@ require (
 	github.com/hashicorp/terraform-json v0.27.2
 	github.com/jokarl/tfclassify/sdk v0.0.0
 	github.com/spf13/cobra v1.10.2
+	google.golang.org/grpc v1.79.1
 )
 
 require (
@@ -34,7 +35,6 @@ require (
 	golang.org/x/text v0.32.0 // indirect
 	golang.org/x/tools v0.39.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20251202230838-ff82c1b0f217 // indirect
-	google.golang.org/grpc v1.79.1 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 )
 
