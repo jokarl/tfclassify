@@ -196,3 +196,232 @@ func TestSensitiveAnalyzer_Name(t *testing.T) {
 		t.Errorf("expected name 'sensitive', got %q", analyzer.Name())
 	}
 }
+
+func TestSensitiveAnalyzer_NewSensitiveAttribute(t *testing.T) {
+	// Test case: attribute becomes sensitive in after state
+	config := &PluginConfig{SensitiveEnabled: true}
+	analyzer := NewSensitiveAnalyzer(config)
+
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			{
+				Address: "aws_db_instance.main",
+				Type:    "aws_db_instance",
+				Actions: []string{"update"},
+				Before: map[string]interface{}{
+					"password": "old-pass",
+				},
+				After: map[string]interface{}{
+					"password": "new-pass",
+				},
+				BeforeSensitive: nil, // was not sensitive
+				AfterSensitive: map[string]interface{}{
+					"password": true, // now sensitive
+				},
+			},
+		},
+	}
+
+	err := analyzer.Analyze(runner)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(runner.decisions) != 1 {
+		t.Fatalf("expected 1 decision, got %d", len(runner.decisions))
+	}
+
+	if !strings.Contains(runner.decisions[0].decision.Reason, "password") {
+		t.Errorf("expected reason to mention password, got: %s", runner.decisions[0].decision.Reason)
+	}
+}
+
+func TestSensitiveAnalyzer_AttributeRemoved(t *testing.T) {
+	// Test case: sensitive attribute removed
+	config := &PluginConfig{SensitiveEnabled: true}
+	analyzer := NewSensitiveAnalyzer(config)
+
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			{
+				Address: "aws_db_instance.main",
+				Type:    "aws_db_instance",
+				Actions: []string{"update"},
+				Before: map[string]interface{}{
+					"password": "old-pass",
+				},
+				After:           map[string]interface{}{}, // password removed
+				BeforeSensitive: map[string]interface{}{"password": true},
+				AfterSensitive:  nil,
+			},
+		},
+	}
+
+	err := analyzer.Analyze(runner)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(runner.decisions) != 1 {
+		t.Fatalf("expected 1 decision for removed sensitive attr, got %d", len(runner.decisions))
+	}
+}
+
+func TestSensitiveAnalyzer_SameValue(t *testing.T) {
+	// Test case: sensitive attribute exists but value unchanged
+	config := &PluginConfig{SensitiveEnabled: true}
+	analyzer := NewSensitiveAnalyzer(config)
+
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			{
+				Address: "aws_db_instance.main",
+				Type:    "aws_db_instance",
+				Actions: []string{"update"},
+				Before: map[string]interface{}{
+					"password": "same-pass",
+					"name":     "old-name",
+				},
+				After: map[string]interface{}{
+					"password": "same-pass", // unchanged
+					"name":     "new-name",  // changed but not sensitive
+				},
+				BeforeSensitive: map[string]interface{}{"password": true},
+				AfterSensitive:  map[string]interface{}{"password": true},
+			},
+		},
+	}
+
+	err := analyzer.Analyze(runner)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(runner.decisions) != 0 {
+		t.Errorf("expected 0 decisions for unchanged sensitive attr, got %d", len(runner.decisions))
+	}
+}
+
+func TestSensitiveAnalyzer_MultipleSensitive(t *testing.T) {
+	// Test case: multiple sensitive attributes
+	config := &PluginConfig{SensitiveEnabled: true}
+	analyzer := NewSensitiveAnalyzer(config)
+
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			{
+				Address: "aws_db_instance.main",
+				Type:    "aws_db_instance",
+				Actions: []string{"update"},
+				Before: map[string]interface{}{
+					"password": "old-pass",
+					"api_key":  "old-key",
+				},
+				After: map[string]interface{}{
+					"password": "new-pass",
+					"api_key":  "new-key",
+				},
+				BeforeSensitive: map[string]interface{}{
+					"password": true,
+					"api_key":  true,
+				},
+				AfterSensitive: map[string]interface{}{
+					"password": true,
+					"api_key":  true,
+				},
+			},
+		},
+	}
+
+	err := analyzer.Analyze(runner)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(runner.decisions) != 1 {
+		t.Fatalf("expected 1 decision (aggregated), got %d", len(runner.decisions))
+	}
+
+	decision := runner.decisions[0].decision
+	if !strings.Contains(decision.Reason, "password") || !strings.Contains(decision.Reason, "api_key") {
+		t.Errorf("expected reason to mention both attrs, got: %s", decision.Reason)
+	}
+}
+
+func TestAsBoolMap_Nil(t *testing.T) {
+	result := asBoolMap(nil)
+	if result != nil {
+		t.Errorf("expected nil for nil input, got %v", result)
+	}
+}
+
+func TestAsBoolMap_NotMap(t *testing.T) {
+	result := asBoolMap("not a map")
+	if result != nil {
+		t.Errorf("expected nil for non-map input, got %v", result)
+	}
+
+	result = asBoolMap([]string{"a", "b"})
+	if result != nil {
+		t.Errorf("expected nil for slice input, got %v", result)
+	}
+
+	result = asBoolMap(42)
+	if result != nil {
+		t.Errorf("expected nil for int input, got %v", result)
+	}
+}
+
+func TestAsBoolMap_ValidMap(t *testing.T) {
+	input := map[string]interface{}{"password": true}
+	result := asBoolMap(input)
+	if result == nil {
+		t.Fatal("expected non-nil result")
+	}
+	if result["password"] != true {
+		t.Errorf("expected password=true, got %v", result["password"])
+	}
+}
+
+func TestHasAttributeChanged_BothNil(t *testing.T) {
+	result := hasAttributeChanged("test", nil, nil)
+	if result {
+		t.Error("expected false when both before and after are nil")
+	}
+}
+
+func TestHasAttributeChanged_AttributeAdded(t *testing.T) {
+	before := map[string]interface{}{}
+	after := map[string]interface{}{"password": "new"}
+	result := hasAttributeChanged("password", before, after)
+	if !result {
+		t.Error("expected true when attribute is added")
+	}
+}
+
+func TestHasAttributeChanged_AttributeRemoved(t *testing.T) {
+	before := map[string]interface{}{"password": "old"}
+	after := map[string]interface{}{}
+	result := hasAttributeChanged("password", before, after)
+	if !result {
+		t.Error("expected true when attribute is removed")
+	}
+}
+
+func TestHasAttributeChanged_ValueChanged(t *testing.T) {
+	before := map[string]interface{}{"password": "old"}
+	after := map[string]interface{}{"password": "new"}
+	result := hasAttributeChanged("password", before, after)
+	if !result {
+		t.Error("expected true when value changed")
+	}
+}
+
+func TestHasAttributeChanged_ValueUnchanged(t *testing.T) {
+	before := map[string]interface{}{"password": "same"}
+	after := map[string]interface{}{"password": "same"}
+	result := hasAttributeChanged("password", before, after)
+	if result {
+		t.Error("expected false when value unchanged")
+	}
+}

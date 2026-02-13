@@ -383,3 +383,255 @@ func TestHost_Shutdown(t *testing.T) {
 		t.Error("clients map should not be nil after shutdown")
 	}
 }
+
+func TestHost_DiscoverAndStart_NoPlugins(t *testing.T) {
+	cfg := &config.Config{
+		Plugins: []config.PluginConfig{}, // no plugins
+	}
+
+	host := NewHost(cfg)
+	err := host.DiscoverAndStart("/usr/bin/tfclassify")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(host.plugins) != 0 {
+		t.Errorf("expected 0 plugins, got %d", len(host.plugins))
+	}
+}
+
+func TestHost_DiscoverAndStart_BundledPlugin(t *testing.T) {
+	cfg := &config.Config{
+		Plugins: []config.PluginConfig{
+			{Name: "terraform", Enabled: true}, // bundled
+		},
+	}
+
+	host := NewHost(cfg)
+	err := host.DiscoverAndStart("/usr/bin/tfclassify")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(host.plugins) != 1 {
+		t.Errorf("expected 1 plugin, got %d", len(host.plugins))
+	}
+
+	plugin := host.plugins["terraform"]
+	if plugin == nil {
+		t.Fatal("expected terraform plugin to be discovered")
+	}
+	if !plugin.IsBundled {
+		t.Error("expected terraform plugin to be bundled")
+	}
+
+	// Cleanup
+	host.Shutdown()
+}
+
+func TestHost_DiscoverAndStart_DisabledPlugins(t *testing.T) {
+	cfg := &config.Config{
+		Plugins: []config.PluginConfig{
+			{Name: "terraform", Enabled: false}, // disabled
+		},
+	}
+
+	host := NewHost(cfg)
+	err := host.DiscoverAndStart("/usr/bin/tfclassify")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(host.plugins) != 0 {
+		t.Errorf("expected 0 plugins (disabled skipped), got %d", len(host.plugins))
+	}
+}
+
+func TestHost_RunAnalysis_WithTimeout(t *testing.T) {
+	cfg := &config.Config{
+		Defaults: &config.DefaultsConfig{
+			PluginTimeout: "100ms",
+		},
+	}
+
+	host := NewHost(cfg)
+	host.plugins = make(map[string]*DiscoveredPlugin)
+
+	changes := []plan.ResourceChange{
+		{Address: "test.resource", Type: "test_type", Actions: []string{"create"}},
+	}
+
+	decisions, err := host.RunAnalysis(changes)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// With no plugins, expect no decisions but no error
+	if decisions == nil {
+		t.Error("expected non-nil decisions slice")
+	}
+}
+
+func TestRunner_GetResourceChanges_MultiplePatterns(t *testing.T) {
+	cfg := &config.Config{
+		Defaults: &config.DefaultsConfig{},
+	}
+	host := NewHost(cfg)
+	host.changes = []plan.ResourceChange{
+		{Address: "aws_instance.web", Type: "aws_instance"},
+		{Address: "aws_s3_bucket.data", Type: "aws_s3_bucket"},
+		{Address: "azurerm_role_assignment.admin", Type: "azurerm_role_assignment"},
+		{Address: "google_compute_instance.server", Type: "google_compute_instance"},
+	}
+
+	runner := NewRunner(host)
+
+	// Multiple patterns should return matches for all
+	changes, err := runner.GetResourceChanges([]string{"aws_*", "google_*"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(changes) != 3 {
+		t.Errorf("expected 3 changes (2 aws + 1 google), got %d", len(changes))
+	}
+}
+
+func TestRunner_EmitDecision_MetadataOnly(t *testing.T) {
+	cfg := &config.Config{
+		Defaults: &config.DefaultsConfig{},
+	}
+	host := NewHost(cfg)
+	runner := NewRunner(host)
+
+	analyzer := &mockAnalyzer{name: "sensitive-analyzer"}
+	change := &sdk.ResourceChange{
+		Address: "test.resource",
+		Type:    "test_resource",
+		Actions: []string{"update"},
+	}
+	// Empty classification = metadata-only decision
+	decision := &sdk.Decision{
+		Classification: "", // empty means metadata-only
+		Reason:         "sensitive attribute changed",
+		Severity:       70,
+		Metadata:       map[string]interface{}{"attribute": "password"},
+	}
+
+	err := runner.EmitDecision(analyzer, change, decision)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(host.decisions) != 1 {
+		t.Fatalf("expected 1 decision, got %d", len(host.decisions))
+	}
+
+	d := host.decisions[0]
+	if d.Classification != "" {
+		t.Errorf("expected empty classification for metadata-only, got %q", d.Classification)
+	}
+}
+
+func TestRunner_GetResourceChanges_WildcardPattern(t *testing.T) {
+	cfg := &config.Config{
+		Defaults: &config.DefaultsConfig{},
+	}
+	host := NewHost(cfg)
+	host.changes = []plan.ResourceChange{
+		{Address: "aws_instance.web", Type: "aws_instance"},
+		{Address: "azure_vm.server", Type: "azure_vm"},
+	}
+
+	runner := NewRunner(host)
+
+	// Wildcard should match all
+	changes, err := runner.GetResourceChanges([]string{"*"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(changes) != 2 {
+		t.Errorf("expected 2 changes, got %d", len(changes))
+	}
+}
+
+func TestToSDKResourceChange_AllFields(t *testing.T) {
+	planChange := &plan.ResourceChange{
+		Address:      "module.app.aws_instance.main",
+		Type:         "aws_instance",
+		ProviderName: "registry.terraform.io/hashicorp/aws",
+		Mode:         "managed",
+		Actions:      []string{"delete", "create"},
+		Before: map[string]interface{}{
+			"ami":           "ami-old",
+			"instance_type": "t2.micro",
+		},
+		After: map[string]interface{}{
+			"ami":           "ami-new",
+			"instance_type": "t3.small",
+		},
+		BeforeSensitive: map[string]interface{}{"password": true},
+		AfterSensitive:  map[string]interface{}{"api_key": true},
+	}
+
+	sdkChange := toSDKResourceChange(planChange)
+
+	// Verify all fields are copied correctly
+	if sdkChange.Address != "module.app.aws_instance.main" {
+		t.Errorf("Address mismatch: %q", sdkChange.Address)
+	}
+	if sdkChange.Type != "aws_instance" {
+		t.Errorf("Type mismatch: %q", sdkChange.Type)
+	}
+	if sdkChange.ProviderName != "registry.terraform.io/hashicorp/aws" {
+		t.Errorf("ProviderName mismatch: %q", sdkChange.ProviderName)
+	}
+	if sdkChange.Mode != "managed" {
+		t.Errorf("Mode mismatch: %q", sdkChange.Mode)
+	}
+	if len(sdkChange.Actions) != 2 {
+		t.Errorf("Actions length mismatch: %d", len(sdkChange.Actions))
+	}
+	if sdkChange.Before["ami"] != "ami-old" {
+		t.Errorf("Before mismatch: %v", sdkChange.Before)
+	}
+	if sdkChange.After["ami"] != "ami-new" {
+		t.Errorf("After mismatch: %v", sdkChange.After)
+	}
+	if sdkChange.BeforeSensitive == nil {
+		t.Error("BeforeSensitive should not be nil")
+	}
+	if sdkChange.AfterSensitive == nil {
+		t.Error("AfterSensitive should not be nil")
+	}
+}
+
+func TestHost_RunAnalysis_EmptyTimeout(t *testing.T) {
+	cfg := &config.Config{
+		Defaults: &config.DefaultsConfig{
+			PluginTimeout: "", // empty timeout should use default
+		},
+	}
+
+	host := NewHost(cfg)
+	host.plugins = make(map[string]*DiscoveredPlugin)
+
+	changes := []plan.ResourceChange{}
+
+	decisions, err := host.RunAnalysis(changes)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if decisions == nil {
+		t.Error("expected non-nil decisions slice")
+	}
+}
+
+func TestSDKVersionConstraints(t *testing.T) {
+	// Test that the SDK version constraint is properly set
+	if SDKVersionConstraints != ">= 0.1.0" {
+		t.Errorf("unexpected SDK version constraint: %s", SDKVersionConstraints)
+	}
+}

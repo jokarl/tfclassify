@@ -68,3 +68,35 @@ type EmitDecisionRequest struct {
 
 // EmitDecisionResponse is empty on success.
 type EmitDecisionResponse struct{}
+
+// GetPluginInfoRequest requests plugin metadata.
+type GetPluginInfoRequest struct{}
+
+// GetPluginInfoResponse contains plugin metadata for verification.
+type GetPluginInfoResponse struct {
+	// Name is the plugin name (e.g., "terraform", "azurerm").
+	Name string
+	// Version is the plugin version (e.g., "0.1.0").
+	Version string
+	// SDKVersion is the SDK version the plugin was built with (e.g., "0.1.0").
+	SDKVersion string
+	// HostVersionConstraint specifies which host versions the plugin supports.
+	// Uses semver constraint syntax (e.g., ">= 0.1.0").
+	HostVersionConstraint string
+}
+
+// GetConfigSchemaRequest requests the plugin's configuration schema.
+type GetConfigSchemaRequest struct{}
+
+// GetConfigSchemaResponse contains the configuration schema for validation.
+type GetConfigSchemaResponse struct {
+	Attributes []*ConfigAttribute
+}
+
+// ConfigAttribute describes a single configuration attribute.
+type ConfigAttribute struct {
+	Name        string
+	Type        string
+	Required    bool
+	Description string
+}

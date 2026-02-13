@@ -10,6 +10,10 @@ Classify Terraform plan changes based on organization-defined rules. tfclassify 
 4. The overall classification (and exit code) is determined by the highest-precedence match across all resources
 
 ```
+# Binary plans work directly
+tfclassify -p tfplan
+
+# Or use JSON
 terraform show -json tfplan > plan.json
 tfclassify -p plan.json
 ```
@@ -76,6 +80,10 @@ Rules are evaluated in precedence order. `resource = ["*"]` on `standard` is saf
 ### Run
 
 ```bash
+# Use binary plan directly (auto-detected)
+tfclassify -p tfplan -v
+
+# Or use JSON
 terraform show -json tfplan > plan.json
 tfclassify -p plan.json -v
 ```
@@ -106,11 +114,10 @@ tfclassify [flags]
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
-| `--plan` | `-p` | (required) | Path to Terraform plan JSON file |
+| `--plan` | `-p` | (required) | Path to Terraform plan file (JSON or binary) |
 | `--config` | `-c` | auto-discover | Path to `.tfclassify.hcl` config file |
 | `--output` | `-o` | `text` | Output format: `text`, `json`, `github` |
 | `--verbose` | `-v` | `false` | Show per-resource rule match details |
-| `--no-plugins` | | `false` | Disable plugin loading |
 
 ## Configuration
 
@@ -169,9 +176,46 @@ defaults {
 }
 ```
 
+## Plan file formats
+
+tfclassify accepts both JSON and binary Terraform plan files:
+
+| Format | How to generate | Detection |
+|--------|-----------------|-----------|
+| JSON | `terraform show -json tfplan > plan.json` | First byte is `{` |
+| Binary | `terraform plan -out=tfplan` | ZIP magic bytes (`PK`) |
+
+When a binary plan is detected, tfclassify automatically invokes `terraform show -json` to convert it. The `terraform` binary must be on PATH (or set `TERRAFORM_PATH` env var).
+
+```bash
+# Direct binary plan support — no manual conversion needed
+terraform plan -out=tfplan
+tfclassify -p tfplan
+```
+
 ## Plugin system
 
 tfclassify supports plugins for deep inspection beyond pattern matching. Plugins run as separate processes communicating over gRPC.
+
+### Installing plugins
+
+External plugins are installed using `tfclassify init`, which reads plugin declarations from your config and downloads binaries from GitHub releases:
+
+```bash
+tfclassify init
+```
+
+Example config with an external plugin:
+
+```hcl
+plugin "azurerm" {
+  enabled = true
+  source  = "github.com/jokarl/tfclassify-plugin-azurerm"
+  version = "0.1.0"
+}
+```
+
+Plugin binaries are placed in `.tfclassify/plugins/` (or `TFCLASSIFY_PLUGIN_DIR`).
 
 ### Bundled plugin: terraform
 
@@ -182,6 +226,20 @@ The `terraform` plugin ships with tfclassify and provides three analyzers:
 | `deletion` | Standalone resource deletions (not replacements) | 80 |
 | `replace` | Resource replacements (destroy + recreate) | 75 |
 | `sensitive` | Changes to Terraform-marked sensitive attributes | 70 |
+
+### Example plugin: azurerm
+
+The `azurerm` plugin in `plugins/azurerm/` demonstrates deep inspection (Layer 3) analysis for Azure resources. It includes three analyzers:
+
+| Analyzer | Detects | Severity |
+|----------|---------|----------|
+| `privilege-escalation` | Role changes with permission-based severity scoring (e.g., Reader → Owner) | 40-95 (graduated) |
+| `network-exposure` | Permissive network rules (0.0.0.0/0, *, Internet) | 85 |
+| `key-vault-access` | Destructive Key Vault permissions (purge, delete) | 80 |
+
+The privilege escalation analyzer uses an embedded database of 400+ Azure built-in roles with full permission sets, scope-based weighting (management group > subscription > resource group > resource), and cross-references custom role definitions from the Terraform plan.
+
+See the [plugin authoring guide](docs/plugin-authoring.md) for details on building custom plugins.
 
 ### Plugin configuration
 
@@ -224,7 +282,9 @@ tfclassify/
 │   └── plugin/            # Plugin discovery and lifecycle management
 ├── sdk/                   # Public plugin SDK (Analyzer, Runner, PluginSet interfaces)
 │   └── plugin/            # Plugin gRPC server entry point
-├── plugins/terraform/     # Bundled Terraform plugin (deletion, sensitive, replace analyzers)
+├── plugins/
+│   ├── terraform/         # Bundled Terraform plugin (deletion, sensitive, replace analyzers)
+│   └── azurerm/           # Example Azure deep inspection plugin (privilege, network, keyvault)
 ├── proto/                 # gRPC protocol definitions
 └── docs/
     ├── adr/               # Architecture Decision Records
@@ -239,6 +299,7 @@ The repository uses Go workspaces (`go.work`) with three modules:
 | `github.com/jokarl/tfclassify` | `.` | CLI and core packages |
 | `github.com/jokarl/tfclassify/sdk` | `sdk/` | Plugin authoring SDK (minimal dependencies) |
 | `github.com/jokarl/tfclassify/plugin-terraform` | `plugins/terraform/` | Bundled Terraform plugin |
+| `github.com/jokarl/tfclassify-plugin-azurerm` | `plugins/azurerm/` | Example Azure deep inspection plugin |
 
 ## Development
 

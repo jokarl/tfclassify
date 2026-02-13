@@ -3,6 +3,7 @@ package plugin
 
 import (
 	"archive/zip"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -14,10 +15,65 @@ import (
 	"github.com/jokarl/tfclassify/pkg/config"
 )
 
+// ManifestFileName is the name of the plugin manifest file.
+const ManifestFileName = "manifest.json"
+
+// Manifest tracks installed plugin versions.
+type Manifest struct {
+	Plugins map[string]string `json:"plugins"` // plugin name -> version
+}
+
+// loadManifest loads the manifest file from the plugin directory.
+func loadManifest(pluginDir string) (*Manifest, error) {
+	manifestPath := filepath.Join(pluginDir, ManifestFileName)
+	data, err := os.ReadFile(manifestPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return &Manifest{Plugins: make(map[string]string)}, nil
+		}
+		return nil, fmt.Errorf("failed to read manifest: %w", err)
+	}
+
+	var m Manifest
+	if err := json.Unmarshal(data, &m); err != nil {
+		return nil, fmt.Errorf("failed to parse manifest: %w", err)
+	}
+	if m.Plugins == nil {
+		m.Plugins = make(map[string]string)
+	}
+	return &m, nil
+}
+
+// saveManifest saves the manifest file to the plugin directory.
+func saveManifest(pluginDir string, m *Manifest) error {
+	if err := os.MkdirAll(pluginDir, 0755); err != nil {
+		return fmt.Errorf("failed to create plugin directory: %w", err)
+	}
+
+	manifestPath := filepath.Join(pluginDir, ManifestFileName)
+	data, err := json.MarshalIndent(m, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal manifest: %w", err)
+	}
+
+	if err := os.WriteFile(manifestPath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write manifest: %w", err)
+	}
+	return nil
+}
+
 // InstallPlugins downloads and installs external plugins declared in the config.
 // Bundled plugins and disabled plugins are skipped.
 func InstallPlugins(cfg *config.Config, w io.Writer) error {
 	pluginDir := DefaultPluginDir()
+
+	// Load existing manifest
+	manifest, err := loadManifest(pluginDir)
+	if err != nil {
+		return fmt.Errorf("failed to load plugin manifest: %w", err)
+	}
+
+	manifestChanged := false
 
 	for _, p := range cfg.Plugins {
 		if p.Source == "" {
@@ -33,26 +89,53 @@ func InstallPlugins(cfg *config.Config, w io.Writer) error {
 		binaryName := PluginBinaryPrefix + p.Name
 		binaryPath := filepath.Join(pluginDir, binaryName)
 
-		if isInstalledAtVersion(binaryPath, p.Version) {
+		if isInstalledAtVersion(binaryPath, p.Name, p.Version, manifest) {
 			fmt.Fprintf(w, "  %s: already installed (v%s)\n", p.Name, p.Version)
 			continue
 		}
 
-		fmt.Fprintf(w, "  %s: installing v%s from %s...\n", p.Name, p.Version, p.Source)
+		// Check if a different version is installed
+		if installedVersion, exists := manifest.Plugins[p.Name]; exists {
+			fmt.Fprintf(w, "  %s: upgrading from v%s to v%s...\n", p.Name, installedVersion, p.Version)
+		} else {
+			fmt.Fprintf(w, "  %s: installing v%s from %s...\n", p.Name, p.Version, p.Source)
+		}
+
 		if err := downloadAndInstall(p.Name, p.Source, p.Version, pluginDir); err != nil {
 			return fmt.Errorf("failed to install plugin %q: %w", p.Name, err)
 		}
+
+		// Update manifest with new version
+		manifest.Plugins[p.Name] = p.Version
+		manifestChanged = true
 		fmt.Fprintf(w, "  %s: installed\n", p.Name)
+	}
+
+	// Save manifest if changed
+	if manifestChanged {
+		if err := saveManifest(pluginDir, manifest); err != nil {
+			return fmt.Errorf("failed to save plugin manifest: %w", err)
+		}
 	}
 
 	return nil
 }
 
-// isInstalledAtVersion checks if a plugin binary exists at the given path.
-// For now, we just check existence. Version tracking would require a manifest.
-func isInstalledAtVersion(binaryPath, version string) bool {
-	_, err := os.Stat(binaryPath)
-	return err == nil
+// isInstalledAtVersion checks if a plugin is installed at the requested version.
+// It checks both the binary existence and the manifest version.
+func isInstalledAtVersion(binaryPath, name, version string, manifest *Manifest) bool {
+	// Check if binary exists
+	if _, err := os.Stat(binaryPath); err != nil {
+		return false
+	}
+
+	// Check if manifest has this plugin at the correct version
+	installedVersion, exists := manifest.Plugins[name]
+	if !exists {
+		return false
+	}
+
+	return installedVersion == version
 }
 
 // downloadAndInstall downloads a plugin from GitHub releases and installs it.

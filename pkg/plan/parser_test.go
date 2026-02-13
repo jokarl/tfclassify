@@ -420,3 +420,201 @@ func TestParseFile_SeekError(t *testing.T) {
 		t.Errorf("expected 2 changes, got %d", len(result.Changes))
 	}
 }
+
+func TestParseFile_BinaryPlanDetection(t *testing.T) {
+	// Create a temp file with ZIP magic bytes to simulate binary plan
+	tmpDir, err := os.MkdirTemp("", "tfclassify-binary-test")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Create a fake binary plan file (starts with PK)
+	binaryPlanPath := tmpDir + "/plan.tfplan"
+	zipContent := []byte("PK\x03\x04") // ZIP magic bytes
+	if err := os.WriteFile(binaryPlanPath, zipContent, 0644); err != nil {
+		t.Fatalf("failed to write fake binary plan: %v", err)
+	}
+
+	// Clear TERRAFORM_PATH to ensure terraform won't be found
+	oldPath := os.Getenv("TERRAFORM_PATH")
+	os.Setenv("TERRAFORM_PATH", "/nonexistent/terraform")
+	defer os.Setenv("TERRAFORM_PATH", oldPath)
+
+	// This should fail because terraform is not available
+	_, err = ParseFile(binaryPlanPath)
+	if err == nil {
+		t.Fatal("expected error for binary plan when terraform not available")
+	}
+
+	// Error should indicate terraform is needed
+	if !strings.Contains(err.Error(), "terraform") {
+		t.Errorf("expected error to mention terraform, got: %v", err)
+	}
+}
+
+func TestParseFile_JSONWithLeadingWhitespace(t *testing.T) {
+	// Create a temp file with leading whitespace before JSON
+	tmpDir, err := os.MkdirTemp("", "tfclassify-whitespace-test")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	jsonWithWhitespace := `
+{
+  "format_version": "1.2",
+  "terraform_version": "1.9.0",
+  "resource_changes": []
+}`
+	wsPath := tmpDir + "/whitespace.json"
+	if err := os.WriteFile(wsPath, []byte(jsonWithWhitespace), 0644); err != nil {
+		t.Fatalf("failed to write file: %v", err)
+	}
+
+	result, err := ParseFile(wsPath)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if result.FormatVersion != "1.2" {
+		t.Errorf("expected format version 1.2, got %s", result.FormatVersion)
+	}
+}
+
+func TestFindTerraform_ValidPath(t *testing.T) {
+	// Create a fake terraform binary
+	tmpDir, err := os.MkdirTemp("", "tfclassify-terraform-test")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	terraformPath := tmpDir + "/terraform"
+	if err := os.WriteFile(terraformPath, []byte("#!/bin/sh\necho mock"), 0755); err != nil {
+		t.Fatalf("failed to write fake terraform: %v", err)
+	}
+
+	oldPath := os.Getenv("TERRAFORM_PATH")
+	os.Setenv("TERRAFORM_PATH", terraformPath)
+	defer os.Setenv("TERRAFORM_PATH", oldPath)
+
+	path, err := findTerraform()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if path != terraformPath {
+		t.Errorf("expected path %s, got %s", terraformPath, path)
+	}
+}
+
+func TestParse_ReadError(t *testing.T) {
+	// Use a reader that will fail
+	_, err := Parse(&failingReader{})
+	if err == nil {
+		t.Fatal("expected error from failing reader")
+	}
+	if !strings.Contains(err.Error(), "failed to read plan data") {
+		t.Errorf("expected read error message, got: %v", err)
+	}
+}
+
+// failingReader is an io.Reader that always fails
+type failingReader struct{}
+
+func (f *failingReader) Read(p []byte) (n int, err error) {
+	return 0, os.ErrInvalid
+}
+
+func TestParse_MinimalValidPlan(t *testing.T) {
+	json := `{
+		"format_version": "1.2",
+		"terraform_version": "1.9.0",
+		"resource_changes": [
+			{
+				"address": "test.resource",
+				"mode": "managed",
+				"type": "test_type",
+				"name": "test",
+				"provider_name": "test",
+				"change": {
+					"actions": ["create"],
+					"before": null,
+					"after": null
+				}
+			}
+		]
+	}`
+	reader := strings.NewReader(json)
+	result, err := Parse(reader)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(result.Changes) != 1 {
+		t.Errorf("expected 1 change, got %d", len(result.Changes))
+	}
+
+	change := result.Changes[0]
+	if change.Address != "test.resource" {
+		t.Errorf("expected address test.resource, got %s", change.Address)
+	}
+	if change.Before != nil {
+		t.Errorf("expected Before to be nil")
+	}
+	if change.After != nil {
+		t.Errorf("expected After to be nil")
+	}
+}
+
+func TestParseBinaryPlan_NoTerraform(t *testing.T) {
+	// Clear TERRAFORM_PATH to ensure terraform won't be found
+	oldPath := os.Getenv("TERRAFORM_PATH")
+	os.Setenv("TERRAFORM_PATH", "/nonexistent/terraform")
+	defer os.Setenv("TERRAFORM_PATH", oldPath)
+
+	// Try to parse a "binary" plan
+	_, err := parseBinaryPlan("/nonexistent/plan.tfplan")
+	if err == nil {
+		t.Fatal("expected error when terraform not available")
+	}
+	if !strings.Contains(err.Error(), "terraform") {
+		t.Errorf("expected error to mention terraform, got: %v", err)
+	}
+}
+
+func TestParseResourceChange_ProviderName(t *testing.T) {
+	json := `{
+		"format_version": "1.2",
+		"terraform_version": "1.9.0",
+		"resource_changes": [
+			{
+				"address": "azurerm_storage_account.main",
+				"mode": "managed",
+				"type": "azurerm_storage_account",
+				"name": "main",
+				"provider_name": "registry.terraform.io/hashicorp/azurerm",
+				"change": {
+					"actions": ["create"],
+					"before": null,
+					"after": {"name": "storage123"}
+				}
+			}
+		]
+	}`
+	reader := strings.NewReader(json)
+	result, err := Parse(reader)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(result.Changes) != 1 {
+		t.Fatalf("expected 1 change, got %d", len(result.Changes))
+	}
+
+	change := result.Changes[0]
+	if change.ProviderName != "registry.terraform.io/hashicorp/azurerm" {
+		t.Errorf("expected provider name registry.terraform.io/hashicorp/azurerm, got %s", change.ProviderName)
+	}
+}
