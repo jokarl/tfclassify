@@ -252,3 +252,18 @@ func TestKeyVaultAccess_Name(t *testing.T) {
 		t.Errorf("expected name 'key-vault-access', got %q", analyzer.Name())
 	}
 }
+
+func TestKeyVaultAccess_Enabled(t *testing.T) {
+	enabledConfig := &PluginConfig{KeyVaultEnabled: true}
+	disabledConfig := &PluginConfig{KeyVaultEnabled: false}
+
+	enabledAnalyzer := NewKeyVaultAccessAnalyzer(enabledConfig)
+	disabledAnalyzer := NewKeyVaultAccessAnalyzer(disabledConfig)
+
+	if !enabledAnalyzer.Enabled() {
+		t.Error("expected analyzer to be enabled when KeyVaultEnabled is true")
+	}
+	if disabledAnalyzer.Enabled() {
+		t.Error("expected analyzer to be disabled when KeyVaultEnabled is false")
+	}
+}

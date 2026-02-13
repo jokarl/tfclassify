@@ -304,3 +304,18 @@ func TestNetworkExposure_SourceAddressPrefixes(t *testing.T) {
 		t.Fatalf("expected 1 decision for wildcard in prefixes array, got %d", len(runner.decisions))
 	}
 }
+
+func TestNetworkExposure_Enabled(t *testing.T) {
+	enabledConfig := &PluginConfig{NetworkEnabled: true}
+	disabledConfig := &PluginConfig{NetworkEnabled: false}
+
+	enabledAnalyzer := NewNetworkExposureAnalyzer(enabledConfig)
+	disabledAnalyzer := NewNetworkExposureAnalyzer(disabledConfig)
+
+	if !enabledAnalyzer.Enabled() {
+		t.Error("expected analyzer to be enabled when NetworkEnabled is true")
+	}
+	if disabledAnalyzer.Enabled() {
+		t.Error("expected analyzer to be disabled when NetworkEnabled is false")
+	}
+}

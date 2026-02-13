@@ -920,3 +920,417 @@ func TestDefaultConfig_NewFields(t *testing.T) {
 		t.Error("CrossReferenceCustomRoles should be true by default")
 	}
 }
+
+func TestCustomRoleCrossReference_RoleDefinitionError(t *testing.T) {
+	// Mock runner that returns error for role_definition queries
+	config := DefaultConfig()
+	analyzer := NewPrivilegeEscalationAnalyzer(config)
+
+	runner := &mockRunnerWithRoleDefError{
+		mockRunner: mockRunner{
+			changes: []*sdk.ResourceChange{
+				{
+					Address: "azurerm_role_assignment.test",
+					Type:    "azurerm_role_assignment",
+					Actions: []string{"create"},
+					After: map[string]interface{}{
+						"role_definition_name": "Custom Role",
+						"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
+					},
+				},
+			},
+		},
+	}
+
+	err := analyzer.Analyze(runner)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Should still work and fall back to unknown role
+	if len(runner.decisions) != 1 {
+		t.Fatalf("expected 1 decision, got %d", len(runner.decisions))
+	}
+	if runner.decisions[0].Metadata["role_source"] != "unknown" {
+		t.Errorf("expected role_source unknown (role def error), got %v", runner.decisions[0].Metadata["role_source"])
+	}
+}
+
+// mockRunnerWithRoleDefError returns error when querying role_definition resources
+type mockRunnerWithRoleDefError struct {
+	mockRunner
+}
+
+func (r *mockRunnerWithRoleDefError) GetResourceChanges(patterns []string) ([]*sdk.ResourceChange, error) {
+	for _, p := range patterns {
+		if p == "azurerm_role_definition" {
+			return nil, errors.New("mock error for role_definition")
+		}
+	}
+	return r.mockRunner.GetResourceChanges(patterns)
+}
+
+func TestCustomRoleCrossReference_NoAfterOrBeforeState(t *testing.T) {
+	config := DefaultConfig()
+	analyzer := NewPrivilegeEscalationAnalyzer(config)
+
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			// Role definition with nil states
+			{
+				Address: "azurerm_role_definition.orphan",
+				Type:    "azurerm_role_definition",
+				Actions: []string{"delete"},
+				Before:  nil,
+				After:   nil,
+			},
+			{
+				Address: "azurerm_role_assignment.test",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"role_definition_name": "Orphan Role",
+					"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
+				},
+			},
+		},
+	}
+
+	err := analyzer.Analyze(runner)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Should still work - orphan role def is skipped, assignment uses unknown
+	if len(runner.decisions) != 1 {
+		t.Fatalf("expected 1 decision, got %d", len(runner.decisions))
+	}
+}
+
+func TestCustomRoleCrossReference_EmptyName(t *testing.T) {
+	config := DefaultConfig()
+	analyzer := NewPrivilegeEscalationAnalyzer(config)
+
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			// Role definition with empty name
+			{
+				Address: "azurerm_role_definition.empty",
+				Type:    "azurerm_role_definition",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"name": "",
+					"permissions": []interface{}{
+						map[string]interface{}{
+							"actions": []interface{}{"*"},
+						},
+					},
+				},
+			},
+			{
+				Address: "azurerm_role_assignment.test",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"role_definition_name": "Some Role",
+					"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
+				},
+			},
+		},
+	}
+
+	err := analyzer.Analyze(runner)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Should work - empty name is skipped
+	if len(runner.decisions) != 1 {
+		t.Fatalf("expected 1 decision, got %d", len(runner.decisions))
+	}
+}
+
+func TestCustomRoleCrossReference_NoPermissions(t *testing.T) {
+	config := DefaultConfig()
+	analyzer := NewPrivilegeEscalationAnalyzer(config)
+
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			// Role definition with no permissions field
+			{
+				Address: "azurerm_role_definition.noperms",
+				Type:    "azurerm_role_definition",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"name": "No Perms Role",
+					// Missing permissions field
+				},
+			},
+			{
+				Address: "azurerm_role_assignment.test",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"role_definition_name": "No Perms Role",
+					"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
+				},
+			},
+		},
+	}
+
+	err := analyzer.Analyze(runner)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Should work - role with no permissions is skipped, assignment uses unknown
+	if len(runner.decisions) != 1 {
+		t.Fatalf("expected 1 decision, got %d", len(runner.decisions))
+	}
+	if runner.decisions[0].Metadata["role_source"] != "unknown" {
+		t.Errorf("expected role_source unknown, got %v", runner.decisions[0].Metadata["role_source"])
+	}
+}
+
+func TestCustomRoleCrossReference_InvalidPermissionsType(t *testing.T) {
+	config := DefaultConfig()
+	analyzer := NewPrivilegeEscalationAnalyzer(config)
+
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			// Role definition with permissions as string (invalid type)
+			{
+				Address: "azurerm_role_definition.badtype",
+				Type:    "azurerm_role_definition",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"name":        "Bad Type Role",
+					"permissions": "not-a-list",
+				},
+			},
+			{
+				Address: "azurerm_role_assignment.test",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"role_definition_name": "Bad Type Role",
+					"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
+				},
+			},
+		},
+	}
+
+	err := analyzer.Analyze(runner)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Should work - invalid type is handled gracefully
+	if len(runner.decisions) != 1 {
+		t.Fatalf("expected 1 decision, got %d", len(runner.decisions))
+	}
+	if runner.decisions[0].Metadata["role_source"] != "unknown" {
+		t.Errorf("expected role_source unknown, got %v", runner.decisions[0].Metadata["role_source"])
+	}
+}
+
+func TestCustomRoleCrossReference_InvalidPermissionBlockType(t *testing.T) {
+	config := DefaultConfig()
+	analyzer := NewPrivilegeEscalationAnalyzer(config)
+
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			// Role definition with permission block as string (invalid)
+			{
+				Address: "azurerm_role_definition.badblock",
+				Type:    "azurerm_role_definition",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"name": "Bad Block Role",
+					"permissions": []interface{}{
+						"not-a-map", // Invalid - should be map[string]interface{}
+					},
+				},
+			},
+			{
+				Address: "azurerm_role_assignment.test",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"role_definition_name": "Bad Block Role",
+					"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
+				},
+			},
+		},
+	}
+
+	err := analyzer.Analyze(runner)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Should work - invalid block type is handled gracefully
+	if len(runner.decisions) != 1 {
+		t.Fatalf("expected 1 decision, got %d", len(runner.decisions))
+	}
+	if runner.decisions[0].Metadata["role_source"] != "unknown" {
+		t.Errorf("expected role_source unknown, got %v", runner.decisions[0].Metadata["role_source"])
+	}
+}
+
+func TestCustomRoleCrossReference_UsesBeforeStateForDelete(t *testing.T) {
+	config := DefaultConfig()
+	analyzer := NewPrivilegeEscalationAnalyzer(config)
+
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			// Role definition being deleted - should use Before state
+			{
+				Address: "azurerm_role_definition.deleting",
+				Type:    "azurerm_role_definition",
+				Actions: []string{"delete"},
+				Before: map[string]interface{}{
+					"name": "Deleting Role",
+					"permissions": []interface{}{
+						map[string]interface{}{
+							"actions": []interface{}{"Microsoft.Authorization/roleAssignments/write"},
+						},
+					},
+				},
+				After: nil,
+			},
+			{
+				Address: "azurerm_role_assignment.test",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"role_definition_name": "Deleting Role",
+					"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
+				},
+			},
+		},
+	}
+
+	err := analyzer.Analyze(runner)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Should use the Before state for the deleted role definition
+	if len(runner.decisions) != 1 {
+		t.Fatalf("expected 1 decision, got %d", len(runner.decisions))
+	}
+	// Should have found the custom role from Before state
+	if runner.decisions[0].Metadata["role_source"] != "plan-custom-role" {
+		t.Errorf("expected role_source plan-custom-role, got %v", runner.decisions[0].Metadata["role_source"])
+	}
+}
+
+func TestResolveRole_OnlyRoleDefinitionID(t *testing.T) {
+	config := DefaultConfig()
+	analyzer := NewPrivilegeEscalationAnalyzer(config)
+
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			{
+				Address: "azurerm_role_assignment.test",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					// Only ID, no name - should use ID for lookup and display
+					"role_definition_id": "8e3af657-a8ff-443c-a75c-2fe8c4bcb635", // Owner
+					"scope":              "/subscriptions/00000000-0000-0000-0000-000000000000",
+				},
+			},
+		},
+	}
+
+	err := analyzer.Analyze(runner)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(runner.decisions) != 1 {
+		t.Fatalf("expected 1 decision, got %d", len(runner.decisions))
+	}
+
+	// Should resolve by ID
+	if runner.decisions[0].Metadata["role_source"] != "builtin" {
+		t.Errorf("expected role_source builtin, got %v", runner.decisions[0].Metadata["role_source"])
+	}
+	if runner.decisions[0].Severity != 95 {
+		t.Errorf("expected severity 95 (Owner), got %d", runner.decisions[0].Severity)
+	}
+}
+
+func TestResolveRole_UnknownIDOnly(t *testing.T) {
+	config := DefaultConfig()
+	analyzer := NewPrivilegeEscalationAnalyzer(config)
+
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			{
+				Address: "azurerm_role_assignment.test",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					// Unknown ID, no name
+					"role_definition_id": "/providers/Microsoft.Authorization/roleDefinitions/00000000-0000-0000-0000-000000000000",
+					"scope":              "/subscriptions/00000000-0000-0000-0000-000000000000",
+				},
+			},
+		},
+	}
+
+	err := analyzer.Analyze(runner)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(runner.decisions) != 1 {
+		t.Fatalf("expected 1 decision, got %d", len(runner.decisions))
+	}
+
+	// Should fall back to unknown, using ID as the name
+	if runner.decisions[0].Metadata["role_source"] != "unknown" {
+		t.Errorf("expected role_source unknown, got %v", runner.decisions[0].Metadata["role_source"])
+	}
+	if runner.decisions[0].Metadata["after_role"] != "/providers/Microsoft.Authorization/roleDefinitions/00000000-0000-0000-0000-000000000000" {
+		t.Errorf("expected after_role to be the ID, got %v", runner.decisions[0].Metadata["after_role"])
+	}
+}
+
+func TestScopeFromBeforeState(t *testing.T) {
+	config := DefaultConfig()
+	analyzer := NewPrivilegeEscalationAnalyzer(config)
+
+	// Test that scope is taken from Before when After has no scope
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			{
+				Address: "azurerm_role_assignment.test",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"delete"},
+				Before: map[string]interface{}{
+					"role_definition_name": "Owner",
+					"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
+				},
+				After: nil,
+			},
+		},
+	}
+
+	err := analyzer.Analyze(runner)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(runner.decisions) != 1 {
+		t.Fatalf("expected 1 decision, got %d", len(runner.decisions))
+	}
+
+	// Should use scope from Before state
+	if runner.decisions[0].Metadata["scope"] != "/subscriptions/00000000-0000-0000-0000-000000000000" {
+		t.Errorf("expected scope from before state, got %v", runner.decisions[0].Metadata["scope"])
+	}
+}

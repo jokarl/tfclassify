@@ -630,3 +630,88 @@ func TestScorePermissions_EmbeddedUAA(t *testing.T) {
 		t.Errorf("Embedded UAA score = %d, want 85", score.Total)
 	}
 }
+
+func TestActionMatchesPattern_NoMatch(t *testing.T) {
+	tests := []struct {
+		action  string
+		pattern string
+	}{
+		{"Microsoft.Compute/virtualMachines/read", "Microsoft.Storage/*"},
+		{"Microsoft.Compute/virtualMachines/write", "*/read"},
+		{"Microsoft.Compute/virtualMachines", "Microsoft.Network/virtualNetworks"},
+	}
+
+	for _, tc := range tests {
+		got := actionMatchesPattern(tc.action, tc.pattern)
+		if got {
+			t.Errorf("actionMatchesPattern(%q, %q) = true, want false", tc.action, tc.pattern)
+		}
+	}
+}
+
+func TestCoversAuthorizationWrite_RoleAssignmentsWildcard(t *testing.T) {
+	// Test for Microsoft.Authorization/roleAssignments/* pattern
+	notActions := []string{"Microsoft.Authorization/roleAssignments/*"}
+	got := coversAuthorizationWrite(notActions)
+	if got {
+		t.Error("expected false for roleAssignments/* (doesn't cover all Authorization)")
+	}
+}
+
+func TestCoversAuthorizationWrite_PartialPath(t *testing.T) {
+	// Test partial paths ending in /write - these DO match per the function logic
+	// as they contain "write" and end with "/write"
+	notActions := []string{
+		"Microsoft.Authorization/locks/write",
+		"Microsoft.Authorization/policyAssignments/write",
+	}
+	got := coversAuthorizationWrite(notActions)
+	if !got {
+		t.Error("expected true - paths ending in /write do match")
+	}
+}
+
+func TestCoversAuthorizationWrite_ReadOnly(t *testing.T) {
+	// Test paths that shouldn't match (no write/delete)
+	notActions := []string{
+		"Microsoft.Authorization/locks/read",
+		"Microsoft.Authorization/policyAssignments/read",
+	}
+	got := coversAuthorizationWrite(notActions)
+	if got {
+		t.Error("expected false for read-only paths")
+	}
+}
+
+func TestHasAuthorizationAccess_NotExcluded(t *testing.T) {
+	// Test when auth action is present but excluded by notActions
+	actions := []string{"Microsoft.Authorization/*"}
+	notActions := []string{"Microsoft.Authorization/*"}
+
+	got := hasAuthorizationAccess(actions, notActions)
+	if got {
+		t.Error("expected false when auth action is excluded")
+	}
+}
+
+func TestHasTargetedRoleAssignmentWrite_Excluded(t *testing.T) {
+	// Test when roleAssignments/write is excluded
+	actions := []string{"Microsoft.Authorization/roleAssignments/write"}
+	notActions := []string{"Microsoft.Authorization/*"}
+
+	got := hasTargetedRoleAssignmentWrite(actions, notActions)
+	if got {
+		t.Error("expected false when roleAssignments write is excluded")
+	}
+}
+
+func TestHasTargetedRoleAssignmentWrite_Wildcard(t *testing.T) {
+	// Test with roleAssignments/* pattern
+	actions := []string{"Microsoft.Authorization/roleAssignments/*"}
+	notActions := []string{}
+
+	got := hasTargetedRoleAssignmentWrite(actions, notActions)
+	if !got {
+		t.Error("expected true for roleAssignments/*")
+	}
+}
