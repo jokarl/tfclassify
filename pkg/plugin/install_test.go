@@ -1,6 +1,7 @@
 package plugin
 
 import (
+	"archive/zip"
 	"bytes"
 	"os"
 	"path/filepath"
@@ -187,5 +188,161 @@ func TestDefaultPluginDir(t *testing.T) {
 	expected := filepath.Join(cwd, ".tfclassify", "plugins")
 	if result != expected {
 		t.Errorf("expected %s, got %s", expected, result)
+	}
+}
+
+func TestExtractBinaryFromZip(t *testing.T) {
+	// Create a temp directory for our test
+	tmpDir, err := os.MkdirTemp("", "tfclassify-zip-test")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Create a zip file with a test binary
+	zipPath := filepath.Join(tmpDir, "test.zip")
+	destDir := filepath.Join(tmpDir, "dest")
+	os.MkdirAll(destDir, 0755)
+
+	zipFile, err := os.Create(zipPath)
+	if err != nil {
+		t.Fatalf("failed to create zip file: %v", err)
+	}
+
+	zipWriter := zip.NewWriter(zipFile)
+
+	// Add a binary file to the zip
+	binaryContent := []byte("#!/bin/sh\necho hello")
+	writer, err := zipWriter.Create("tfclassify-plugin-test")
+	if err != nil {
+		t.Fatalf("failed to create file in zip: %v", err)
+	}
+	if _, err := writer.Write(binaryContent); err != nil {
+		t.Fatalf("failed to write to zip: %v", err)
+	}
+
+	zipWriter.Close()
+	zipFile.Close()
+
+	// Test extraction
+	err = extractBinaryFromZip(zipPath, "tfclassify-plugin-test", destDir)
+	if err != nil {
+		t.Fatalf("extractBinaryFromZip failed: %v", err)
+	}
+
+	// Verify the extracted file exists
+	extractedPath := filepath.Join(destDir, "tfclassify-plugin-test")
+	if _, err := os.Stat(extractedPath); os.IsNotExist(err) {
+		t.Error("expected extracted binary to exist")
+	}
+
+	// Verify the content
+	content, err := os.ReadFile(extractedPath)
+	if err != nil {
+		t.Fatalf("failed to read extracted file: %v", err)
+	}
+	if !bytes.Equal(content, binaryContent) {
+		t.Errorf("extracted content mismatch: got %q, want %q", content, binaryContent)
+	}
+}
+
+func TestExtractBinaryFromZip_BinaryNotFound(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "tfclassify-zip-test")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Create a zip file without the expected binary
+	zipPath := filepath.Join(tmpDir, "test.zip")
+	destDir := filepath.Join(tmpDir, "dest")
+	os.MkdirAll(destDir, 0755)
+
+	zipFile, err := os.Create(zipPath)
+	if err != nil {
+		t.Fatalf("failed to create zip file: %v", err)
+	}
+
+	zipWriter := zip.NewWriter(zipFile)
+
+	// Add a different file to the zip
+	writer, err := zipWriter.Create("other-file")
+	if err != nil {
+		t.Fatalf("failed to create file in zip: %v", err)
+	}
+	writer.Write([]byte("content"))
+
+	zipWriter.Close()
+	zipFile.Close()
+
+	// Test extraction - should fail
+	err = extractBinaryFromZip(zipPath, "tfclassify-plugin-missing", destDir)
+	if err == nil {
+		t.Error("expected error when binary not found in zip")
+	}
+}
+
+func TestExtractBinaryFromZip_InvalidZip(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "tfclassify-zip-test")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Create an invalid zip file
+	invalidZipPath := filepath.Join(tmpDir, "invalid.zip")
+	os.WriteFile(invalidZipPath, []byte("not a zip file"), 0644)
+
+	destDir := filepath.Join(tmpDir, "dest")
+	os.MkdirAll(destDir, 0755)
+
+	err = extractBinaryFromZip(invalidZipPath, "tfclassify-plugin-test", destDir)
+	if err == nil {
+		t.Error("expected error for invalid zip file")
+	}
+}
+
+func TestExtractBinaryFromZip_BinaryInSubdirectory(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "tfclassify-zip-test")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Create a zip file with binary in subdirectory
+	zipPath := filepath.Join(tmpDir, "test.zip")
+	destDir := filepath.Join(tmpDir, "dest")
+	os.MkdirAll(destDir, 0755)
+
+	zipFile, err := os.Create(zipPath)
+	if err != nil {
+		t.Fatalf("failed to create zip file: %v", err)
+	}
+
+	zipWriter := zip.NewWriter(zipFile)
+
+	// Add a binary file in a subdirectory
+	binaryContent := []byte("#!/bin/sh\necho from subdir")
+	writer, err := zipWriter.Create("some/subdir/tfclassify-plugin-test")
+	if err != nil {
+		t.Fatalf("failed to create file in zip: %v", err)
+	}
+	if _, err := writer.Write(binaryContent); err != nil {
+		t.Fatalf("failed to write to zip: %v", err)
+	}
+
+	zipWriter.Close()
+	zipFile.Close()
+
+	// Test extraction - should work because we use filepath.Base
+	err = extractBinaryFromZip(zipPath, "tfclassify-plugin-test", destDir)
+	if err != nil {
+		t.Fatalf("extractBinaryFromZip failed: %v", err)
+	}
+
+	// Verify the extracted file exists
+	extractedPath := filepath.Join(destDir, "tfclassify-plugin-test")
+	if _, err := os.Stat(extractedPath); os.IsNotExist(err) {
+		t.Error("expected extracted binary to exist")
 	}
 }
