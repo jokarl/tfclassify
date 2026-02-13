@@ -282,3 +282,61 @@ func TestBinaryPlanMagicBytes(t *testing.T) {
 		t.Errorf("BinaryPlanMagicBytes should be 'PK', got %q", string(BinaryPlanMagicBytes))
 	}
 }
+
+func TestValidateFormatVersion(t *testing.T) {
+	tests := []struct {
+		version string
+		wantErr bool
+	}{
+		// Exact matches
+		{"0.2", false},
+		{"1.0", false},
+		{"1.1", false},
+		{"1.2", false},
+
+		// Forward compatibility - patch versions
+		{"1.0.0", false},
+		{"1.0.1", false},
+		{"1.1.0", false},
+		{"1.2.5", false},
+		{"0.2.3", false},
+
+		// Unsupported versions
+		{"0.1", true},
+		{"1.3", true},
+		{"2.0", true},
+		{"", true},
+		{"invalid", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.version, func(t *testing.T) {
+			err := validateFormatVersion(tt.version)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("validateFormatVersion(%q) error = %v, wantErr %v", tt.version, err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestExtractMajorMinor(t *testing.T) {
+	tests := []struct {
+		version string
+		want    string
+	}{
+		{"1.2.3", "1.2"},
+		{"1.0", "1.0"},
+		{"0.2.1", "0.2"},
+		{"2", ""},
+		{"", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.version, func(t *testing.T) {
+			got := extractMajorMinor(tt.version)
+			if got != tt.want {
+				t.Errorf("extractMajorMinor(%q) = %q, want %q", tt.version, got, tt.want)
+			}
+		})
+	}
+}

@@ -121,6 +121,7 @@ func Parse(r io.Reader) (*ParseResult, error) {
 }
 
 // validateFormatVersion checks that the plan format version is supported.
+// Forward compatible: accepts any patch version of supported major.minor versions.
 func validateFormatVersion(version string) error {
 	if version == "" {
 		return fmt.Errorf("plan format_version is missing")
@@ -131,14 +132,24 @@ func validateFormatVersion(version string) error {
 		return nil
 	}
 
-	// Check major.minor prefix for forward compatibility
-	for supported := range supportedFormatVersions {
-		if strings.HasPrefix(version, supported) {
-			return nil
-		}
+	// Extract major.minor prefix for forward compatibility
+	// For example, "1.2.3" should be accepted if "1.2" is supported
+	majorMinor := extractMajorMinor(version)
+	if majorMinor != "" && supportedFormatVersions[majorMinor] {
+		return nil
 	}
 
 	return fmt.Errorf("unsupported plan format_version %q; supported versions are: 0.2, 1.0, 1.1, 1.2", version)
+}
+
+// extractMajorMinor extracts the major.minor portion of a semver-like version string.
+// For example: "1.2.3" -> "1.2", "1.0" -> "1.0", "2" -> ""
+func extractMajorMinor(version string) string {
+	parts := strings.Split(version, ".")
+	if len(parts) < 2 {
+		return ""
+	}
+	return parts[0] + "." + parts[1]
 }
 
 // extractResourceChanges converts terraform-json resource changes to our internal type.

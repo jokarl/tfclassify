@@ -108,24 +108,3 @@ func (a *PrivilegeEscalationAnalyzer) Analyze(runner sdk.Runner) error {
 	return nil
 }
 
-// toSet converts a slice to a set (map with bool values).
-func toSet(slice []string) map[string]bool {
-	set := make(map[string]bool)
-	for _, s := range slice {
-		set[s] = true
-	}
-	return set
-}
-
-// stringField extracts a string field from a map.
-func stringField(m map[string]interface{}, key string) string {
-	if m == nil {
-		return ""
-	}
-	if v, ok := m[key]; ok {
-		if s, ok := v.(string); ok {
-			return s
-		}
-	}
-	return ""
-}

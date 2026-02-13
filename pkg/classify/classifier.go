@@ -134,6 +134,16 @@ func (c *Classifier) AddPluginDecisions(result *Result, pluginDecisions []Resour
 
 	// Process plugin decisions
 	for _, pluginDecision := range pluginDecisions {
+		// Skip decisions with empty classification - these are invalid
+		if pluginDecision.Classification == "" {
+			continue
+		}
+
+		// Skip decisions with unknown classifications not in precedence map
+		if _, known := c.precedenceMap[pluginDecision.Classification]; !known {
+			continue
+		}
+
 		existing, ok := decisionMap[pluginDecision.Address]
 		if !ok {
 			// New resource from plugin (shouldn't happen in normal flow)
@@ -142,11 +152,14 @@ func (c *Classifier) AddPluginDecisions(result *Result, pluginDecisions []Resour
 		}
 
 		// Compare precedence and keep higher precedence classification
-		existingPrecedence := c.precedenceMap[existing.Classification]
+		existingPrecedence, existingKnown := c.precedenceMap[existing.Classification]
 		pluginPrecedence := c.precedenceMap[pluginDecision.Classification]
 
-		if pluginPrecedence < existingPrecedence {
+		// Only replace if plugin classification has higher precedence
+		// (lower index = higher precedence)
+		if !existingKnown || pluginPrecedence < existingPrecedence {
 			existing.Classification = pluginDecision.Classification
+			existing.ClassificationDescription = c.descriptionMap[pluginDecision.Classification]
 			existing.MatchedRule = pluginDecision.MatchedRule
 		}
 	}
@@ -155,10 +168,14 @@ func (c *Classifier) AddPluginDecisions(result *Result, pluginDecisions []Resour
 	if len(result.ResourceDecisions) > 0 {
 		highestPrecedence := -1
 		for _, decision := range result.ResourceDecisions {
-			precedence := c.precedenceMap[decision.Classification]
+			precedence, known := c.precedenceMap[decision.Classification]
+			if !known {
+				continue
+			}
 			if highestPrecedence == -1 || precedence < highestPrecedence {
 				highestPrecedence = precedence
 				result.Overall = decision.Classification
+				result.OverallDescription = c.descriptionMap[decision.Classification]
 			}
 		}
 		result.OverallExitCode = c.getExitCode(result.Overall)

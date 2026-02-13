@@ -131,7 +131,14 @@ func downloadFile(url string) (string, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("download failed with status %d: %s", resp.StatusCode, url)
+		// Read a limited amount of the response body for error context
+		bodyBytes := make([]byte, 256)
+		n, _ := io.ReadFull(resp.Body, bodyBytes)
+		if n > 0 {
+			bodyPreview := string(bodyBytes[:n])
+			return "", fmt.Errorf("download failed with status %d from %s: %s", resp.StatusCode, url, bodyPreview)
+		}
+		return "", fmt.Errorf("download failed with status %d from %s", resp.StatusCode, url)
 	}
 
 	// Create temp file

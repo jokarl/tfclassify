@@ -77,7 +77,9 @@ func (h *Host) startPlugin(name string, plugin *DiscoveredPlugin) error {
 		AllowedProtocols: []goplugin.Protocol{goplugin.ProtocolGRPC},
 	})
 
+	h.mu.Lock()
 	h.clients[name] = client
+	h.mu.Unlock()
 	return nil
 }
 
@@ -127,6 +129,8 @@ func (h *Host) runPluginAnalysis(ctx context.Context, name string, plugin *Disco
 
 // Shutdown stops all plugin processes.
 func (h *Host) Shutdown() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	for _, client := range h.clients {
 		client.Kill()
 	}

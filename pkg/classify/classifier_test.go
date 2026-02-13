@@ -318,3 +318,95 @@ func TestClassify_WithPluginDecisions(t *testing.T) {
 			result.ResourceDecisions[0].Classification)
 	}
 }
+
+func TestClassify_PluginDecisionsWithEmptyClassification(t *testing.T) {
+	cfg := newTestConfig()
+	classifier, err := New(cfg)
+	if err != nil {
+		t.Fatalf("failed to create classifier: %v", err)
+	}
+
+	changes := []plan.ResourceChange{
+		{
+			Address: "azurerm_virtual_network.main",
+			Type:    "azurerm_virtual_network",
+			Actions: []string{"update"},
+		},
+	}
+
+	result := classifier.Classify(changes)
+
+	// Core classification should be "standard"
+	if result.Overall != "standard" {
+		t.Errorf("expected initial overall 'standard', got '%s'", result.Overall)
+	}
+
+	// Add plugin decisions with empty classification (should be ignored)
+	pluginDecisions := []ResourceDecision{
+		{
+			Address:        "azurerm_virtual_network.main",
+			ResourceType:   "azurerm_virtual_network",
+			Actions:        []string{"update"},
+			Classification: "", // Empty - should be ignored
+			MatchedRule:    "plugin: some detection",
+		},
+	}
+
+	classifier.AddPluginDecisions(result, pluginDecisions)
+
+	// Should remain "standard" because empty classification is ignored
+	if result.Overall != "standard" {
+		t.Errorf("expected overall to remain 'standard' when empty classification is ignored, got '%s'", result.Overall)
+	}
+
+	if result.ResourceDecisions[0].Classification != "standard" {
+		t.Errorf("expected resource to remain 'standard' when empty classification is ignored, got '%s'",
+			result.ResourceDecisions[0].Classification)
+	}
+}
+
+func TestClassify_PluginDecisionsWithUnknownClassification(t *testing.T) {
+	cfg := newTestConfig()
+	classifier, err := New(cfg)
+	if err != nil {
+		t.Fatalf("failed to create classifier: %v", err)
+	}
+
+	changes := []plan.ResourceChange{
+		{
+			Address: "azurerm_virtual_network.main",
+			Type:    "azurerm_virtual_network",
+			Actions: []string{"update"},
+		},
+	}
+
+	result := classifier.Classify(changes)
+
+	// Core classification should be "standard"
+	if result.Overall != "standard" {
+		t.Errorf("expected initial overall 'standard', got '%s'", result.Overall)
+	}
+
+	// Add plugin decisions with unknown classification (should be ignored)
+	pluginDecisions := []ResourceDecision{
+		{
+			Address:        "azurerm_virtual_network.main",
+			ResourceType:   "azurerm_virtual_network",
+			Actions:        []string{"update"},
+			Classification: "unknown_classification", // Not in precedence list
+			MatchedRule:    "plugin: some detection",
+		},
+	}
+
+	classifier.AddPluginDecisions(result, pluginDecisions)
+
+	// Should remain "standard" because unknown classification is ignored
+	if result.Overall != "standard" {
+		t.Errorf("expected overall to remain 'standard' when unknown classification is ignored, got '%s'", result.Overall)
+	}
+
+	if result.ResourceDecisions[0].Classification != "standard" {
+		t.Errorf("expected resource to remain 'standard' when unknown classification is ignored, got '%s'",
+			result.ResourceDecisions[0].Classification)
+	}
+}
