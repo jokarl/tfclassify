@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/jokarl/tfclassify/sdk"
@@ -242,5 +243,80 @@ func TestPrivilegeEscalation_NewAssignment(t *testing.T) {
 
 	if runner.decisions[0].Severity != 90 {
 		t.Errorf("expected severity 90, got %d", runner.decisions[0].Severity)
+	}
+}
+
+func TestPrivilegeEscalation_GetResourceChangesError(t *testing.T) {
+	config := DefaultConfig()
+	analyzer := NewPrivilegeEscalationAnalyzer(config)
+	runner := &mockRunner{err: errors.New("test error")}
+
+	err := analyzer.Analyze(runner)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestPrivilegeEscalation_EmitDecisionError(t *testing.T) {
+	config := DefaultConfig()
+	analyzer := NewPrivilegeEscalationAnalyzer(config)
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			{
+				Address: "azurerm_role_assignment.test",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"role_definition_name": "Owner",
+				},
+			},
+		},
+		emitErr: errors.New("emit error"),
+	}
+
+	err := analyzer.Analyze(runner)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestPrivilegeEscalation_Name(t *testing.T) {
+	config := DefaultConfig()
+	analyzer := NewPrivilegeEscalationAnalyzer(config)
+
+	if analyzer.Name() != "privilege-escalation" {
+		t.Errorf("expected name 'privilege-escalation', got %q", analyzer.Name())
+	}
+}
+
+func TestPrivilegeEscalation_RoleRemoval(t *testing.T) {
+	config := DefaultConfig()
+	analyzer := NewPrivilegeEscalationAnalyzer(config)
+
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			{
+				Address: "azurerm_role_assignment.test",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"delete"},
+				Before: map[string]interface{}{
+					"role_definition_name": "Owner",
+				},
+				After: nil,
+			},
+		},
+	}
+
+	err := analyzer.Analyze(runner)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(runner.decisions) != 1 {
+		t.Fatalf("expected 1 decision for privileged role removal, got %d", len(runner.decisions))
+	}
+
+	if runner.decisions[0].Metadata["direction"] != "de-escalation" {
+		t.Errorf("expected direction de-escalation, got %v", runner.decisions[0].Metadata["direction"])
 	}
 }

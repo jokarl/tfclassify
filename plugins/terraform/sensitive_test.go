@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -140,5 +141,58 @@ func TestSensitiveAnalyzer_Disabled(t *testing.T) {
 
 	if analyzer.Enabled() {
 		t.Error("expected analyzer to be disabled")
+	}
+}
+
+func TestSensitiveAnalyzer_GetResourceChangesError(t *testing.T) {
+	config := &PluginConfig{SensitiveEnabled: true}
+	analyzer := NewSensitiveAnalyzer(config)
+	runner := &mockRunner{err: errors.New("test error")}
+
+	err := analyzer.Analyze(runner)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestSensitiveAnalyzer_EmitDecisionError(t *testing.T) {
+	config := &PluginConfig{SensitiveEnabled: true}
+	analyzer := NewSensitiveAnalyzer(config)
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			{
+				Address:         "aws_db_instance.main",
+				Actions:         []string{"update"},
+				Before:          map[string]interface{}{"password": "old"},
+				After:           map[string]interface{}{"password": "new"},
+				BeforeSensitive: map[string]interface{}{"password": true},
+				AfterSensitive:  map[string]interface{}{"password": true},
+			},
+		},
+		emitErr: errors.New("emit error"),
+	}
+
+	err := analyzer.Analyze(runner)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestSensitiveAnalyzer_ResourcePatterns(t *testing.T) {
+	config := &PluginConfig{SensitiveEnabled: true}
+	analyzer := NewSensitiveAnalyzer(config)
+
+	patterns := analyzer.ResourcePatterns()
+	if len(patterns) != 1 || patterns[0] != "*" {
+		t.Errorf("expected patterns [*], got %v", patterns)
+	}
+}
+
+func TestSensitiveAnalyzer_Name(t *testing.T) {
+	config := &PluginConfig{SensitiveEnabled: true}
+	analyzer := NewSensitiveAnalyzer(config)
+
+	if analyzer.Name() != "sensitive" {
+		t.Errorf("expected name 'sensitive', got %q", analyzer.Name())
 	}
 }

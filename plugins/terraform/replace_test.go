@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/jokarl/tfclassify/sdk"
@@ -89,5 +90,75 @@ func TestReplaceAnalyzer_Disabled(t *testing.T) {
 
 	if analyzer.Enabled() {
 		t.Error("expected analyzer to be disabled")
+	}
+}
+
+func TestReplaceAnalyzer_GetResourceChangesError(t *testing.T) {
+	config := &PluginConfig{ReplaceEnabled: true}
+	analyzer := NewReplaceAnalyzer(config)
+	runner := &mockRunner{err: errors.New("test error")}
+
+	err := analyzer.Analyze(runner)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestReplaceAnalyzer_EmitDecisionError(t *testing.T) {
+	config := &PluginConfig{ReplaceEnabled: true}
+	analyzer := NewReplaceAnalyzer(config)
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			{Address: "aws_instance.foo", Actions: []string{"delete", "create"}},
+		},
+		emitErr: errors.New("emit error"),
+	}
+
+	err := analyzer.Analyze(runner)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestReplaceAnalyzer_ResourcePatterns(t *testing.T) {
+	config := &PluginConfig{ReplaceEnabled: true}
+	analyzer := NewReplaceAnalyzer(config)
+
+	patterns := analyzer.ResourcePatterns()
+	if len(patterns) != 1 || patterns[0] != "*" {
+		t.Errorf("expected patterns [*], got %v", patterns)
+	}
+}
+
+func TestReplaceAnalyzer_Name(t *testing.T) {
+	config := &PluginConfig{ReplaceEnabled: true}
+	analyzer := NewReplaceAnalyzer(config)
+
+	if analyzer.Name() != "replace" {
+		t.Errorf("expected name 'replace', got %q", analyzer.Name())
+	}
+}
+
+func TestReplaceAnalyzer_CreateDelete(t *testing.T) {
+	// Test that create,delete order also counts as replace
+	config := &PluginConfig{ReplaceEnabled: true}
+	analyzer := NewReplaceAnalyzer(config)
+
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			{
+				Address: "aws_instance.foo",
+				Actions: []string{"create", "delete"},
+			},
+		},
+	}
+
+	err := analyzer.Analyze(runner)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(runner.decisions) != 1 {
+		t.Errorf("expected 1 decision for create+delete, got %d", len(runner.decisions))
 	}
 }

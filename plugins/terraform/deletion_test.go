@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/jokarl/tfclassify/sdk"
@@ -9,6 +10,8 @@ import (
 type mockRunner struct {
 	changes   []*sdk.ResourceChange
 	decisions []*mockDecision
+	err       error
+	emitErr   error
 }
 
 type mockDecision struct {
@@ -18,10 +21,16 @@ type mockDecision struct {
 }
 
 func (r *mockRunner) GetResourceChanges(patterns []string) ([]*sdk.ResourceChange, error) {
+	if r.err != nil {
+		return nil, r.err
+	}
 	return r.changes, nil
 }
 
 func (r *mockRunner) GetResourceChange(address string) (*sdk.ResourceChange, error) {
+	if r.err != nil {
+		return nil, r.err
+	}
 	for _, c := range r.changes {
 		if c.Address == address {
 			return c, nil
@@ -31,6 +40,9 @@ func (r *mockRunner) GetResourceChange(address string) (*sdk.ResourceChange, err
 }
 
 func (r *mockRunner) EmitDecision(analyzer sdk.Analyzer, change *sdk.ResourceChange, decision *sdk.Decision) error {
+	if r.emitErr != nil {
+		return r.emitErr
+	}
 	r.decisions = append(r.decisions, &mockDecision{
 		analyzer: analyzer,
 		change:   change,
@@ -147,5 +159,51 @@ func TestDeletionAnalyzer_Disabled(t *testing.T) {
 
 	if analyzer.Enabled() {
 		t.Error("expected analyzer to be disabled")
+	}
+}
+
+func TestDeletionAnalyzer_GetResourceChangesError(t *testing.T) {
+	config := &PluginConfig{DeletionEnabled: true}
+	analyzer := NewDeletionAnalyzer(config)
+	runner := &mockRunner{err: errors.New("test error")}
+
+	err := analyzer.Analyze(runner)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestDeletionAnalyzer_EmitDecisionError(t *testing.T) {
+	config := &PluginConfig{DeletionEnabled: true}
+	analyzer := NewDeletionAnalyzer(config)
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			{Address: "aws_instance.foo", Actions: []string{"delete"}},
+		},
+		emitErr: errors.New("emit error"),
+	}
+
+	err := analyzer.Analyze(runner)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestDeletionAnalyzer_ResourcePatterns(t *testing.T) {
+	config := &PluginConfig{DeletionEnabled: true}
+	analyzer := NewDeletionAnalyzer(config)
+
+	patterns := analyzer.ResourcePatterns()
+	if len(patterns) != 1 || patterns[0] != "*" {
+		t.Errorf("expected patterns [*], got %v", patterns)
+	}
+}
+
+func TestDeletionAnalyzer_Name(t *testing.T) {
+	config := &PluginConfig{DeletionEnabled: true}
+	analyzer := NewDeletionAnalyzer(config)
+
+	if analyzer.Name() != "deletion" {
+		t.Errorf("expected name 'deletion', got %q", analyzer.Name())
 	}
 }

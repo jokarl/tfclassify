@@ -10,9 +10,14 @@ import (
 type mockRunner struct {
 	changes   []*sdk.ResourceChange
 	decisions []*sdk.Decision
+	err       error
+	emitErr   error
 }
 
 func (r *mockRunner) GetResourceChanges(patterns []string) ([]*sdk.ResourceChange, error) {
+	if r.err != nil {
+		return nil, r.err
+	}
 	if len(patterns) == 0 {
 		return r.changes, nil
 	}
@@ -31,6 +36,9 @@ func (r *mockRunner) GetResourceChanges(patterns []string) ([]*sdk.ResourceChang
 }
 
 func (r *mockRunner) GetResourceChange(address string) (*sdk.ResourceChange, error) {
+	if r.err != nil {
+		return nil, r.err
+	}
 	for _, c := range r.changes {
 		if c.Address == address {
 			return c, nil
@@ -40,6 +48,9 @@ func (r *mockRunner) GetResourceChange(address string) (*sdk.ResourceChange, err
 }
 
 func (r *mockRunner) EmitDecision(analyzer sdk.Analyzer, change *sdk.ResourceChange, decision *sdk.Decision) error {
+	if r.emitErr != nil {
+		return r.emitErr
+	}
 	r.decisions = append(r.decisions, decision)
 	return nil
 }

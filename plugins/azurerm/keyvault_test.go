@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/jokarl/tfclassify/sdk"
@@ -206,5 +207,48 @@ func TestKeyVaultAccess_CustomPermissions(t *testing.T) {
 
 	if len(runner2.decisions) != 0 {
 		t.Errorf("expected 0 decisions when purge not in custom list, got %d", len(runner2.decisions))
+	}
+}
+
+func TestKeyVaultAccess_GetResourceChangesError(t *testing.T) {
+	config := DefaultConfig()
+	analyzer := NewKeyVaultAccessAnalyzer(config)
+	runner := &mockRunner{err: errors.New("test error")}
+
+	err := analyzer.Analyze(runner)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestKeyVaultAccess_EmitDecisionError(t *testing.T) {
+	config := DefaultConfig()
+	analyzer := NewKeyVaultAccessAnalyzer(config)
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			{
+				Address: "azurerm_key_vault_access_policy.test",
+				Type:    "azurerm_key_vault_access_policy",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"secret_permissions": []interface{}{"get", "purge"},
+				},
+			},
+		},
+		emitErr: errors.New("emit error"),
+	}
+
+	err := analyzer.Analyze(runner)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestKeyVaultAccess_Name(t *testing.T) {
+	config := DefaultConfig()
+	analyzer := NewKeyVaultAccessAnalyzer(config)
+
+	if analyzer.Name() != "key-vault-access" {
+		t.Errorf("expected name 'key-vault-access', got %q", analyzer.Name())
 	}
 }

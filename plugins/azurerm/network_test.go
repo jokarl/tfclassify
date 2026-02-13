@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/jokarl/tfclassify/sdk"
@@ -225,5 +226,81 @@ func TestNetworkExposure_Internet(t *testing.T) {
 
 	if len(runner.decisions) != 1 {
 		t.Fatalf("expected 1 decision for Internet source, got %d", len(runner.decisions))
+	}
+}
+
+func TestNetworkExposure_GetResourceChangesError(t *testing.T) {
+	config := DefaultConfig()
+	analyzer := NewNetworkExposureAnalyzer(config)
+	runner := &mockRunner{err: errors.New("test error")}
+
+	err := analyzer.Analyze(runner)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestNetworkExposure_EmitDecisionError(t *testing.T) {
+	config := DefaultConfig()
+	analyzer := NewNetworkExposureAnalyzer(config)
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			{
+				Address: "azurerm_network_security_rule.test",
+				Type:    "azurerm_network_security_rule",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"name":                  "allow-all-inbound",
+					"direction":             "Inbound",
+					"access":                "Allow",
+					"source_address_prefix": "*",
+				},
+			},
+		},
+		emitErr: errors.New("emit error"),
+	}
+
+	err := analyzer.Analyze(runner)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestNetworkExposure_Name(t *testing.T) {
+	config := DefaultConfig()
+	analyzer := NewNetworkExposureAnalyzer(config)
+
+	if analyzer.Name() != "network-exposure" {
+		t.Errorf("expected name 'network-exposure', got %q", analyzer.Name())
+	}
+}
+
+func TestNetworkExposure_SourceAddressPrefixes(t *testing.T) {
+	config := DefaultConfig()
+	analyzer := NewNetworkExposureAnalyzer(config)
+
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			{
+				Address: "azurerm_network_security_rule.test",
+				Type:    "azurerm_network_security_rule",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"name":                     "allow-all-inbound",
+					"direction":                "Inbound",
+					"access":                   "Allow",
+					"source_address_prefixes":  []interface{}{"10.0.0.0/8", "*"},
+				},
+			},
+		},
+	}
+
+	err := analyzer.Analyze(runner)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(runner.decisions) != 1 {
+		t.Fatalf("expected 1 decision for wildcard in prefixes array, got %d", len(runner.decisions))
 	}
 }
