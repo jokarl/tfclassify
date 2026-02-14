@@ -1,4 +1,4 @@
-name: refresh-role-data
+name: Refresh role data
 
 on:
   schedule:
