@@ -1,6 +1,6 @@
 ---
 id: "CR-0019"
-status: proposed
+status: implemented
 date: 2026-02-14
 requestor: Johan
 stakeholders: Johan

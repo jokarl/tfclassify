@@ -623,7 +623,7 @@ func TestHost_RunAnalysis_EmptyTimeout(t *testing.T) {
 
 func TestSDKVersionConstraints(t *testing.T) {
 	// Test that the SDK version constraint is properly set
-	if SDKVersionConstraints != ">= 0.1.0" {
+	if SDKVersionConstraints != ">= 0.0.1" {
 		t.Errorf("unexpected SDK version constraint: %s", SDKVersionConstraints)
 	}
 }

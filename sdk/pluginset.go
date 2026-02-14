@@ -31,7 +31,8 @@ type ConfigSchemaSpec struct {
 
 // ConfigAttribute describes a single attribute in a plugin's config schema.
 type ConfigAttribute struct {
-	Name     string
-	Type     string // HCL type: "string", "number", "bool", "list(string)", etc.
-	Required bool
+	Name        string
+	Type        string // HCL type: "string", "number", "bool", "list(string)", etc.
+	Required    bool
+	Description string
 }

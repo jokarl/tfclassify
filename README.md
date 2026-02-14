@@ -217,15 +217,17 @@ plugin "azurerm" {
 
 Plugin binaries are placed in `.tfclassify/plugins/` (or `TFCLASSIFY_PLUGIN_DIR`).
 
-### Bundled plugin: terraform
+### Builtin analyzers
 
-The `terraform` plugin ships with tfclassify and provides three analyzers:
+tfclassify includes three cross-provider analyzers that run in-process (no plugin required):
 
 | Analyzer | Detects | Severity |
 |----------|---------|----------|
 | `deletion` | Standalone resource deletions (not replacements) | 80 |
 | `replace` | Resource replacements (destroy + recreate) | 75 |
 | `sensitive` | Changes to Terraform-marked sensitive attributes | 70 |
+
+These are enabled by default and operate on Terraform-level concepts (actions, sensitive markers) rather than provider-specific semantics.
 
 ### Example plugin: azurerm
 
@@ -240,14 +242,6 @@ The `azurerm` plugin in `plugins/azurerm/` demonstrates deep inspection (Layer 3
 The privilege escalation analyzer uses an embedded database of 400+ Azure built-in roles with full permission sets, scope-based weighting (management group > subscription > resource group > resource), and cross-references custom role definitions from the Terraform plan.
 
 See the [plugin authoring guide](docs/plugin-authoring.md) for details on building custom plugins.
-
-### Plugin configuration
-
-```hcl
-plugin "terraform" {
-  enabled = true
-}
-```
 
 ### Plugin discovery
 
@@ -283,7 +277,6 @@ tfclassify/
 ├── sdk/                   # Public plugin SDK (Analyzer, Runner, PluginSet interfaces)
 │   └── plugin/            # Plugin gRPC server entry point
 ├── plugins/
-│   ├── terraform/         # Bundled Terraform plugin (deletion, sensitive, replace analyzers)
 │   └── azurerm/           # Example Azure deep inspection plugin (privilege, network, keyvault)
 ├── proto/                 # gRPC protocol definitions
 └── docs/
@@ -298,17 +291,18 @@ The repository uses Go workspaces (`go.work`) with three modules:
 |--------|------|---------|
 | `github.com/jokarl/tfclassify` | `.` | CLI and core packages |
 | `github.com/jokarl/tfclassify/sdk` | `sdk/` | Plugin authoring SDK (minimal dependencies) |
-| `github.com/jokarl/tfclassify/plugin-terraform` | `plugins/terraform/` | Bundled Terraform plugin |
 | `github.com/jokarl/tfclassify-plugin-azurerm` | `plugins/azurerm/` | Example Azure deep inspection plugin |
 
 ## Development
 
 ```bash
-make build    # Build binary to bin/tfclassify
-make test     # Run all tests across workspace
-make vet      # Run go vet
-make lint     # Run golangci-lint
-make clean    # Remove build artifacts
+make build          # Build binary to bin/tfclassify
+make build-all      # Build CLI and azurerm plugin
+make test           # Run all tests across workspace
+make vet            # Run go vet
+make lint           # Run golangci-lint
+make generate-roles # Refresh Azure role database from AzAdvertizer
+make clean          # Remove build artifacts
 ```
 
 ## Architecture decisions
@@ -319,3 +313,5 @@ make clean    # Remove build artifacts
 | [ADR-0002](docs/adr/ADR-0002-grpc-plugin-architecture.md) | gRPC plugin architecture via hashicorp/go-plugin |
 | [ADR-0003](docs/adr/ADR-0003-provider-agnostic-core-with-deep-inspection-plugins.md) | Provider-agnostic core with deep inspection plugins |
 | [ADR-0004](docs/adr/ADR-0004-hcl-configuration-format.md) | HCL configuration format |
+| [ADR-0005](docs/adr/ADR-0005-plugin-sdk-versioning-and-protocol-compatibility.md) | Plugin SDK versioning and protocol compatibility |
+| [ADR-0006](docs/adr/ADR-0006-permission-based-privilege-escalation-detection.md) | Permission-based privilege escalation detection |

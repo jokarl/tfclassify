@@ -22,7 +22,7 @@ import (
 
 // SDKVersionConstraints specifies which SDK versions this host is compatible with.
 // Plugins built against an SDK version that doesn't satisfy this constraint will be rejected.
-const SDKVersionConstraints = ">= 0.1.0"
+const SDKVersionConstraints = ">= 0.0.1"
 
 // Host manages plugin lifecycle and communication.
 type Host struct {

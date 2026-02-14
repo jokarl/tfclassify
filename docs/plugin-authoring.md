@@ -14,7 +14,7 @@ This guide focuses on Layer 3 — writing plugins that inspect resource attribut
 
 ## Prerequisites
 
-- Go 1.21 or later
+- Go 1.24 or later
 - Familiarity with Terraform resource structures
 - Understanding of the provider you're targeting (Azure, AWS, GCP, etc.)
 
@@ -393,15 +393,12 @@ The ZIP should contain the plugin binary at the root level.
 
 ## Reference Implementation
 
-The `plugins/terraform/` directory in the tfclassify repository contains a reference plugin. Study it for patterns on:
+The `plugins/azurerm/` directory in the tfclassify repository contains a complete reference plugin. Study it for patterns on:
+- Structuring a multi-analyzer plugin (`plugin.go`, `privilege.go`, `network.go`, `keyvault.go`)
 - Handling different action types (create, update, delete)
-- Extracting nested field values
-- Comprehensive test coverage
-
-When designing your plugin, keep the scope focused. For example, instead of one plugin that covers all Azure resources, create separate plugins for specific use cases:
-- `tfclassify-plugin-azurerm-roleassignment` — deep inspection of role assignments and privilege escalation
-- `tfclassify-plugin-azurerm-networking` — analysis of NSG rules and network exposure
-- `tfclassify-plugin-azurerm-keyvault` — detection of destructive key vault permissions
+- Extracting nested field values with safe type assertions
+- Embedding data files (`//go:embed` for role database)
+- Comprehensive test coverage with mock runners
 
 ## Common Patterns
 

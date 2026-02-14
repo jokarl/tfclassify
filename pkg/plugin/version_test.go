@@ -25,7 +25,7 @@ func TestVerifyPlugin_SDKTooOld(t *testing.T) {
 	info := &PluginInfo{
 		Name:       "test-plugin",
 		Version:    "1.0.0",
-		SDKVersion: "0.0.1", // Older than required 0.1.0
+		SDKVersion: "0.0.0", // Older than required 0.0.1
 	}
 
 	err := VerifyPlugin("test-plugin", info)
@@ -44,9 +44,9 @@ func TestVerifyPlugin_SDKCompatible(t *testing.T) {
 		name       string
 		sdkVersion string
 	}{
-		{"exact match", "0.1.0"},
-		{"newer patch", "0.1.5"},
-		{"newer minor", "0.2.0"},
+		{"exact match", "0.0.1"},
+		{"newer patch", "0.0.5"},
+		{"newer minor", "0.1.0"},
 		{"newer major", "1.0.0"},
 	}
 
@@ -88,8 +88,8 @@ func TestVerifyPlugin_HostConstraintMet(t *testing.T) {
 	info := &PluginInfo{
 		Name:                  "test-plugin",
 		Version:               "1.0.0",
-		SDKVersion:            "0.1.0",
-		HostVersionConstraint: ">= 0.1.0", // Current host should satisfy this
+		SDKVersion:            "0.0.1",
+		HostVersionConstraint: ">= 0.0.1", // Current host should satisfy this
 	}
 
 	err := VerifyPlugin("test-plugin", info)

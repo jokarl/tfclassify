@@ -9,7 +9,7 @@ import (
 )
 
 // HostVersion is the current version of the tfclassify host.
-const HostVersion = "0.1.0"
+const HostVersion = "0.0.1"
 
 // PluginInfo contains metadata about a plugin for verification.
 type PluginInfo struct {

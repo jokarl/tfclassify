@@ -1,9 +1,11 @@
 package plugin
 
 import (
+	"context"
 	"testing"
 
 	"github.com/jokarl/tfclassify/sdk"
+	"github.com/jokarl/tfclassify/sdk/pb"
 	"google.golang.org/grpc"
 )
 
@@ -218,7 +220,7 @@ func TestPluginServiceServer_GetPluginInfo(t *testing.T) {
 	ps := &mockPluginSet{}
 	server := NewPluginServiceServer(ps, nil)
 
-	resp, err := server.GetPluginInfo(nil, &GetPluginInfoRequest{})
+	resp, err := server.GetPluginInfo(context.Background(), &pb.GetPluginInfoRequest{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -231,8 +233,8 @@ func TestPluginServiceServer_GetPluginInfo(t *testing.T) {
 		t.Errorf("expected version '1.0.0', got %q", resp.Version)
 	}
 
-	if resp.SDKVersion != sdk.SDKVersion {
-		t.Errorf("expected SDKVersion %q, got %q", sdk.SDKVersion, resp.SDKVersion)
+	if resp.SdkVersion != sdk.SDKVersion {
+		t.Errorf("expected SdkVersion %q, got %q", sdk.SDKVersion, resp.SdkVersion)
 	}
 }
 
@@ -240,7 +242,7 @@ func TestPluginServiceServer_GetConfigSchema_Nil(t *testing.T) {
 	ps := &mockPluginSet{}
 	server := NewPluginServiceServer(ps, nil)
 
-	resp, err := server.GetConfigSchema(nil, &GetConfigSchemaRequest{})
+	resp, err := server.GetConfigSchema(context.Background(), &pb.GetConfigSchemaRequest{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -254,7 +256,7 @@ func TestPluginServiceServer_ApplyConfig(t *testing.T) {
 	ps := &mockPluginSet{}
 	server := NewPluginServiceServer(ps, nil)
 
-	resp, err := server.ApplyConfig(nil, &ApplyConfigRequest{Config: []byte("test")})
+	resp, err := server.ApplyConfig(context.Background(), &pb.ApplyConfigRequest{Config: []byte("test")})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -266,15 +268,15 @@ func TestPluginServiceServer_ApplyConfig(t *testing.T) {
 
 func TestProtoConversions(t *testing.T) {
 	// Test nil conversions
-	if protoToSDKResourceChange(nil) != nil {
+	if ProtoToSDKResourceChange(nil) != nil {
 		t.Error("expected nil for nil proto")
 	}
 
-	if sdkToProtoResourceChange(nil) != nil {
+	if SDKToProtoResourceChange(nil) != nil {
 		t.Error("expected nil for nil sdk")
 	}
 
-	if sdkToProtoDecision(nil) != nil {
+	if SDKToProtoDecision(nil) != nil {
 		t.Error("expected nil for nil decision")
 	}
 
@@ -289,13 +291,13 @@ func TestProtoConversions(t *testing.T) {
 		After:        map[string]interface{}{"key": "value"},
 	}
 
-	protoChange := sdkToProtoResourceChange(sdkChange)
+	protoChange := SDKToProtoResourceChange(sdkChange)
 	if protoChange.Address != "test.resource" {
 		t.Errorf("expected address 'test.resource', got %q", protoChange.Address)
 	}
 
 	// Convert back
-	converted := protoToSDKResourceChange(protoChange)
+	converted := ProtoToSDKResourceChange(protoChange)
 	if converted.Address != sdkChange.Address {
 		t.Errorf("round-trip failed: expected %q, got %q", sdkChange.Address, converted.Address)
 	}
@@ -308,7 +310,7 @@ func TestProtoConversions(t *testing.T) {
 		Metadata:       map[string]interface{}{"key": "value"},
 	}
 
-	protoDecision := sdkToProtoDecision(sdkDecision)
+	protoDecision := SDKToProtoDecision(sdkDecision)
 	if protoDecision.Classification != "critical" {
 		t.Errorf("expected classification 'critical', got %q", protoDecision.Classification)
 	}

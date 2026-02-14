@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/jokarl/tfclassify/sdk"
+	"github.com/jokarl/tfclassify/sdk/pb"
 	"google.golang.org/grpc"
 )
 
@@ -55,7 +56,7 @@ func TestPluginServiceServer_GetConfigSchema_WithAttributes(t *testing.T) {
 		Version: "1.0.0",
 		Schema: &sdk.ConfigSchemaSpec{
 			Attributes: []sdk.ConfigAttribute{
-				{Name: "threshold", Type: "number", Required: true},
+				{Name: "threshold", Type: "number", Required: true, Description: "Score threshold"},
 				{Name: "enabled", Type: "bool", Required: false},
 				{Name: "regions", Type: "list(string)", Required: false},
 			},
@@ -64,7 +65,7 @@ func TestPluginServiceServer_GetConfigSchema_WithAttributes(t *testing.T) {
 
 	server := NewPluginServiceServer(ps, nil)
 
-	resp, err := server.GetConfigSchema(context.Background(), &GetConfigSchemaRequest{})
+	resp, err := server.GetConfigSchema(context.Background(), &pb.GetConfigSchemaRequest{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -81,6 +82,9 @@ func TestPluginServiceServer_GetConfigSchema_WithAttributes(t *testing.T) {
 	}
 	if !resp.Attributes[0].Required {
 		t.Error("expected threshold to be required")
+	}
+	if resp.Attributes[0].Description != "Score threshold" {
+		t.Errorf("expected description 'Score threshold', got %q", resp.Attributes[0].Description)
 	}
 
 	if resp.Attributes[1].Name != "enabled" {
@@ -107,7 +111,7 @@ func TestPluginServiceServer_GetConfigSchema_SingleAttribute(t *testing.T) {
 	}
 
 	server := NewPluginServiceServer(ps, nil)
-	resp, err := server.GetConfigSchema(context.Background(), &GetConfigSchemaRequest{})
+	resp, err := server.GetConfigSchema(context.Background(), &pb.GetConfigSchemaRequest{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -125,10 +129,16 @@ func TestPluginServiceServer_Analyze_NonBuiltinSet(t *testing.T) {
 	ps := &mockPluginSet{}
 	server := NewPluginServiceServer(ps, nil)
 
-	// Analyze will fail because broker is nil, but the non-builtin branch should handle gracefully
-	// We test this indirectly by verifying the analyzer cache is empty
-	if len(server.analyzers) != 0 {
-		t.Errorf("expected 0 analyzers for non-builtin set, got %d", len(server.analyzers))
+	// Verify the impl is stored
+	if server.impl == nil {
+		t.Error("expected non-nil impl")
+	}
+
+	// A non-BuiltinPluginSet will cause Analyze to return empty response
+	// (the type assertion to *sdk.BuiltinPluginSet fails)
+	_, isBuiltin := server.impl.(*sdk.BuiltinPluginSet)
+	if isBuiltin {
+		t.Error("expected non-builtin plugin set")
 	}
 }
 
@@ -149,15 +159,13 @@ func TestPluginServiceServer_Analyze_DisabledAnalyzerSkipped(t *testing.T) {
 
 	server := NewPluginServiceServer(ps, nil)
 
-	// Verify both analyzers are in the cache
-	if len(server.analyzers) != 2 {
-		t.Errorf("expected 2 analyzers in cache, got %d", len(server.analyzers))
+	// Verify the impl is a BuiltinPluginSet with correct analyzers
+	builtinSet, ok := server.impl.(*sdk.BuiltinPluginSet)
+	if !ok {
+		t.Fatal("expected BuiltinPluginSet impl")
 	}
-	if _, ok := server.analyzers["disabled"]; !ok {
-		t.Error("expected 'disabled' analyzer in cache")
-	}
-	if _, ok := server.analyzers["enabled-one"]; !ok {
-		t.Error("expected 'enabled-one' analyzer in cache")
+	if len(builtinSet.Analyzers) != 2 {
+		t.Errorf("expected 2 analyzers, got %d", len(builtinSet.Analyzers))
 	}
 }
 
@@ -166,8 +174,9 @@ func TestPluginServiceServer_NewPluginServiceServer_NonBuiltinPluginSet(t *testi
 
 	server := NewPluginServiceServer(ps, nil)
 
-	if len(server.analyzers) != 0 {
-		t.Errorf("expected 0 analyzers in cache for non-builtin set, got %d", len(server.analyzers))
+	_, isBuiltin := server.impl.(*sdk.BuiltinPluginSet)
+	if isBuiltin {
+		t.Error("expected non-builtin plugin set")
 	}
 }
 
@@ -184,8 +193,8 @@ func TestProtoConversions_RoundTrip_WithSensitiveFields(t *testing.T) {
 		AfterSensitive:  map[string]interface{}{"password": true, "master_password": true},
 	}
 
-	proto := sdkToProtoResourceChange(original)
-	converted := protoToSDKResourceChange(proto)
+	proto := SDKToProtoResourceChange(original)
+	converted := ProtoToSDKResourceChange(proto)
 
 	if converted.Address != original.Address {
 		t.Errorf("address mismatch: %q vs %q", converted.Address, original.Address)
@@ -247,7 +256,7 @@ func TestProtoConversions_Decision_WithMetadata(t *testing.T) {
 		},
 	}
 
-	proto := sdkToProtoDecision(original)
+	proto := SDKToProtoDecision(original)
 
 	if proto.Classification != "critical" {
 		t.Errorf("classification mismatch: %q", proto.Classification)
@@ -268,7 +277,7 @@ func TestProtoConversions_Decision_NilMetadata(t *testing.T) {
 		Metadata:       nil,
 	}
 
-	proto := sdkToProtoDecision(original)
+	proto := SDKToProtoDecision(original)
 
 	if proto.Metadata != nil {
 		t.Errorf("expected nil metadata, got %v", proto.Metadata)
@@ -282,7 +291,7 @@ func TestProtoConversions_ResourceChange_EmptyFields(t *testing.T) {
 		Actions: []string{"create"},
 	}
 
-	proto := sdkToProtoResourceChange(original)
+	proto := SDKToProtoResourceChange(original)
 	if proto.Before != nil {
 		t.Errorf("expected nil Before, got %v", proto.Before)
 	}
@@ -293,7 +302,7 @@ func TestProtoConversions_ResourceChange_EmptyFields(t *testing.T) {
 		t.Errorf("expected nil BeforeSensitive, got %v", proto.BeforeSensitive)
 	}
 
-	converted := protoToSDKResourceChange(proto)
+	converted := ProtoToSDKResourceChange(proto)
 	if converted.Before != nil {
 		t.Errorf("expected nil Before after round-trip, got %v", converted.Before)
 	}
@@ -309,131 +318,7 @@ func TestRegisterPluginServiceServer(t *testing.T) {
 	defer s.Stop()
 
 	// Should not panic
-	RegisterPluginServiceServer(s, server)
-}
-
-func TestGRPCPluginServiceHandlers_NoInterceptor(t *testing.T) {
-	ps := &sdk.BuiltinPluginSet{
-		Name:    "handler-test",
-		Version: "1.0.0",
-		Schema: &sdk.ConfigSchemaSpec{
-			Attributes: []sdk.ConfigAttribute{
-				{Name: "test", Type: "string", Required: false},
-			},
-		},
-	}
-	server := NewPluginServiceServer(ps, nil)
-
-	// Test GetPluginInfo handler without interceptor
-	result, err := pluginServiceGetPluginInfoHandler(server, context.Background(), func(i interface{}) error {
-		return nil
-	}, nil)
-	if err != nil {
-		t.Fatalf("GetPluginInfo handler error: %v", err)
-	}
-	resp := result.(*GetPluginInfoResponse)
-	if resp.Name != "handler-test" {
-		t.Errorf("expected name 'handler-test', got %q", resp.Name)
-	}
-
-	// Test GetConfigSchema handler without interceptor
-	result, err = pluginServiceGetConfigSchemaHandler(server, context.Background(), func(i interface{}) error {
-		return nil
-	}, nil)
-	if err != nil {
-		t.Fatalf("GetConfigSchema handler error: %v", err)
-	}
-	schemaResp := result.(*GetConfigSchemaResponse)
-	if len(schemaResp.Attributes) != 1 {
-		t.Errorf("expected 1 attribute, got %d", len(schemaResp.Attributes))
-	}
-
-	// Test ApplyConfig handler without interceptor
-	result, err = pluginServiceApplyConfigHandler(server, context.Background(), func(i interface{}) error {
-		return nil
-	}, nil)
-	if err != nil {
-		t.Fatalf("ApplyConfig handler error: %v", err)
-	}
-	if result == nil {
-		t.Error("expected non-nil ApplyConfig response")
-	}
-}
-
-func TestGRPCPluginServiceHandlers_WithInterceptor(t *testing.T) {
-	ps := &sdk.BuiltinPluginSet{
-		Name:    "interceptor-test",
-		Version: "1.0.0",
-	}
-	server := NewPluginServiceServer(ps, nil)
-
-	interceptorCalled := false
-	interceptor := func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
-		interceptorCalled = true
-		return handler(ctx, req)
-	}
-
-	// Test GetPluginInfo with interceptor
-	result, err := pluginServiceGetPluginInfoHandler(server, context.Background(), func(i interface{}) error {
-		return nil
-	}, interceptor)
-	if err != nil {
-		t.Fatalf("handler error: %v", err)
-	}
-	if !interceptorCalled {
-		t.Error("expected interceptor to be called")
-	}
-	resp := result.(*GetPluginInfoResponse)
-	if resp.Name != "interceptor-test" {
-		t.Errorf("expected name 'interceptor-test', got %q", resp.Name)
-	}
-
-	// Test GetConfigSchema with interceptor
-	interceptorCalled = false
-	_, err = pluginServiceGetConfigSchemaHandler(server, context.Background(), func(i interface{}) error {
-		return nil
-	}, interceptor)
-	if err != nil {
-		t.Fatalf("GetConfigSchema handler error: %v", err)
-	}
-	if !interceptorCalled {
-		t.Error("expected interceptor to be called for GetConfigSchema")
-	}
-
-	// Test ApplyConfig with interceptor
-	interceptorCalled = false
-	_, err = pluginServiceApplyConfigHandler(server, context.Background(), func(i interface{}) error {
-		return nil
-	}, interceptor)
-	if err != nil {
-		t.Fatalf("ApplyConfig handler error: %v", err)
-	}
-	if !interceptorCalled {
-		t.Error("expected interceptor to be called for ApplyConfig")
-	}
-}
-
-func TestNewRunnerClient(t *testing.T) {
-	client := NewRunnerClient(nil)
-	if client == nil {
-		t.Fatal("expected non-nil RunnerClient")
-	}
-	if client.conn != nil {
-		t.Error("expected nil conn")
-	}
-}
-
-func TestNewPluginServiceClient(t *testing.T) {
-	client := NewPluginServiceClient(nil, nil)
-	if client == nil {
-		t.Fatal("expected non-nil PluginServiceClient")
-	}
-	if client.client != nil {
-		t.Error("expected nil client conn")
-	}
-	if client.broker != nil {
-		t.Error("expected nil broker")
-	}
+	pb.RegisterPluginServiceServer(s, server)
 }
 
 func TestPluginServiceServer_AnalyzerCacheWithMultipleAnalyzers(t *testing.T) {
@@ -449,13 +334,18 @@ func TestPluginServiceServer_AnalyzerCacheWithMultipleAnalyzers(t *testing.T) {
 
 	server := NewPluginServiceServer(ps, nil)
 
-	if len(server.analyzers) != 3 {
-		t.Fatalf("expected 3 analyzers, got %d", len(server.analyzers))
+	builtinSet, ok := server.impl.(*sdk.BuiltinPluginSet)
+	if !ok {
+		t.Fatal("expected BuiltinPluginSet impl")
+	}
+	if len(builtinSet.Analyzers) != 3 {
+		t.Fatalf("expected 3 analyzers, got %d", len(builtinSet.Analyzers))
 	}
 
 	for _, name := range []string{"analyzer-a", "analyzer-b", "analyzer-c"} {
-		if _, ok := server.analyzers[name]; !ok {
-			t.Errorf("expected analyzer %q in cache", name)
+		a := builtinSet.GetAnalyzer(name)
+		if a == nil {
+			t.Errorf("expected analyzer %q to be found", name)
 		}
 	}
 }
@@ -469,7 +359,7 @@ func TestPluginServiceServer_GetPluginInfo_AllFields(t *testing.T) {
 
 	server := NewPluginServiceServer(ps, nil)
 
-	resp, err := server.GetPluginInfo(context.Background(), &GetPluginInfoRequest{})
+	resp, err := server.GetPluginInfo(context.Background(), &pb.GetPluginInfoRequest{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -480,10 +370,34 @@ func TestPluginServiceServer_GetPluginInfo_AllFields(t *testing.T) {
 	if resp.Version != "2.5.0" {
 		t.Errorf("expected version '2.5.0', got %q", resp.Version)
 	}
-	if resp.SDKVersion != sdk.SDKVersion {
-		t.Errorf("expected SDK version %q, got %q", sdk.SDKVersion, resp.SDKVersion)
+	if resp.SdkVersion != sdk.SDKVersion {
+		t.Errorf("expected SDK version %q, got %q", sdk.SDKVersion, resp.SdkVersion)
 	}
 	if resp.HostVersionConstraint != ">= 0.2.0" {
 		t.Errorf("expected host constraint '>= 0.2.0', got %q", resp.HostVersionConstraint)
+	}
+}
+
+func TestNewRunnerClient(t *testing.T) {
+	client := NewRunnerClient(nil)
+	if client == nil {
+		t.Fatal("expected non-nil RunnerClient")
+	}
+	// pb.NewRunnerServiceClient(nil) returns a non-nil client wrapper
+	if client.client == nil {
+		t.Error("expected non-nil client")
+	}
+}
+
+func TestNewPluginClient(t *testing.T) {
+	client := NewPluginClient(nil, nil)
+	if client == nil {
+		t.Fatal("expected non-nil PluginClient")
+	}
+	if client.conn != nil {
+		t.Error("expected nil conn")
+	}
+	if client.broker != nil {
+		t.Error("expected nil broker")
 	}
 }

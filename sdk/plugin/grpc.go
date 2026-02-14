@@ -48,9 +48,10 @@ func (s *PluginServiceServer) GetConfigSchema(ctx context.Context, req *pb.GetCo
 	attrs := make([]*pb.ConfigAttribute, len(schema.Attributes))
 	for i, a := range schema.Attributes {
 		attrs[i] = &pb.ConfigAttribute{
-			Name:     a.Name,
-			Type:     a.Type,
-			Required: a.Required,
+			Name:        a.Name,
+			Type:        a.Type,
+			Required:    a.Required,
+			Description: a.Description,
 		}
 	}
 

@@ -1,6 +1,7 @@
 ---
 id: "CR-0007"
-status: implemented
+status: superseded
+superseded-by: CR-0018
 date: 2026-02-13
 requestor: Johan
 stakeholders: Johan
