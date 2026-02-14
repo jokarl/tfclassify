@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -900,6 +901,106 @@ func TestInstallPlugins_VersionUpgrade(t *testing.T) {
 	output := buf.String()
 	if !strings.Contains(output, "upgrading from v1.0.0 to v2.0.0") {
 		t.Errorf("expected upgrade message, got: %s", output)
+	}
+}
+
+func TestResolveReleaseTag(t *testing.T) {
+	tests := []struct {
+		name    string
+		plugin  string
+		repo    string
+		version string
+		want    string
+	}{
+		{
+			name:    "standalone repo",
+			plugin:  "azurerm",
+			repo:    "tfclassify-plugin-azurerm",
+			version: "0.1.0",
+			want:    "v0.1.0",
+		},
+		{
+			name:    "monorepo",
+			plugin:  "azurerm",
+			repo:    "tfclassify",
+			version: "0.1.0",
+			want:    "tfclassify-plugin-azurerm-v0.1.0",
+		},
+		{
+			name:    "monorepo different plugin",
+			plugin:  "aws",
+			repo:    "tfclassify",
+			version: "2.3.4",
+			want:    "tfclassify-plugin-aws-v2.3.4",
+		},
+		{
+			name:    "standalone repo different plugin",
+			plugin:  "aws",
+			repo:    "tfclassify-plugin-aws",
+			version: "1.0.0",
+			want:    "v1.0.0",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := resolveReleaseTag(tt.plugin, tt.repo, tt.version)
+			if got != tt.want {
+				t.Errorf("resolveReleaseTag(%q, %q, %q) = %q, want %q", tt.plugin, tt.repo, tt.version, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDownloadURL_Monorepo(t *testing.T) {
+	// Verify URL construction for monorepo source (repo != plugin binary name)
+	name := "azurerm"
+	source := "github.com/jokarl/tfclassify"
+	version := "0.1.0"
+
+	owner, repo, err := parseGitHubSource(source)
+	if err != nil {
+		t.Fatalf("parseGitHubSource(%q) error: %v", source, err)
+	}
+
+	tag := resolveReleaseTag(name, repo, version)
+	assetName := fmt.Sprintf("tfclassify-plugin-%s_%s_%s_%s.zip", name, version, runtime.GOOS, runtime.GOARCH)
+	url := fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s", owner, repo, tag, assetName)
+
+	expectedTag := "tfclassify-plugin-azurerm-v0.1.0"
+	if tag != expectedTag {
+		t.Errorf("tag = %q, want %q", tag, expectedTag)
+	}
+
+	expectedPrefix := "https://github.com/jokarl/tfclassify/releases/download/tfclassify-plugin-azurerm-v0.1.0/tfclassify-plugin-azurerm_0.1.0_"
+	if !strings.HasPrefix(url, expectedPrefix) {
+		t.Errorf("url = %q, want prefix %q", url, expectedPrefix)
+	}
+}
+
+func TestDownloadURL_Standalone(t *testing.T) {
+	// Verify URL construction for standalone repo (repo == plugin binary name)
+	name := "azurerm"
+	source := "github.com/jokarl/tfclassify-plugin-azurerm"
+	version := "0.1.0"
+
+	owner, repo, err := parseGitHubSource(source)
+	if err != nil {
+		t.Fatalf("parseGitHubSource(%q) error: %v", source, err)
+	}
+
+	tag := resolveReleaseTag(name, repo, version)
+	assetName := fmt.Sprintf("tfclassify-plugin-%s_%s_%s_%s.zip", name, version, runtime.GOOS, runtime.GOARCH)
+	url := fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s", owner, repo, tag, assetName)
+
+	expectedTag := "v0.1.0"
+	if tag != expectedTag {
+		t.Errorf("tag = %q, want %q", tag, expectedTag)
+	}
+
+	expectedPrefix := "https://github.com/jokarl/tfclassify-plugin-azurerm/releases/download/v0.1.0/tfclassify-plugin-azurerm_0.1.0_"
+	if !strings.HasPrefix(url, expectedPrefix) {
+		t.Errorf("url = %q, want prefix %q", url, expectedPrefix)
 	}
 }
 

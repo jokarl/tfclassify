@@ -138,6 +138,16 @@ func isInstalledAtVersion(binaryPath, name, version string, manifest *Manifest) 
 	return installedVersion == version
 }
 
+// resolveReleaseTag returns the GitHub release tag for a plugin.
+// If the repo name matches the plugin binary name (standalone repo), it uses "v{version}".
+// Otherwise (monorepo), it uses "{binaryName}-v{version}".
+func resolveReleaseTag(name, repo, version string) string {
+	if repo == PluginBinaryPrefix+name {
+		return "v" + version
+	}
+	return PluginBinaryPrefix + name + "-v" + version
+}
+
 // downloadAndInstall downloads a plugin from GitHub releases and installs it.
 func downloadAndInstall(name, source, version, pluginDir string) error {
 	// Parse the source to get owner/repo
@@ -148,8 +158,9 @@ func downloadAndInstall(name, source, version, pluginDir string) error {
 	}
 
 	// Construct the release asset URL
+	tag := resolveReleaseTag(name, repo, version)
 	assetName := fmt.Sprintf("tfclassify-plugin-%s_%s_%s_%s.zip", name, version, runtime.GOOS, runtime.GOARCH)
-	assetURL := fmt.Sprintf("https://github.com/%s/%s/releases/download/v%s/%s", owner, repo, version, assetName)
+	assetURL := fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s", owner, repo, tag, assetName)
 
 	// Create plugin directory if it doesn't exist
 	if err := os.MkdirAll(pluginDir, 0755); err != nil {

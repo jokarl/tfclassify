@@ -47,9 +47,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release upload "${{ needs.release-please.outputs.cli_tag_name }}" \
-            dist/tfclassify_*.tar.gz \
             dist/tfclassify_*.zip \
-            dist/tfclassify_checksums.txt \
+            dist/tfclassify_*_checksums.txt \
             --clobber
 
   goreleaser-plugin:
@@ -76,7 +75,6 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release upload "${{ needs.release-please.outputs.plugin_tag_name }}" \
-            plugins/azurerm/dist/tfclassify-plugin-azurerm_*.tar.gz \
             plugins/azurerm/dist/tfclassify-plugin-azurerm_*.zip \
-            plugins/azurerm/dist/tfclassify-plugin-azurerm_checksums.txt \
+            plugins/azurerm/dist/tfclassify-plugin-azurerm_*_checksums.txt \
             --clobber
