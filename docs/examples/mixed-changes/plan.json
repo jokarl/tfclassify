@@ -1,0 +1,151 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.9.0",
+  "resource_changes": [
+    {
+      "address": "azurerm_key_vault.secrets",
+      "mode": "managed",
+      "type": "azurerm_key_vault",
+      "name": "secrets",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["delete"],
+        "before": {
+          "name": "kv-secrets-prod",
+          "location": "westeurope",
+          "resource_group_name": "rg-production",
+          "sku_name": "standard",
+          "purge_protection_enabled": true
+        },
+        "after": null,
+        "after_unknown": {},
+        "before_sensitive": false,
+        "after_sensitive": false
+      }
+    },
+    {
+      "address": "azurerm_network_security_rule.allow_https",
+      "mode": "managed",
+      "type": "azurerm_network_security_rule",
+      "name": "allow_https",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "name": "allow-https-inbound",
+          "priority": 100,
+          "direction": "Inbound",
+          "access": "Allow",
+          "protocol": "Tcp",
+          "source_port_range": "*",
+          "destination_port_range": "443",
+          "source_address_prefix": "*",
+          "destination_address_prefix": "10.0.1.0/24"
+        },
+        "after_unknown": {
+          "id": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": false
+      }
+    },
+    {
+      "address": "azurerm_subnet.backend",
+      "mode": "managed",
+      "type": "azurerm_subnet",
+      "name": "backend",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["delete", "create"],
+        "before": {
+          "name": "snet-backend",
+          "address_prefixes": ["10.0.2.0/24"],
+          "virtual_network_name": "vnet-production"
+        },
+        "after": {
+          "name": "snet-backend",
+          "address_prefixes": ["10.0.3.0/24"],
+          "virtual_network_name": "vnet-production"
+        },
+        "after_unknown": {
+          "id": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": false
+      }
+    },
+    {
+      "address": "azurerm_storage_account.logs",
+      "mode": "managed",
+      "type": "azurerm_storage_account",
+      "name": "logs",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["update"],
+        "before": {
+          "name": "stlogs001",
+          "account_tier": "Standard",
+          "account_replication_type": "LRS",
+          "min_tls_version": "TLS1_2"
+        },
+        "after": {
+          "name": "stlogs001",
+          "account_tier": "Standard",
+          "account_replication_type": "GRS",
+          "min_tls_version": "TLS1_2"
+        },
+        "after_unknown": {},
+        "before_sensitive": false,
+        "after_sensitive": false
+      }
+    },
+    {
+      "address": "azurerm_key_vault_secret.db_password",
+      "mode": "managed",
+      "type": "azurerm_key_vault_secret",
+      "name": "db_password",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["update"],
+        "before": {
+          "name": "db-password",
+          "value": "old-password-value",
+          "key_vault_id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-production/providers/Microsoft.KeyVault/vaults/kv-secrets-prod"
+        },
+        "after": {
+          "name": "db-password",
+          "value": "new-password-value",
+          "key_vault_id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-production/providers/Microsoft.KeyVault/vaults/kv-secrets-prod"
+        },
+        "after_unknown": {},
+        "before_sensitive": {
+          "value": true
+        },
+        "after_sensitive": {
+          "value": true
+        }
+      }
+    },
+    {
+      "address": "azurerm_resource_group.monitoring",
+      "mode": "managed",
+      "type": "azurerm_resource_group",
+      "name": "monitoring",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "name": "rg-monitoring",
+          "location": "westeurope"
+        },
+        "after_unknown": {
+          "id": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": false
+      }
+    }
+  ]
+}

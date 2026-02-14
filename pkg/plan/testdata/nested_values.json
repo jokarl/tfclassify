@@ -1,0 +1,32 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.5.0",
+  "resource_changes": [
+    {
+      "address": "azurerm_virtual_machine.example",
+      "mode": "managed",
+      "type": "azurerm_virtual_machine",
+      "name": "example",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "name": "vm-example",
+          "os_disk": {
+            "caching": "ReadWrite",
+            "storage_account_type": "Standard_LRS"
+          },
+          "network_interface_ids": ["/subscriptions/abc/nic1", "/subscriptions/abc/nic2"],
+          "tags": {
+            "environment": "production",
+            "team": "platform"
+          }
+        },
+        "after_unknown": {},
+        "before_sensitive": false,
+        "after_sensitive": false
+      }
+    }
+  ]
+}

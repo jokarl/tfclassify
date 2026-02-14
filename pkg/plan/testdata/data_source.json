@@ -1,0 +1,23 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.5.0",
+  "resource_changes": [
+    {
+      "address": "data.azurerm_subscription.current",
+      "mode": "data",
+      "type": "azurerm_subscription",
+      "name": "current",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["read"],
+        "before": null,
+        "after": {
+          "subscription_id": "abc-123"
+        },
+        "after_unknown": {},
+        "before_sensitive": false,
+        "after_sensitive": false
+      }
+    }
+  ]
+}

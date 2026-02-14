@@ -41,11 +41,11 @@ Chosen option: "Provider-agnostic core with pattern matching + bundled cross-pro
 │ → Analyzes CIDR ranges in security rules                    │
 │ → Emits decisions with severity and reasoning               │
 ├─────────────────────────────────────────────────────────────┤
-│ Layer 2: Bundled "terraform" Plugin (cross-provider)        │
+│ Layer 2: Builtin Analyzers (cross-provider, in-process)     │
 │ → Detects resource deletions and replacements               │
 │ → Flags changes to sensitive-marked attributes              │
 │ → Analyzes action patterns beyond simple glob matching      │
-│ → Enabled by default, can be disabled                       │
+│ → Enabled by default, runs in-process (no gRPC overhead)    │
 ├─────────────────────────────────────────────────────────────┤
 │ Layer 1: Core Engine (config-driven pattern matching)       │
 │ → Reads org-defined classification levels from config       │
@@ -65,15 +65,17 @@ Config-driven rules match on:
 - Action types: `create`, `update`, `delete`, `replace`
 - Negation patterns: `notResource` for exclusion-based rules
 
-### Layer 2: Bundled "terraform" Plugin
+### Layer 2: Builtin Analyzers (cross-provider)
 
-Like TFLint's bundled terraform plugin, this is enabled by default and provides cross-provider analyzers that go beyond simple pattern matching:
+> **Note:** This layer was originally designed as a bundled "terraform" plugin running as a separate process (TFLint pattern). CR-0018 inlined these analyzers into the core classification engine as in-process `BuiltinAnalyzer` implementations in `pkg/classify/`, eliminating process spawn overhead while preserving the same functionality. The `plugin "terraform"` config block is accepted for backward compatibility but has no effect.
+
+The following cross-provider analyzers are enabled by default:
 
 - **Deletion analyzer**: flags resource deletions with context (is it a standalone delete or part of a replacement?)
 - **Sensitive attribute analyzer**: detects changes to attributes marked as sensitive in the Terraform state
 - **Replace analyzer**: identifies destroy-and-recreate changes that may cause downtime
 
-These analyzers work across all providers because they operate on Terraform-level concepts (actions, sensitive markers) rather than provider-specific field semantics. They can be individually disabled in config.
+These analyzers work across all providers because they operate on Terraform-level concepts (actions, sensitive markers) rather than provider-specific field semantics.
 
 ### Layer 3: Deep Inspection Plugins
 

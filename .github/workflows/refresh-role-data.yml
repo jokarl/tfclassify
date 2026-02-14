@@ -1,0 +1,44 @@
+name: Refresh role data
+
+on:
+  schedule:
+    - cron: "0 0 * * 1" # Weekly, Monday 00:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: make generate-roles
+      - name: Create PR if roles changed
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if git diff --quiet plugins/azurerm/roledata/roles.json; then
+            echo "No changes detected, skipping PR."
+            exit 0
+          fi
+          BRANCH="auto/refresh-role-data"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$BRANCH"
+          git add plugins/azurerm/roledata/roles.json
+          git commit -m "chore: refresh Azure built-in role data"
+          git push -f origin "$BRANCH"
+          if gh pr view "$BRANCH" --json state -q .state 2>/dev/null | grep -q OPEN; then
+            echo "PR already exists, updated branch."
+          else
+            gh pr create \
+              --base main \
+              --head "$BRANCH" \
+              --title "chore: refresh Azure built-in role data" \
+              --body "Automated weekly refresh of Azure built-in role definitions from AzAdvertizer."
+          fi

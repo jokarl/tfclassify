@@ -1,0 +1,20 @@
+version: 2
+project_name: tfclassify
+
+builds:
+  - main: ./cmd/tfclassify
+    binary: tfclassify
+    ldflags:
+      - -s -w -X main.Version={{.Version}}
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+
+archives:
+  - name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format: zip
+
+checksum:
+  name_template: "{{ .ProjectName }}_{{ .Version }}_checksums.txt"
+
+release:
+  skip: true

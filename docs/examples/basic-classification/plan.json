@@ -1,0 +1,69 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.9.0",
+  "resource_changes": [
+    {
+      "address": "azurerm_role_assignment.admin",
+      "mode": "managed",
+      "type": "azurerm_role_assignment",
+      "name": "admin",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "principal_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+          "role_definition_name": "Owner",
+          "scope": "/subscriptions/00000000-0000-0000-0000-000000000000"
+        },
+        "after_unknown": {
+          "id": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": false
+      }
+    },
+    {
+      "address": "azurerm_virtual_network.main",
+      "mode": "managed",
+      "type": "azurerm_virtual_network",
+      "name": "main",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "name": "vnet-production",
+          "address_space": ["10.0.0.0/16"],
+          "location": "westeurope",
+          "resource_group_name": "rg-production"
+        },
+        "after_unknown": {
+          "id": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": false
+      }
+    },
+    {
+      "address": "azurerm_resource_group.production",
+      "mode": "managed",
+      "type": "azurerm_resource_group",
+      "name": "production",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "name": "rg-production",
+          "location": "westeurope"
+        },
+        "after_unknown": {
+          "id": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": false
+      }
+    }
+  ]
+}

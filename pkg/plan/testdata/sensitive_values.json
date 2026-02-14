@@ -1,0 +1,31 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.5.0",
+  "resource_changes": [
+    {
+      "address": "azurerm_key_vault_secret.password",
+      "mode": "managed",
+      "type": "azurerm_key_vault_secret",
+      "name": "password",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["update"],
+        "before": {
+          "name": "my-secret",
+          "value": "old-secret-value"
+        },
+        "after": {
+          "name": "my-secret",
+          "value": "new-secret-value"
+        },
+        "after_unknown": {},
+        "before_sensitive": {
+          "value": true
+        },
+        "after_sensitive": {
+          "value": true
+        }
+      }
+    }
+  ]
+}
