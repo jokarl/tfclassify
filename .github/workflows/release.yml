@@ -78,7 +78,7 @@ jobs:
           go-version-file: go.mod
       - uses: goreleaser/goreleaser-action@v6
         with:
-          args: release --clean
+          args: release --clean ${{ github.event_name == 'workflow_dispatch' && '--skip=validate' || '' }}
         env:
           GORELEASER_CURRENT_TAG: v${{ needs.resolve.outputs.cli_version || needs.release-please.outputs.cli_version }}
       - name: Upload artifacts to GitHub Release
@@ -108,7 +108,7 @@ jobs:
       - uses: goreleaser/goreleaser-action@v6
         with:
           workdir: plugins/azurerm
-          args: release --clean
+          args: release --clean ${{ github.event_name == 'workflow_dispatch' && '--skip=validate' || '' }}
         env:
           GORELEASER_CURRENT_TAG: v${{ needs.resolve.outputs.plugin_version || needs.release-please.outputs.plugin_version }}
       - name: Upload artifacts to GitHub Release
