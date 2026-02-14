@@ -91,26 +91,35 @@ Go workspace mode ensures all commands run across all three modules (root, plugi
 
 ### 2. Release Workflow (`.github/workflows/release.yml`)
 
-Runs on push to main. Three potential jobs:
+Runs on push to main (automated) or via `workflow_dispatch` with explicit tags (manual recovery). Four jobs:
 
 ```mermaid
 flowchart TD
-    subgraph Release["Push to main"]
-        RP["release-please<br/>(path-based monorepo)"]
+    subgraph Trigger["Trigger"]
+        PUSH["push to main"]
+        DISPATCH["workflow_dispatch<br/>(tags CSV input)"]
     end
 
-    RP -->|".  release_created"| GR_CLI["goreleaser-cli"]
-    RP -->|"plugins/azurerm--release_created"| GR_PLUGIN["goreleaser-plugin"]
-    RP -->|"sdk--release_created"| SDK_DONE["SDK release<br/>(tag + changelog only)"]
-    RP -->|"no releases"| SKIP["skip"]
+    subgraph Release["Release"]
+        RP["release-please<br/>(path-based monorepo)"]
+        RESOLVE["resolve<br/>(merge outputs or parse tags)"]
+    end
+
+    PUSH --> RP
+    RP -->|"outputs"| RESOLVE
+    DISPATCH -->|"tags input"| RESOLVE
+
+    RESOLVE -->|"cli_release=true"| GR_CLI["goreleaser-cli"]
+    RESOLVE -->|"plugin_release=true"| GR_PLUGIN["goreleaser-plugin"]
+    RESOLVE -->|"no releases"| SKIP["skip"]
 
     GR_CLI -->|"gh release upload"| REL_CLI["GitHub Release<br/>tfclassify-v0.2.0"]
     GR_PLUGIN -->|"gh release upload"| REL_PLUGIN["GitHub Release<br/>tfclassify-plugin-azurerm-v0.1.1"]
 ```
 
-**Job 1: release-please**
+**Job 1: release-please** (push only)
 
-Uses `googleapis/release-please-action@v4` with path-based monorepo config. Each module is a separate package in `release-please-config.json` with `include-component-in-tag: true`. The action emits path-prefixed outputs:
+Conditional on `github.event_name == 'push'`. Uses `googleapis/release-please-action@v4` with path-based monorepo config. Each module is a separate package in `release-please-config.json` with `include-component-in-tag: true`. The action emits path-prefixed outputs:
 
 | Output | Example |
 |--------|---------|
@@ -124,15 +133,43 @@ Uses `googleapis/release-please-action@v4` with path-based monorepo config. Each
 | `sdk--tag_name` | `tfclassify-plugin-tfclassify-plugin-sdk-v0.1.1` |
 | `sdk--version` | `0.1.1` |
 
-**Job 2: goreleaser-cli** (conditional on root release)
+**Job 2: resolve** (always runs)
+
+Intermediary job that normalizes parameters for downstream goreleaser jobs. On `push`, it passes through release-please outputs. On `workflow_dispatch`, it parses the CSV `tags` input to extract component, tag name, and version for each recognized tag pattern. Unrecognized tags emit a workflow warning.
+
+Tag patterns:
+- `tfclassify-v<version>` → triggers CLI build
+- `tfclassify-plugin-azurerm-v<version>` → triggers plugin build
+
+**Job 3: goreleaser-cli** (conditional on `resolve.cli_release == 'true'`)
 
 Runs goreleaser from the repo root using `.goreleaser.yml`. Builds `tfclassify` for all platforms. Uses `release.skip: true` in goreleaser config so goreleaser builds + archives + checksums without touching the GitHub Release. Then `gh release upload` attaches the artifacts to the release-please-created release.
 
-**Job 3: goreleaser-plugin** (conditional on plugin release)
+**Job 4: goreleaser-plugin** (conditional on `resolve.plugin_release == 'true'`)
 
 Runs goreleaser with `workdir: plugins/azurerm` using `plugins/azurerm/.goreleaser.yml`. Same pattern: goreleaser builds, `gh release upload` attaches to the plugin's GitHub Release.
 
 **SDK releases** create a tag and changelog only — no binary to build.
+
+#### Recovery via `workflow_dispatch`
+
+When the automated release flow fails after release-please has created tags and releases (e.g., goreleaser build failure, upload failure, or a bug in the workflow itself), the goreleaser jobs cannot be recovered by re-running the workflow. This is because release-please detects the existing tag on re-run and sets `release_created=false`, causing all downstream jobs to skip.
+
+The `workflow_dispatch` trigger provides a recovery path:
+
+1. Fix the root cause (workflow bug, build issue, etc.) on the target branch
+2. Trigger the workflow manually via GitHub UI or `gh workflow run`
+3. Provide the tags of releases that need artifact builds as CSV
+
+```bash
+# Rebuild CLI artifacts only
+gh workflow run release --ref main -f tags=tfclassify-v0.1.0
+
+# Rebuild both CLI and plugin artifacts
+gh workflow run release --ref main -f tags="tfclassify-v0.1.0,tfclassify-plugin-azurerm-v0.1.0"
+```
+
+This skips release-please entirely and runs only the resolve + goreleaser jobs. The `--ref` flag selects which branch's workflow code to execute, so fixes to the workflow itself take effect immediately. `gh release upload --clobber` ensures artifacts are replaced if a partial upload occurred.
 
 ### 3. GoReleaser Configurations
 
@@ -262,8 +299,15 @@ flowchart TD
         MAIN_RP["release-please<br/>(monorepo, path-based)"]
     end
 
-    MAIN_RP -->|". release"| CLI_GR["goreleaser-cli<br/>workdir: ."]
-    MAIN_RP -->|"plugins/azurerm release"| PLG_GR["goreleaser-plugin<br/>workdir: plugins/azurerm"]
+    subgraph Manual["workflow_dispatch"]
+        TAGS["tags CSV input"]
+    end
+
+    MAIN_RP -->|"outputs"| RESOLVE["resolve<br/>(normalize parameters)"]
+    TAGS -->|"parse tags"| RESOLVE
+
+    RESOLVE -->|"cli_release=true"| CLI_GR["goreleaser-cli<br/>workdir: ."]
+    RESOLVE -->|"plugin_release=true"| PLG_GR["goreleaser-plugin<br/>workdir: plugins/azurerm"]
     MAIN_RP -->|"sdk release"| SDK_REL["Tag + CHANGELOG only"]
 
     CLI_GR --> CLI_UP["gh release upload →<br/>tfclassify-v0.2.0"]
@@ -305,6 +349,10 @@ flowchart TD
 18. GoReleaser **MUST** generate checksums for all archives
 19. The plugin's version declaration **MUST** be changed from `const` to `var` to support ldflags injection
 20. All workflows **MUST** pin the Go version using `go-version-file: go.mod`
+21. The release workflow **MUST** support `workflow_dispatch` with a `tags` CSV input to rebuild artifacts for existing releases without re-running release-please
+22. The release workflow **MUST** use an intermediary `resolve` job that normalizes release parameters from either release-please outputs (push) or parsed tag inputs (workflow_dispatch)
+23. The `resolve` job **MUST** parse component-prefixed tags (`tfclassify-v<version>`, `tfclassify-plugin-azurerm-v<version>`) to extract the tag name and version for each component
+24. The `resolve` job **MUST** emit a workflow warning for unrecognized tag formats
 
 ### Non-Functional Requirements
 
@@ -474,6 +522,12 @@ name: release
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      tags:
+        description: "CSV of release tags to rebuild, e.g. tfclassify-v0.1.0,tfclassify-plugin-azurerm-v0.1.0"
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -481,6 +535,7 @@ permissions:
 
 jobs:
   release-please:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     outputs:
       cli_release_created: ${{ steps.release.outputs.release_created }}
@@ -495,9 +550,49 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-  goreleaser-cli:
+  resolve:
     needs: release-please
-    if: ${{ needs.release-please.outputs.cli_release_created == 'true' }}
+    if: always() && (needs.release-please.result == 'success' || needs.release-please.result == 'skipped')
+    runs-on: ubuntu-latest
+    outputs:
+      cli_release: ${{ steps.resolve.outputs.cli_release }}
+      cli_tag: ${{ steps.resolve.outputs.cli_tag }}
+      cli_version: ${{ steps.resolve.outputs.cli_version }}
+      plugin_release: ${{ steps.resolve.outputs.plugin_release }}
+      plugin_tag: ${{ steps.resolve.outputs.plugin_tag }}
+      plugin_version: ${{ steps.resolve.outputs.plugin_version }}
+    steps:
+      - name: Resolve release parameters
+        id: resolve
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "cli_release=${{ needs.release-please.outputs.cli_release_created }}" >> "$GITHUB_OUTPUT"
+            echo "cli_tag=${{ needs.release-please.outputs.cli_tag_name }}" >> "$GITHUB_OUTPUT"
+            echo "cli_version=${{ needs.release-please.outputs.cli_version }}" >> "$GITHUB_OUTPUT"
+            echo "plugin_release=${{ needs.release-please.outputs.plugin_release_created }}" >> "$GITHUB_OUTPUT"
+            echo "plugin_tag=${{ needs.release-please.outputs.plugin_tag_name }}" >> "$GITHUB_OUTPUT"
+            echo "plugin_version=${{ needs.release-please.outputs.plugin_version }}" >> "$GITHUB_OUTPUT"
+          else
+            IFS=',' read -ra TAGS <<< "${{ inputs.tags }}"
+            for tag in "${TAGS[@]}"; do
+              tag=$(echo "$tag" | xargs)
+              if [[ "$tag" =~ ^tfclassify-plugin-azurerm-v(.+)$ ]]; then
+                echo "plugin_release=true" >> "$GITHUB_OUTPUT"
+                echo "plugin_tag=$tag" >> "$GITHUB_OUTPUT"
+                echo "plugin_version=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+              elif [[ "$tag" =~ ^tfclassify-v(.+)$ ]]; then
+                echo "cli_release=true" >> "$GITHUB_OUTPUT"
+                echo "cli_tag=$tag" >> "$GITHUB_OUTPUT"
+                echo "cli_version=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+              else
+                echo "::warning::Unrecognized tag format: $tag"
+              fi
+            done
+          fi
+
+  goreleaser-cli:
+    needs: resolve
+    if: needs.resolve.outputs.cli_release == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -512,20 +607,19 @@ jobs:
         with:
           args: release --clean
         env:
-          GORELEASER_CURRENT_TAG: v${{ needs.release-please.outputs.cli_version }}
+          GORELEASER_CURRENT_TAG: v${{ needs.resolve.outputs.cli_version }}
       - name: Upload artifacts to GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release upload "${{ needs.release-please.outputs.cli_tag_name }}" \
-            dist/tfclassify_*.tar.gz \
+          gh release upload "${{ needs.resolve.outputs.cli_tag }}" \
             dist/tfclassify_*.zip \
-            dist/tfclassify_checksums.txt \
+            dist/tfclassify_*_checksums.txt \
             --clobber
 
   goreleaser-plugin:
-    needs: release-please
-    if: ${{ needs.release-please.outputs.plugin_release_created == 'true' }}
+    needs: resolve
+    if: needs.resolve.outputs.plugin_release == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -541,21 +635,23 @@ jobs:
           workdir: plugins/azurerm
           args: release --clean
         env:
-          GORELEASER_CURRENT_TAG: v${{ needs.release-please.outputs.plugin_version }}
+          GORELEASER_CURRENT_TAG: v${{ needs.resolve.outputs.plugin_version }}
       - name: Upload artifacts to GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release upload "${{ needs.release-please.outputs.plugin_tag_name }}" \
-            plugins/azurerm/dist/tfclassify-plugin-azurerm_*.tar.gz \
+          gh release upload "${{ needs.resolve.outputs.plugin_tag }}" \
             plugins/azurerm/dist/tfclassify-plugin-azurerm_*.zip \
-            plugins/azurerm/dist/tfclassify-plugin-azurerm_checksums.txt \
+            plugins/azurerm/dist/tfclassify-plugin-azurerm_*_checksums.txt \
             --clobber
 ```
 
 Key design points:
+- `workflow_dispatch` with a `tags` CSV input enables manual recovery when goreleaser fails after release-please succeeds — the `resolve` job parses tags to extract component and version, bypassing release-please entirely
+- release-please is conditional on `github.event_name == 'push'` — skipped during manual dispatch since tags and releases already exist
+- The `resolve` job normalizes parameters from either source (release-please outputs or manual tags) so goreleaser jobs have a single consistent interface
 - `GORELEASER_CURRENT_TAG=v<version>` gives goreleaser an unprefixed semver tag it can parse, while `release.skip: true` in the goreleaser config prevents it from creating or modifying releases
-- `gh release upload` uses the component-prefixed tag from release-please (e.g., `tfclassify-v0.2.0`) to attach artifacts to the correct release
+- `gh release upload --clobber` uses the component-prefixed tag (e.g., `tfclassify-v0.2.0`) to attach artifacts to the correct release, replacing any partial uploads from a failed run
 - The plugin job uses `workdir: plugins/azurerm` so goreleaser reads `plugins/azurerm/.goreleaser.yml` and builds from that directory
 - Both goreleaser jobs can run in parallel since they target independent releases
 
@@ -673,6 +769,36 @@ When goreleaser builds with -ldflags -X main.Version=0.1.1
 Then the plugin binary reports version "0.1.1" to the host
 ```
 
+### AC-11: Manual recovery via workflow_dispatch
+
+```gherkin
+Given release-please has created a release with tag tfclassify-v0.2.0
+  And the goreleaser-cli job failed (build error, upload error, or workflow bug)
+When the workflow is triggered manually with tags "tfclassify-v0.2.0"
+Then the release-please job is skipped
+  And the resolve job parses the tag to extract version "0.2.0"
+  And the goreleaser-cli job builds and uploads artifacts to the tfclassify-v0.2.0 release
+```
+
+### AC-12: Manual recovery with multiple tags
+
+```gherkin
+Given release-please has created releases for both CLI and plugin
+  And both goreleaser jobs failed
+When the workflow is triggered manually with tags "tfclassify-v0.2.0,tfclassify-plugin-azurerm-v0.1.1"
+Then both goreleaser-cli and goreleaser-plugin jobs run in parallel
+  And artifacts are uploaded to their respective GitHub Releases
+```
+
+### AC-13: Unrecognized tags emit warning
+
+```gherkin
+Given the workflow is triggered manually with tags "unknown-v1.0.0"
+When the resolve job parses the tags
+Then a workflow warning is emitted for the unrecognized tag
+  And no goreleaser jobs run
+```
+
 ## Quality Standards Compliance
 
 ### Build & Compilation
@@ -752,6 +878,12 @@ actionlint .github/workflows/ci.yml .github/workflows/release.yml
 **Likelihood:** certain
 **Impact:** low
 **Mitigation:** Four parallel CI jobs each take ~1-2 minutes. Public repositories get unlimited Actions minutes. Private repositories on free tier get 2,000 minutes/month — sufficient for typical development cadence.
+
+### Risk 6: Release workflow not recoverable after goreleaser failure
+
+**Likelihood:** low
+**Impact:** high
+**Mitigation:** When release-please succeeds but goreleaser fails, re-running the workflow does not help — release-please detects the existing tag and sets `release_created=false`, causing goreleaser jobs to skip. The `workflow_dispatch` trigger with a `tags` CSV input provides a recovery path: fix the root cause, then manually trigger with the existing release tags. The `resolve` job parses tags to extract component and version, bypassing release-please entirely. Since `workflow_dispatch` runs the workflow from the specified `--ref` branch, workflow fixes take effect immediately.
 
 ## Dependencies
 

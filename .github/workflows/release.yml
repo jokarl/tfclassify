@@ -3,6 +3,12 @@ name: release
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      tags:
+        description: "CSV of release tags to rebuild, e.g. tfclassify-v0.1.0,tfclassify-plugin-azurerm-v0.1.0"
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -10,6 +16,7 @@ permissions:
 
 jobs:
   release-please:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     outputs:
       cli_release_created: ${{ steps.release.outputs.release_created }}
@@ -24,9 +31,49 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-  goreleaser-cli:
+  resolve:
     needs: release-please
-    if: ${{ needs.release-please.outputs.cli_release_created == 'true' }}
+    if: always() && (needs.release-please.result == 'success' || needs.release-please.result == 'skipped')
+    runs-on: ubuntu-latest
+    outputs:
+      cli_release: ${{ steps.resolve.outputs.cli_release }}
+      cli_tag: ${{ steps.resolve.outputs.cli_tag }}
+      cli_version: ${{ steps.resolve.outputs.cli_version }}
+      plugin_release: ${{ steps.resolve.outputs.plugin_release }}
+      plugin_tag: ${{ steps.resolve.outputs.plugin_tag }}
+      plugin_version: ${{ steps.resolve.outputs.plugin_version }}
+    steps:
+      - name: Resolve release parameters
+        id: resolve
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "cli_release=${{ needs.release-please.outputs.cli_release_created }}" >> "$GITHUB_OUTPUT"
+            echo "cli_tag=${{ needs.release-please.outputs.cli_tag_name }}" >> "$GITHUB_OUTPUT"
+            echo "cli_version=${{ needs.release-please.outputs.cli_version }}" >> "$GITHUB_OUTPUT"
+            echo "plugin_release=${{ needs.release-please.outputs.plugin_release_created }}" >> "$GITHUB_OUTPUT"
+            echo "plugin_tag=${{ needs.release-please.outputs.plugin_tag_name }}" >> "$GITHUB_OUTPUT"
+            echo "plugin_version=${{ needs.release-please.outputs.plugin_version }}" >> "$GITHUB_OUTPUT"
+          else
+            IFS=',' read -ra TAGS <<< "${{ inputs.tags }}"
+            for tag in "${TAGS[@]}"; do
+              tag=$(echo "$tag" | xargs)
+              if [[ "$tag" =~ ^tfclassify-plugin-azurerm-v(.+)$ ]]; then
+                echo "plugin_release=true" >> "$GITHUB_OUTPUT"
+                echo "plugin_tag=$tag" >> "$GITHUB_OUTPUT"
+                echo "plugin_version=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+              elif [[ "$tag" =~ ^tfclassify-v(.+)$ ]]; then
+                echo "cli_release=true" >> "$GITHUB_OUTPUT"
+                echo "cli_tag=$tag" >> "$GITHUB_OUTPUT"
+                echo "cli_version=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+              else
+                echo "::warning::Unrecognized tag format: $tag"
+              fi
+            done
+          fi
+
+  goreleaser-cli:
+    needs: resolve
+    if: needs.resolve.outputs.cli_release == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -41,19 +88,19 @@ jobs:
         with:
           args: release --clean
         env:
-          GORELEASER_CURRENT_TAG: v${{ needs.release-please.outputs.cli_version }}
+          GORELEASER_CURRENT_TAG: v${{ needs.resolve.outputs.cli_version }}
       - name: Upload artifacts to GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release upload "${{ needs.release-please.outputs.cli_tag_name }}" \
+          gh release upload "${{ needs.resolve.outputs.cli_tag }}" \
             dist/tfclassify_*.zip \
             dist/tfclassify_*_checksums.txt \
             --clobber
 
   goreleaser-plugin:
-    needs: release-please
-    if: ${{ needs.release-please.outputs.plugin_release_created == 'true' }}
+    needs: resolve
+    if: needs.resolve.outputs.plugin_release == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -69,12 +116,12 @@ jobs:
           workdir: plugins/azurerm
           args: release --clean
         env:
-          GORELEASER_CURRENT_TAG: v${{ needs.release-please.outputs.plugin_version }}
+          GORELEASER_CURRENT_TAG: v${{ needs.resolve.outputs.plugin_version }}
       - name: Upload artifacts to GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release upload "${{ needs.release-please.outputs.plugin_tag_name }}" \
+          gh release upload "${{ needs.resolve.outputs.plugin_tag }}" \
             plugins/azurerm/dist/tfclassify-plugin-azurerm_*.zip \
             plugins/azurerm/dist/tfclassify-plugin-azurerm_*_checksums.txt \
             --clobber
