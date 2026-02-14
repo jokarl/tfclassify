@@ -82,6 +82,7 @@ func findTerraform() (string, error) {
 		if _, err := os.Stat(envPath); err == nil {
 			return envPath, nil
 		}
+		return "", fmt.Errorf("TERRAFORM_PATH set to %q but file not found", envPath)
 	}
 
 	// Look in PATH
