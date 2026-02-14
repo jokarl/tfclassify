@@ -16,6 +16,12 @@ make clean          # Remove build artifacts
 
 Go workspace mode means all commands run across all three modules from the repo root.
 
+**Before committing**, run vulnerability check:
+```bash
+govulncheck ./...
+```
+CI enforces this — the `vuln` job fails the PR if `govulncheck` finds reachable vulnerabilities. Fix by bumping the Go version in `go.work` and all three `go.mod` files, or by upgrading affected dependencies.
+
 **Run a single test:**
 ```bash
 go test ./pkg/classify/ -run TestClassifier_Deletion
