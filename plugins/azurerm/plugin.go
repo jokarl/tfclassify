@@ -6,7 +6,7 @@ import (
 )
 
 // Version is the plugin version.
-const Version = "0.1.0"
+var Version = "dev"
 
 // AzurermPluginSet is the main plugin set for the azurerm deep inspection plugin.
 type AzurermPluginSet struct {

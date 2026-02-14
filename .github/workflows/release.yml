@@ -1,0 +1,82 @@
+name: release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      cli_release_created: ${{ steps.release.outputs.release_created }}
+      cli_tag_name: ${{ steps.release.outputs.tag_name }}
+      cli_version: ${{ steps.release.outputs.version }}
+      plugin_release_created: ${{ steps.release.outputs['plugins/azurerm--release_created'] }}
+      plugin_tag_name: ${{ steps.release.outputs['plugins/azurerm--tag_name'] }}
+      plugin_version: ${{ steps.release.outputs['plugins/azurerm--version'] }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  goreleaser-cli:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.cli_release_created == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          args: release --clean
+        env:
+          GORELEASER_CURRENT_TAG: v${{ needs.release-please.outputs.cli_version }}
+      - name: Upload artifacts to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ needs.release-please.outputs.cli_tag_name }}" \
+            dist/tfclassify_*.tar.gz \
+            dist/tfclassify_*.zip \
+            dist/tfclassify_checksums.txt \
+            --clobber
+
+  goreleaser-plugin:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.plugin_release_created == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          workdir: plugins/azurerm
+          args: release --clean
+        env:
+          GORELEASER_CURRENT_TAG: v${{ needs.release-please.outputs.plugin_version }}
+      - name: Upload artifacts to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ needs.release-please.outputs.plugin_tag_name }}" \
+            plugins/azurerm/dist/tfclassify-plugin-azurerm_*.tar.gz \
+            plugins/azurerm/dist/tfclassify-plugin-azurerm_*.zip \
+            plugins/azurerm/dist/tfclassify-plugin-azurerm_checksums.txt \
+            --clobber

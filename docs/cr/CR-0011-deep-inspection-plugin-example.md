@@ -5,7 +5,7 @@ date: 2026-02-13
 requestor: Johan
 stakeholders: Johan
 priority: low
-target-version: "0.2.0"
+target-version: "0.1.0"
 ---
 
 # Deep Inspection Plugin Example and Authoring Guide

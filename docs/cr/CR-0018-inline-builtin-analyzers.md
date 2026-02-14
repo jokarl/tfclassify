@@ -1,11 +1,11 @@
 ---
 id: "CR-0018"
-status: "proposed"
+status: "implemented"
 date: 2026-02-14
 requestor: Johan
 stakeholders: [Johan]
 priority: "high"
-target-version: "0.2.0"
+target-version: "0.1.0"
 ---
 
 # Inline Builtin Analyzers into Core Classification Engine
