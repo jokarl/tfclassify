@@ -7,7 +7,7 @@ on:
     inputs:
       tags:
         description: "CSV of release tags to rebuild, e.g. tfclassify-v0.1.0,tfclassify-plugin-azurerm-v0.1.0"
-        required: true
+        required: false
         type: string
 
 permissions:
@@ -46,7 +46,8 @@ jobs:
       - name: Resolve release parameters
         id: resolve
         run: |
-          if [ "${{ github.event_name }}" = "push" ]; then
+          TAGS_INPUT="${{ inputs.tags }}"
+          if [ "${{ github.event_name }}" = "push" ] || [ -z "$TAGS_INPUT" ]; then
             echo "cli_release=${{ needs.release-please.outputs.cli_release_created }}" >> "$GITHUB_OUTPUT"
             echo "cli_tag=${{ needs.release-please.outputs.cli_tag_name }}" >> "$GITHUB_OUTPUT"
             echo "cli_version=${{ needs.release-please.outputs.cli_version }}" >> "$GITHUB_OUTPUT"
@@ -54,7 +55,7 @@ jobs:
             echo "plugin_tag=${{ needs.release-please.outputs.plugin_tag_name }}" >> "$GITHUB_OUTPUT"
             echo "plugin_version=${{ needs.release-please.outputs.plugin_version }}" >> "$GITHUB_OUTPUT"
           else
-            IFS=',' read -ra TAGS <<< "${{ inputs.tags }}"
+            IFS=',' read -ra TAGS <<< "$TAGS_INPUT"
             for tag in "${TAGS[@]}"; do
               tag=$(echo "$tag" | xargs)
               if [[ "$tag" =~ ^tfclassify-plugin-azurerm-v(.+)$ ]]; then
