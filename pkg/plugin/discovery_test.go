@@ -8,10 +8,12 @@ import (
 	"github.com/jokarl/tfclassify/pkg/config"
 )
 
-func TestDiscoverPlugins_BundledTerraform(t *testing.T) {
+func TestDiscoverPlugins_SourcelessPluginSkipped(t *testing.T) {
+	// Plugins with no source (e.g. legacy "terraform" block) are skipped
+	// because their functionality is now provided by builtin analyzers.
 	cfg := &config.Config{
 		Plugins: []config.PluginConfig{
-			{Name: "terraform", Enabled: true},
+			{Name: "terraform", Enabled: true}, // no source = builtin, skipped
 		},
 	}
 
@@ -20,17 +22,8 @@ func TestDiscoverPlugins_BundledTerraform(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	plugin, ok := discovered["terraform"]
-	if !ok {
-		t.Fatal("expected to find terraform plugin")
-	}
-
-	if !plugin.IsBundled {
-		t.Error("expected terraform plugin to be bundled")
-	}
-
-	if plugin.Path != "/usr/bin/tfclassify" {
-		t.Errorf("expected path /usr/bin/tfclassify, got %s", plugin.Path)
+	if len(discovered) != 0 {
+		t.Errorf("expected 0 plugins (sourceless skipped), got %d", len(discovered))
 	}
 }
 
@@ -71,7 +64,7 @@ func TestDiscoverPlugins_EnvVar(t *testing.T) {
 
 	cfg := &config.Config{
 		Plugins: []config.PluginConfig{
-			{Name: "test", Enabled: true},
+			{Name: "test", Enabled: true, Source: "github.com/test/repo"},
 		},
 	}
 
@@ -104,7 +97,7 @@ func TestDiscoverPlugins_NotFound(t *testing.T) {
 
 	cfg := &config.Config{
 		Plugins: []config.PluginConfig{
-			{Name: "nonexistent", Enabled: true},
+			{Name: "nonexistent", Enabled: true, Source: "github.com/test/nonexistent"},
 		},
 	}
 
@@ -145,7 +138,7 @@ func TestDiscoverPlugins_Precedence(t *testing.T) {
 
 	cfg := &config.Config{
 		Plugins: []config.PluginConfig{
-			{Name: "test", Enabled: true},
+			{Name: "test", Enabled: true, Source: "github.com/test/repo"},
 		},
 	}
 

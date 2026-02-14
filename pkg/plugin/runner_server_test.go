@@ -7,6 +7,7 @@ import (
 	"github.com/jokarl/tfclassify/pkg/config"
 	"github.com/jokarl/tfclassify/pkg/plan"
 	"github.com/jokarl/tfclassify/sdk"
+	"github.com/jokarl/tfclassify/sdk/pb"
 	sdkplugin "github.com/jokarl/tfclassify/sdk/plugin"
 )
 
@@ -44,7 +45,7 @@ func TestRunnerServiceServer_GetResourceChanges(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := &sdkplugin.GetResourceChangesRequest{Patterns: tt.patterns}
+			req := &pb.GetResourceChangesRequest{Patterns: tt.patterns}
 			resp, err := server.GetResourceChanges(context.Background(), req)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -71,7 +72,7 @@ func TestRunnerServiceServer_GetResourceChange(t *testing.T) {
 	server := NewRunnerServiceServer(runner)
 
 	// Test found
-	req := &sdkplugin.GetResourceChangeRequest{Address: "azurerm_role_assignment.admin"}
+	req := &pb.GetResourceChangeRequest{Address: "azurerm_role_assignment.admin"}
 	resp, err := server.GetResourceChange(context.Background(), req)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -84,7 +85,7 @@ func TestRunnerServiceServer_GetResourceChange(t *testing.T) {
 	}
 
 	// Test not found
-	req = &sdkplugin.GetResourceChangeRequest{Address: "nonexistent.resource"}
+	req = &pb.GetResourceChangeRequest{Address: "nonexistent.resource"}
 	_, err = server.GetResourceChange(context.Background(), req)
 	if err == nil {
 		t.Error("expected error for nonexistent resource")
@@ -97,19 +98,19 @@ func TestRunnerServiceServer_EmitDecision(t *testing.T) {
 	runner := NewRunner(host)
 	server := NewRunnerServiceServer(runner)
 
-	change := &sdkplugin.ResourceChange{
+	change := &pb.ResourceChange{
 		Address: "test.resource",
 		Type:    "test_type",
 		Actions: []string{"create"},
 	}
 
-	decision := &sdkplugin.Decision{
+	decision := &pb.Decision{
 		Classification: "critical",
 		Reason:         "test reason",
 		Severity:       90,
 	}
 
-	req := &sdkplugin.EmitDecisionRequest{
+	req := &pb.EmitDecisionRequest{
 		AnalyzerName: "test-analyzer",
 		Change:       change,
 		Decision:     decision,
@@ -139,10 +140,10 @@ func TestRunnerServiceServer_EmitDecision(t *testing.T) {
 
 func TestProtoConversions_ResourceChange(t *testing.T) {
 	// Test nil
-	if sdkToProtoResourceChange(nil) != nil {
+	if sdkplugin.SDKToProtoResourceChange(nil) != nil {
 		t.Error("expected nil for nil SDK change")
 	}
-	if protoToSDKResourceChange(nil) != nil {
+	if sdkplugin.ProtoToSDKResourceChange(nil) != nil {
 		t.Error("expected nil for nil proto change")
 	}
 
@@ -157,7 +158,7 @@ func TestProtoConversions_ResourceChange(t *testing.T) {
 		After:        map[string]interface{}{"key": "value"},
 	}
 
-	proto := sdkToProtoResourceChange(sdkChange)
+	proto := sdkplugin.SDKToProtoResourceChange(sdkChange)
 	if proto.Address != "test.resource" {
 		t.Errorf("expected address 'test.resource', got %q", proto.Address)
 	}
@@ -166,7 +167,7 @@ func TestProtoConversions_ResourceChange(t *testing.T) {
 	}
 
 	// Round-trip
-	converted := protoToSDKResourceChange(proto)
+	converted := sdkplugin.ProtoToSDKResourceChange(proto)
 	if converted.Address != sdkChange.Address {
 		t.Errorf("round-trip failed for address: expected %q, got %q", sdkChange.Address, converted.Address)
 	}
@@ -174,26 +175,26 @@ func TestProtoConversions_ResourceChange(t *testing.T) {
 
 func TestProtoConversions_Decision(t *testing.T) {
 	// Test nil
-	if protoToSDKDecision(nil) != nil {
+	if sdkplugin.ProtoToSDKDecision(nil) != nil {
 		t.Error("expected nil for nil proto decision")
 	}
 
 	// Test conversion
-	protoDecision := &sdkplugin.Decision{
+	protoDecision := &pb.Decision{
 		Classification: "critical",
 		Reason:         "test reason",
 		Severity:       90,
 		Metadata:       []byte(`{"key":"value"}`),
 	}
 
-	sdk := protoToSDKDecision(protoDecision)
-	if sdk.Classification != "critical" {
-		t.Errorf("expected classification 'critical', got %q", sdk.Classification)
+	sdkDecision := sdkplugin.ProtoToSDKDecision(protoDecision)
+	if sdkDecision.Classification != "critical" {
+		t.Errorf("expected classification 'critical', got %q", sdkDecision.Classification)
 	}
-	if sdk.Severity != 90 {
-		t.Errorf("expected severity 90, got %d", sdk.Severity)
+	if sdkDecision.Severity != 90 {
+		t.Errorf("expected severity 90, got %d", sdkDecision.Severity)
 	}
-	if sdk.Metadata == nil {
+	if sdkDecision.Metadata == nil {
 		t.Error("expected non-nil metadata")
 	}
 }

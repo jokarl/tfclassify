@@ -9,54 +9,13 @@ import (
 	"github.com/jokarl/tfclassify/sdk"
 )
 
-func TestGetPluginInfo_NonGRPCConn(t *testing.T) {
-	cfg := &config.Config{}
-	host := NewHost(cfg)
-
-	// Pass a non-gRPC connection — should return default info
-	info, err := host.getPluginInfo(context.Background(), "not-a-grpc-conn")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if info.Name != "unknown" {
-		t.Errorf("expected default name 'unknown', got %q", info.Name)
-	}
-	if info.SDKVersion != sdk.SDKVersion {
-		t.Errorf("expected SDK version %q, got %q", sdk.SDKVersion, info.SDKVersion)
-	}
-}
-
-func TestApplyPluginConfig_NonGRPCConn(t *testing.T) {
-	cfg := &config.Config{}
-	host := NewHost(cfg)
-
-	// Pass a non-gRPC connection — should skip config without error
-	err := host.applyPluginConfig(context.Background(), "not-a-grpc-conn", "test-plugin")
-	if err != nil {
-		t.Fatalf("unexpected error for non-gRPC conn: %v", err)
-	}
-}
-
-func TestCallAnalyze_NonGRPCConn(t *testing.T) {
-	cfg := &config.Config{}
-	host := NewHost(cfg)
-
-	// Non-gRPC connection should skip without error
-	err := host.callAnalyze(context.Background(), "not-a-grpc-conn", 0)
-	if err != nil {
-		t.Fatalf("unexpected error for non-gRPC conn: %v", err)
-	}
-}
-
 func TestRunPluginAnalysis_ClientNotFound(t *testing.T) {
 	cfg := &config.Config{}
 	host := NewHost(cfg)
 
 	plugin := &DiscoveredPlugin{
-		Name:      "missing",
-		Path:      "/nonexistent/plugin",
-		IsBundled: false,
+		Name: "missing",
+		Path: "/nonexistent/plugin",
 	}
 
 	err := host.runPluginAnalysis(context.Background(), "missing", plugin)
@@ -78,7 +37,7 @@ func TestHost_RunAnalysis_PluginNotStarted(t *testing.T) {
 
 	// Add a plugin entry but don't register a client for it
 	host.plugins = map[string]*DiscoveredPlugin{
-		"ghost": {Name: "ghost", Path: "/nonexistent", IsBundled: false},
+		"ghost": {Name: "ghost", Path: "/nonexistent"},
 	}
 
 	changes := []plan.ResourceChange{

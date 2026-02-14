@@ -2,8 +2,11 @@
 package plugin
 
 import (
+	"context"
+
 	goplugin "github.com/hashicorp/go-plugin"
 	"github.com/jokarl/tfclassify/sdk"
+	"github.com/jokarl/tfclassify/sdk/pb"
 	"google.golang.org/grpc"
 )
 
@@ -46,10 +49,10 @@ func Serve(opts *ServeOpts) {
 	})
 }
 
-// GRPCPluginImpl implements the go-plugin Plugin interface for gRPC plugins.
+// GRPCPluginImpl implements the go-plugin GRPCPlugin interface.
 // This is used internally by the SDK and should not be used directly by plugin authors.
 type GRPCPluginImpl struct {
-	goplugin.Plugin
+	goplugin.NetRPCUnsupportedPlugin
 	Impl sdk.PluginSet
 }
 
@@ -58,13 +61,13 @@ type GRPCPluginImpl struct {
 func (p *GRPCPluginImpl) GRPCServer(broker *goplugin.GRPCBroker, s *grpc.Server) error {
 	// The plugin service server handles ApplyConfig and Analyze calls from the host.
 	// It uses the broker to establish bidirectional communication with the Runner service.
-	RegisterPluginServiceServer(s, NewPluginServiceServer(p.Impl, broker))
+	pb.RegisterPluginServiceServer(s, NewPluginServiceServer(p.Impl, broker))
 	return nil
 }
 
 // GRPCClient creates a client that can communicate with the plugin.
 // This is called by the host to get a client for making RPC calls.
-func (p *GRPCPluginImpl) GRPCClient(ctx interface{}, broker *goplugin.GRPCBroker, c *grpc.ClientConn) (interface{}, error) {
+func (p *GRPCPluginImpl) GRPCClient(ctx context.Context, broker *goplugin.GRPCBroker, c *grpc.ClientConn) (interface{}, error) {
 	// Return a client that wraps the gRPC connection for host-side use
 	return NewPluginClient(c, broker), nil
 }

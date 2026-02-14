@@ -7,7 +7,7 @@ This guide walks you through creating a tfclassify deep inspection plugin. Plugi
 tfclassify has a three-layer classification model:
 
 1. **Layer 1 (Core):** Config-driven pattern matching on resource types and actions
-2. **Layer 2 (Bundled plugin):** Cross-provider analysis of Terraform concepts (deletions, sensitive attributes, replacements)
+2. **Layer 2 (Builtin analyzers):** Cross-provider analysis of Terraform concepts (deletions, sensitive attributes, replacements) — runs in-process, no plugin needed
 3. **Layer 3 (Deep inspection plugins):** Provider-specific analysis of resource field semantics
 
 This guide focuses on Layer 3 — writing plugins that inspect resource attribute values.
@@ -23,7 +23,7 @@ This guide focuses on Layer 3 — writing plugins that inspect resource attribut
 A plugin is a standalone Go module that depends on the tfclassify SDK:
 
 ```
-tfclassify-plugin-yourprovider/
+tfclassify-plugin-yourprovider-yourusecase/
 ├── go.mod
 ├── main.go              # Entry point
 ├── plugin.go            # PluginSet definition
@@ -33,12 +33,14 @@ tfclassify-plugin-yourprovider/
 └── analyzer2_test.go
 ```
 
+Plugin names follow the pattern `tfclassify-plugin-{provider}-{usecase}`. Each plugin targets a specific use case for a provider rather than covering an entire provider's resources. For example, `tfclassify-plugin-azurerm-roleassignment` focuses on deep inspection of Azure role assignments.
+
 ## Step 1: Create the Module
 
 ```bash
-mkdir tfclassify-plugin-yourprovider
-cd tfclassify-plugin-yourprovider
-go mod init github.com/yourorg/tfclassify-plugin-yourprovider
+mkdir tfclassify-plugin-yourprovider-yourusecase
+cd tfclassify-plugin-yourprovider-yourusecase
+go mod init github.com/yourorg/tfclassify-plugin-yourprovider-yourusecase
 go get github.com/jokarl/tfclassify/sdk
 ```
 
@@ -55,7 +57,7 @@ import (
 
 func main() {
     sdkplugin.Serve(&sdkplugin.ServeOpts{
-        PluginSet: NewYourProviderPluginSet(),
+        PluginSet: NewRoleAssignmentPluginSet(),
     })
 }
 ```
@@ -71,7 +73,7 @@ import "github.com/jokarl/tfclassify/sdk"
 
 const Version = "0.1.0"
 
-type YourProviderPluginSet struct {
+type RoleAssignmentPluginSet struct {
     *sdk.BuiltinPluginSet
     config *PluginConfig
 }
@@ -89,16 +91,16 @@ func DefaultConfig() *PluginConfig {
     }
 }
 
-func NewYourProviderPluginSet() *YourProviderPluginSet {
+func NewRoleAssignmentPluginSet() *RoleAssignmentPluginSet {
     config := DefaultConfig()
-    ps := &YourProviderPluginSet{config: config}
+    ps := &RoleAssignmentPluginSet{config: config}
 
     ps.BuiltinPluginSet = &sdk.BuiltinPluginSet{
-        Name:    "yourprovider",
+        Name:    "azurerm-roleassignment",
         Version: Version,
         Analyzers: []sdk.Analyzer{
-            NewFirstAnalyzer(config),
-            NewSecondAnalyzer(config),
+            NewPrivilegeEscalationAnalyzer(config),
+            NewScopeAnalyzer(config),
         },
     }
 
@@ -337,10 +339,10 @@ func TestPrivilegeEscalation_ReaderToOwner(t *testing.T) {
 ## Step 8: Building the Plugin
 
 ```bash
-go build -o tfclassify-plugin-yourprovider .
+go build -o tfclassify-plugin-azurerm-roleassignment .
 ```
 
-The binary name must follow the pattern `tfclassify-plugin-<name>` where `<name>` matches the plugin name in `.tfclassify.hcl`.
+The binary name must follow the pattern `tfclassify-plugin-<provider>-<usecase>` where the combined name matches the plugin name in `.tfclassify.hcl`.
 
 ## Step 9: Installing the Plugin
 
@@ -357,16 +359,16 @@ Or distribute via GitHub releases and let users run `tfclassify init`.
 Users configure your plugin in `.tfclassify.hcl`:
 
 ```hcl
-plugin "yourprovider" {
+plugin "azurerm-roleassignment" {
   enabled = true
-  source  = "github.com/yourorg/tfclassify-plugin-yourprovider"
+  source  = "github.com/yourorg/tfclassify-plugin-azurerm-roleassignment"
   version = "0.1.0"
 
   config {
     some_threshold = 50
     enabled_flags = {
       privilege = true
-      network   = false
+      scope     = false
     }
   }
 }
@@ -379,29 +381,27 @@ plugin "yourprovider" {
 For GitHub releases, name assets following this pattern:
 
 ```
-tfclassify-plugin-<name>_<version>_<os>_<arch>.zip
+tfclassify-plugin-<provider>-<usecase>_<version>_<os>_<arch>.zip
 ```
 
 Examples:
-- `tfclassify-plugin-azurerm_0.1.0_linux_amd64.zip`
-- `tfclassify-plugin-azurerm_0.1.0_darwin_arm64.zip`
-- `tfclassify-plugin-azurerm_0.1.0_windows_amd64.zip`
+- `tfclassify-plugin-azurerm-roleassignment_0.1.0_linux_amd64.zip`
+- `tfclassify-plugin-azurerm-roleassignment_0.1.0_darwin_arm64.zip`
+- `tfclassify-plugin-azurerm-roleassignment_0.1.0_windows_amd64.zip`
 
 The ZIP should contain the plugin binary at the root level.
 
 ## Reference Implementation
 
-The `plugins/azurerm/` directory in the tfclassify repository contains a complete working example with three analyzers:
-
-- `privilege-escalation`: Detects role changes to/from privileged roles
-- `network-exposure`: Detects overly permissive network security rules
-- `key-vault-access`: Detects destructive key vault permissions
-
-Study this implementation for patterns on:
+The `plugins/terraform/` directory in the tfclassify repository contains a reference plugin. Study it for patterns on:
 - Handling different action types (create, update, delete)
 - Extracting nested field values
-- Configurable detection thresholds
 - Comprehensive test coverage
+
+When designing your plugin, keep the scope focused. For example, instead of one plugin that covers all Azure resources, create separate plugins for specific use cases:
+- `tfclassify-plugin-azurerm-roleassignment` — deep inspection of role assignments and privilege escalation
+- `tfclassify-plugin-azurerm-networking` — analysis of NSG rules and network exposure
+- `tfclassify-plugin-azurerm-keyvault` — detection of destructive key vault permissions
 
 ## Common Patterns
 
@@ -455,7 +455,7 @@ if privilegedRoles[role] {
 ### Plugin Not Found
 
 Ensure:
-1. Binary name matches `tfclassify-plugin-<name>`
+1. Binary name matches `tfclassify-plugin-<provider>-<usecase>`
 2. Binary is in a search path directory
 3. Binary is executable (`chmod +x`)
 

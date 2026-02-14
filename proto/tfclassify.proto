@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package tfclassify;
 
-option go_package = "github.com/jokarl/tfclassify/proto/gen";
+option go_package = "github.com/jokarl/tfclassify/sdk/pb";
 
 // PluginService is called by the host to interact with plugins.
 service PluginService {

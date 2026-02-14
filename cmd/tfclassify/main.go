@@ -7,7 +7,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/jokarl/tfclassify/internal/bundled"
 	"github.com/jokarl/tfclassify/pkg/classify"
 	"github.com/jokarl/tfclassify/pkg/config"
 	"github.com/jokarl/tfclassify/pkg/output"
@@ -19,22 +18,22 @@ import (
 var Version = "dev"
 
 var (
-	planPath           string
-	configPath         string
-	outputFmt          string
-	verbose            bool
-	actAsBundledPlugin bool
+	planPath   string
+	configPath string
+	outputFmt  string
+	verbose    bool
 )
 
-func main() {
-	// Check for bundled plugin mode before starting Cobra
-	for _, arg := range os.Args[1:] {
-		if arg == "--act-as-bundled-plugin" {
-			runBundledPlugin()
-			return
-		}
+// builtinAnalyzers returns the default set of builtin analyzers.
+func builtinAnalyzers() []classify.BuiltinAnalyzer {
+	return []classify.BuiltinAnalyzer{
+		&classify.DeletionAnalyzer{},
+		&classify.ReplaceAnalyzer{},
+		&classify.SensitiveAnalyzer{},
 	}
+}
 
+func main() {
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
@@ -56,8 +55,7 @@ var initCmd = &cobra.Command{
 	Long: `Downloads and installs plugin binaries from their declared sources.
 
 Reads plugin declarations from .tfclassify.hcl and downloads external plugins
-from their GitHub release pages. Bundled plugins (like terraform) need no
-installation.
+from their GitHub release pages.
 
 The GITHUB_TOKEN environment variable is supported for authenticated
 requests (to avoid rate limits).`,
@@ -70,8 +68,6 @@ func init() {
 	rootCmd.Flags().StringVarP(&configPath, "config", "c", "", "Path to configuration file")
 	rootCmd.Flags().StringVarP(&outputFmt, "output", "o", "text", "Output format: json, text, github")
 	rootCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose output")
-	rootCmd.Flags().BoolVar(&actAsBundledPlugin, "act-as-bundled-plugin", false, "Run as bundled plugin (internal use)")
-	rootCmd.Flags().MarkHidden("act-as-bundled-plugin")
 
 	rootCmd.MarkFlagRequired("plan")
 
@@ -109,32 +105,35 @@ func run(cmd *cobra.Command, args []string) error {
 	// Classify changes using core rules
 	result := classifier.Classify(planResult.Changes)
 
-	// Run plugins
-	selfPath, err := os.Executable()
-	if err != nil {
-		return fmt.Errorf("failed to determine executable path: %w", err)
-	}
+	// Run builtin analyzers (deletion, replace, sensitive detection)
+	classifier.RunBuiltinAnalyzers(result, planResult.Changes, builtinAnalyzers())
 
-	host := plugin.NewHost(cfg)
-	defer host.Shutdown()
-
-	if err := host.DiscoverAndStart(selfPath); err != nil {
-		// Check if this is a missing external plugin error
-		if missingErr, ok := err.(*plugin.PluginNotInstalledError); ok {
-			return fmt.Errorf("plugin %q is enabled but not installed.\nRun \"tfclassify init\" to install plugins declared in your configuration", missingErr.PluginName)
-		}
-		// Log warning for other errors but continue with core-only classification
-		if verbose {
-			fmt.Fprintf(os.Stderr, "Warning: plugin discovery failed: %v\n", err)
-		}
-	} else {
-		pluginDecisions, err := host.RunAnalysis(planResult.Changes)
+	// Run external plugins (if any configured)
+	if hasExternalPlugins(cfg) {
+		selfPath, err := os.Executable()
 		if err != nil {
-			if verbose {
-				fmt.Fprintf(os.Stderr, "Warning: plugin analysis failed: %v\n", err)
+			return fmt.Errorf("failed to determine executable path: %w", err)
+		}
+
+		host := plugin.NewHost(cfg)
+		defer host.Shutdown()
+
+		if err := host.DiscoverAndStart(selfPath); err != nil {
+			if missingErr, ok := err.(*plugin.PluginNotInstalledError); ok {
+				return fmt.Errorf("plugin %q is enabled but not installed.\nRun \"tfclassify init\" to install plugins declared in your configuration", missingErr.PluginName)
 			}
-		} else if len(pluginDecisions) > 0 {
-			classifier.AddPluginDecisions(result, pluginDecisions)
+			if verbose {
+				fmt.Fprintf(os.Stderr, "Warning: plugin discovery failed: %v\n", err)
+			}
+		} else {
+			pluginDecisions, err := host.RunAnalysis(planResult.Changes)
+			if err != nil {
+				if verbose {
+					fmt.Fprintf(os.Stderr, "Warning: plugin analysis failed: %v\n", err)
+				}
+			} else if len(pluginDecisions) > 0 {
+				classifier.AddPluginDecisions(result, pluginDecisions)
+			}
 		}
 	}
 
@@ -161,8 +160,12 @@ func runInit(cmd *cobra.Command, args []string) error {
 	return plugin.InstallPlugins(cfg, os.Stdout)
 }
 
-// runBundledPlugin runs this binary as the bundled terraform plugin.
-// This is called when --act-as-bundled-plugin is passed.
-func runBundledPlugin() {
-	bundled.ServeTerraform()
+// hasExternalPlugins returns true if the config has any enabled external plugins (with a source).
+func hasExternalPlugins(cfg *config.Config) bool {
+	for _, p := range cfg.Plugins {
+		if p.Enabled && p.Source != "" {
+			return true
+		}
+	}
+	return false
 }

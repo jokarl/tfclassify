@@ -15,13 +15,13 @@ import (
 	"github.com/jokarl/tfclassify/pkg/config"
 )
 
-func TestInstallPlugins_BundledSkipped(t *testing.T) {
+func TestInstallPlugins_BuiltinSkipped(t *testing.T) {
 	cfg := &config.Config{
 		Plugins: []config.PluginConfig{
 			{
 				Name:    "terraform",
 				Enabled: true,
-				Source:  "", // bundled
+				Source:  "", // builtin, no source
 			},
 		},
 	}
@@ -32,8 +32,8 @@ func TestInstallPlugins_BundledSkipped(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	if !bytes.Contains(buf.Bytes(), []byte("bundled (skip)")) {
-		t.Errorf("expected bundled skip message, got: %s", buf.String())
+	if !bytes.Contains(buf.Bytes(), []byte("builtin (skip)")) {
+		t.Errorf("expected builtin skip message, got: %s", buf.String())
 	}
 }
 
@@ -472,6 +472,12 @@ func TestDiscoverPlugins_LocalDir(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
+	// Resolve symlinks (macOS /var -> /private/var) so paths match os.Getwd()
+	tmpDir, err = filepath.EvalSymlinks(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to resolve symlinks: %v", err)
+	}
+
 	// Create .tfclassify/plugins/ directory
 	pluginDir := filepath.Join(tmpDir, ".tfclassify", "plugins")
 	if err := os.MkdirAll(pluginDir, 0755); err != nil {
@@ -496,7 +502,7 @@ func TestDiscoverPlugins_LocalDir(t *testing.T) {
 
 	cfg := &config.Config{
 		Plugins: []config.PluginConfig{
-			{Name: "localtest", Enabled: true},
+			{Name: "localtest", Enabled: true, Source: "github.com/test/localtest"},
 		},
 	}
 
@@ -717,7 +723,7 @@ func TestInstallPlugins_MultiplePlugins(t *testing.T) {
 
 	cfg := &config.Config{
 		Plugins: []config.PluginConfig{
-			{Name: "bundled", Enabled: true, Source: ""}, // bundled
+			{Name: "builtin", Enabled: true, Source: ""}, // builtin, no source
 			{Name: "disabled", Enabled: false, Source: "github.com/test/disabled", Version: "1.0.0"}, // disabled
 			{Name: "existing", Enabled: true, Source: "github.com/test/existing", Version: "1.0.0"}, // already installed
 		},
@@ -730,8 +736,8 @@ func TestInstallPlugins_MultiplePlugins(t *testing.T) {
 	}
 
 	output := buf.String()
-	if !strings.Contains(output, "bundled: bundled (skip)") {
-		t.Errorf("expected bundled skip message in output")
+	if !strings.Contains(output, "builtin: builtin (skip)") {
+		t.Errorf("expected builtin skip message in output")
 	}
 	if !strings.Contains(output, "disabled: disabled (skip)") {
 		t.Errorf("expected disabled skip message in output")

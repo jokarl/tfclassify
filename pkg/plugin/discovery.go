@@ -27,18 +27,25 @@ func (e *PluginNotInstalledError) Error() string {
 type DiscoveredPlugin struct {
 	Name      string
 	Path      string
-	IsBundled bool
 	PluginCfg *config.PluginConfig
 }
 
 // DiscoverPlugins finds plugin binaries for each enabled plugin in the config.
 // Returns a map from plugin name to discovered plugin info.
+// Plugins with no source (e.g. the legacy "terraform" plugin block) are skipped
+// since their functionality is now provided by builtin analyzers.
 func DiscoverPlugins(cfg *config.Config, selfPath string) (map[string]*DiscoveredPlugin, error) {
 	result := make(map[string]*DiscoveredPlugin)
 
 	for i := range cfg.Plugins {
 		pluginCfg := &cfg.Plugins[i]
 		if !pluginCfg.Enabled {
+			continue
+		}
+
+		// Skip plugins with no source — their functionality is now builtin.
+		// The "terraform" plugin block is accepted for backwards compatibility.
+		if pluginCfg.Source == "" {
 			continue
 		}
 
@@ -55,16 +62,6 @@ func DiscoverPlugins(cfg *config.Config, selfPath string) (map[string]*Discovere
 
 // discoverPlugin finds the binary for a single plugin.
 func discoverPlugin(pluginCfg *config.PluginConfig, cfg *config.Config, selfPath string) (*DiscoveredPlugin, error) {
-	// Special case: bundled terraform plugin
-	if pluginCfg.Name == "terraform" && pluginCfg.Source == "" {
-		return &DiscoveredPlugin{
-			Name:      pluginCfg.Name,
-			Path:      selfPath,
-			IsBundled: true,
-			PluginCfg: pluginCfg,
-		}, nil
-	}
-
 	// Search for external plugin binary
 	binaryName := PluginBinaryPrefix + pluginCfg.Name
 	paths := searchPaths()
@@ -75,7 +72,6 @@ func discoverPlugin(pluginCfg *config.PluginConfig, cfg *config.Config, selfPath
 			return &DiscoveredPlugin{
 				Name:      pluginCfg.Name,
 				Path:      candidate,
-				IsBundled: false,
 				PluginCfg: pluginCfg,
 			}, nil
 		}

@@ -400,10 +400,10 @@ func TestHost_DiscoverAndStart_NoPlugins(t *testing.T) {
 	}
 }
 
-func TestHost_DiscoverAndStart_BundledPlugin(t *testing.T) {
+func TestHost_DiscoverAndStart_SourcelessPluginSkipped(t *testing.T) {
 	cfg := &config.Config{
 		Plugins: []config.PluginConfig{
-			{Name: "terraform", Enabled: true}, // bundled
+			{Name: "terraform", Enabled: true}, // no source = builtin, skipped
 		},
 	}
 
@@ -413,16 +413,8 @@ func TestHost_DiscoverAndStart_BundledPlugin(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if len(host.plugins) != 1 {
-		t.Errorf("expected 1 plugin, got %d", len(host.plugins))
-	}
-
-	plugin := host.plugins["terraform"]
-	if plugin == nil {
-		t.Fatal("expected terraform plugin to be discovered")
-	}
-	if !plugin.IsBundled {
-		t.Error("expected terraform plugin to be bundled")
+	if len(host.plugins) != 0 {
+		t.Errorf("expected 0 plugins (sourceless skipped), got %d", len(host.plugins))
 	}
 
 	// Cleanup

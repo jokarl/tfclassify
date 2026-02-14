@@ -15,6 +15,7 @@ import (
 	"github.com/jokarl/tfclassify/pkg/config"
 	"github.com/jokarl/tfclassify/pkg/plan"
 	"github.com/jokarl/tfclassify/sdk"
+	"github.com/jokarl/tfclassify/sdk/pb"
 	sdkplugin "github.com/jokarl/tfclassify/sdk/plugin"
 	"google.golang.org/grpc"
 )
@@ -61,12 +62,7 @@ func (h *Host) DiscoverAndStart(selfPath string) error {
 
 // startPlugin starts a single plugin process.
 func (h *Host) startPlugin(name string, plugin *DiscoveredPlugin) error {
-	var cmd *exec.Cmd
-	if plugin.IsBundled {
-		cmd = exec.Command(plugin.Path, "--act-as-bundled-plugin")
-	} else {
-		cmd = exec.Command(plugin.Path)
-	}
+	cmd := exec.Command(plugin.Path)
 
 	client := goplugin.NewClient(&goplugin.ClientConfig{
 		HandshakeConfig: sdkplugin.HandshakeConfig,
@@ -151,101 +147,37 @@ func (h *Host) runPluginAnalysis(ctx context.Context, name string, plugin *Disco
 	brokerID := broker.NextId()
 	go broker.AcceptAndServe(brokerID, func(opts []grpc.ServerOption) *grpc.Server {
 		s := grpc.NewServer(opts...)
-		RegisterRunnerServiceServer(s, runnerServer)
+		pb.RegisterRunnerServiceServer(s, runnerServer)
 		return s
 	})
 
-	// First, verify plugin version compatibility (CR-0012)
-	pluginInfo, err := h.getPluginInfo(ctx, conn)
+	// Create a typed gRPC client for the plugin service
+	pluginSvcClient := pb.NewPluginServiceClient(conn)
+
+	// First, verify plugin version compatibility
+	infoResp, err := pluginSvcClient.GetPluginInfo(ctx, &pb.GetPluginInfoRequest{})
 	if err != nil {
 		return fmt.Errorf("failed to get plugin info: %w", err)
 	}
 
+	pluginInfo := &PluginInfo{
+		Name:                  infoResp.Name,
+		Version:               infoResp.Version,
+		SDKVersion:            infoResp.SdkVersion,
+		HostVersionConstraint: infoResp.HostVersionConstraint,
+	}
 	if err := VerifyPlugin(name, pluginInfo); err != nil {
 		return fmt.Errorf("plugin verification failed: %w", err)
 	}
 
 	// Apply configuration to the plugin
-	if err := h.applyPluginConfig(ctx, conn, name); err != nil {
+	if _, err := pluginSvcClient.ApplyConfig(ctx, &pb.ApplyConfigRequest{Config: nil}); err != nil {
 		return fmt.Errorf("failed to apply config: %w", err)
 	}
 
 	// Call Analyze on the plugin, passing the broker ID for callback
-	if err := h.callAnalyze(ctx, conn, brokerID); err != nil {
+	if _, err := pluginSvcClient.Analyze(ctx, &pb.AnalyzeRequest{BrokerId: brokerID}); err != nil {
 		return fmt.Errorf("analysis failed: %w", err)
-	}
-
-	return nil
-}
-
-// getPluginInfo retrieves plugin metadata for version negotiation.
-func (h *Host) getPluginInfo(ctx context.Context, conn interface{}) (*PluginInfo, error) {
-	// Type assert to *grpc.ClientConn
-	grpcConn, ok := conn.(interface {
-		Invoke(ctx context.Context, method string, args interface{}, reply interface{}, opts ...interface{}) error
-	})
-	if !ok {
-		// Return default info for bundled plugins
-		return &PluginInfo{
-			Name:       "unknown",
-			Version:    "0.1.0",
-			SDKVersion: sdk.SDKVersion,
-		}, nil
-	}
-
-	req := &sdkplugin.GetPluginInfoRequest{}
-	resp := &sdkplugin.GetPluginInfoResponse{}
-
-	if err := grpcConn.Invoke(ctx, "/tfclassify.PluginService/GetPluginInfo", req, resp); err != nil {
-		return nil, err
-	}
-
-	return &PluginInfo{
-		Name:                  resp.Name,
-		Version:               resp.Version,
-		SDKVersion:            resp.SDKVersion,
-		HostVersionConstraint: resp.HostVersionConstraint,
-	}, nil
-}
-
-// applyPluginConfig sends configuration to the plugin.
-func (h *Host) applyPluginConfig(ctx context.Context, conn interface{}, name string) error {
-	// Type assert to *grpc.ClientConn
-	grpcConn, ok := conn.(interface {
-		Invoke(ctx context.Context, method string, args interface{}, reply interface{}, opts ...interface{}) error
-	})
-	if !ok {
-		return nil // Skip config for non-gRPC connections
-	}
-
-	// Note: Plugin configuration is handled via the raw HCL body which is
-	// deferred for parsing by the plugin. For now, we send an empty config.
-	// The plugin can implement its own config parsing from the HCL body.
-	req := &sdkplugin.ApplyConfigRequest{Config: nil}
-	resp := &sdkplugin.ApplyConfigResponse{}
-
-	if err := grpcConn.Invoke(ctx, "/tfclassify.PluginService/ApplyConfig", req, resp); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// callAnalyze invokes the Analyze RPC on the plugin.
-func (h *Host) callAnalyze(ctx context.Context, conn interface{}, brokerID uint32) error {
-	// Type assert to *grpc.ClientConn
-	grpcConn, ok := conn.(interface {
-		Invoke(ctx context.Context, method string, args interface{}, reply interface{}, opts ...interface{}) error
-	})
-	if !ok {
-		return nil // Skip analysis for non-gRPC connections
-	}
-
-	req := &sdkplugin.AnalyzeRequest{BrokerID: brokerID}
-	resp := &sdkplugin.AnalyzeResponse{}
-
-	if err := grpcConn.Invoke(ctx, "/tfclassify.PluginService/Analyze", req, resp); err != nil {
-		return err
 	}
 
 	return nil

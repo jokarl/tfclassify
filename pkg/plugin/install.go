@@ -63,7 +63,7 @@ func saveManifest(pluginDir string, m *Manifest) error {
 }
 
 // InstallPlugins downloads and installs external plugins declared in the config.
-// Bundled plugins and disabled plugins are skipped.
+// Builtin plugins (no source) and disabled plugins are skipped.
 func InstallPlugins(cfg *config.Config, w io.Writer) error {
 	pluginDir := DefaultPluginDir()
 
@@ -77,7 +77,7 @@ func InstallPlugins(cfg *config.Config, w io.Writer) error {
 
 	for _, p := range cfg.Plugins {
 		if p.Source == "" {
-			fmt.Fprintf(w, "  %s: bundled (skip)\n", p.Name)
+			fmt.Fprintf(w, "  %s: builtin (skip)\n", p.Name)
 			continue
 		}
 
