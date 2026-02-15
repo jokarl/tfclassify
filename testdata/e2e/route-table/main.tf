@@ -35,6 +35,6 @@ resource "azurerm_route" "test" {
   name                = "internet-route"
   resource_group_name = data.azurerm_resource_group.lab.name
   route_table_name    = azurerm_route_table.test.name
-  address_prefix      = "10.100.0.0/16"
+  address_prefix      = "203.0.113.0/24"
   next_hop_type       = "Internet"
 }
