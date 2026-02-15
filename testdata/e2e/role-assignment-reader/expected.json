@@ -1,0 +1,4 @@
+{
+  "create": { "exit_code": 1, "classification": "standard" },
+  "destroy": { "exit_code": 2, "classification": "critical" }
+}
