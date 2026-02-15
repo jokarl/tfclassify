@@ -230,52 +230,106 @@ defaults {
 
 ## How Scoring Works
 
-The privilege escalation analyzer uses a multi-factor scoring system to compute graduated severity for role assignments.
+The privilege escalation analyzer uses a multi-factor scoring system to compute graduated severity for role assignments. The algorithm is implemented in `scoring.go` and `scope.go`.
+
+### Overview
+
+Scoring happens in three steps:
+
+1. **Permission analysis** — score the role's permission set against tiered risk patterns
+2. **Scope weighting** — multiply the base score by a factor based on the ARM scope path
+3. **Clamping** — constrain the result to [0, 100]
+
+When a role definition has multiple permission blocks, each block is scored independently and the highest score wins.
 
 ### Permission Tiers
 
-Roles are scored based on their effective permission set (actions minus notActions):
+Roles are scored based on their effective permission set. Azure RBAC roles define `actions` (allowed operations) and `notActions` (excluded operations). The scoring algorithm examines these lists using Azure's pattern matching rules:
 
-| Tier | Score | Pattern | Example Roles |
-|------|-------|---------|---------------|
-| 1 | 95 | Unrestricted wildcard `*` without auth exclusion | Owner |
-| 2 | 85 | `Microsoft.Authorization/*` control | User Access Administrator |
-| 3 | 75 | Targeted `Microsoft.Authorization/roleAssignments/write` | Custom roles with role assignment write |
-| 4 | 70 | Wildcard `*` with `Microsoft.Authorization` excluded | Contributor |
-| 5 | 50-65 | Provider wildcards (`Microsoft.Compute/*`, etc.) | Custom roles with broad provider access |
-| 6 | 30 | Limited write access | Custom roles with specific write actions |
-| 7 | 15 | Read-only access | Reader, custom read-only roles |
-| 8 | 0 | No permissions | No actions defined |
+- `*` matches all operations
+- `Microsoft.Compute/*` matches all operations under a provider
+- `*/read` matches any read operation
+
+The algorithm classifies each permission block into one of eight tiers:
+
+| Tier | Score | Pattern | Detection Logic | Example Roles |
+|------|-------|---------|-----------------|---------------|
+| 1 | 95 | Unrestricted wildcard `*` without auth exclusion | `actions` contains `*` AND `notActions` does not cover `Microsoft.Authorization` write | Owner |
+| 2 | 85 | `Microsoft.Authorization/*` control | `actions` contains `Microsoft.Authorization/*` (not via wildcard) AND not excluded by `notActions` | User Access Administrator |
+| 3 | 75 | Targeted role assignment write | `actions` contains `Microsoft.Authorization/roleAssignments/write` or `.../roleAssignments/*` without broader auth access | Custom roles granting role assignment write |
+| 4 | 70 | Wildcard with auth excluded | `actions` contains `*` AND `notActions` covers `Microsoft.Authorization` write operations | Contributor |
+| 5 | 50–65 | Provider wildcards | `actions` contains patterns like `Microsoft.Compute/*` (ends with `/*`, contains `.`) | Custom roles with broad provider access |
+| 6 | 30 | Limited write access | Has non-read actions but does not match any higher tier | Custom roles with specific write actions |
+| 7 | 15 | Read-only access | All actions end with `/read` | Reader, custom read-only roles |
+| 8 | 0 | No permissions | Empty `actions` and `dataActions` | Roles with no actions defined |
+
+**Authorization exclusion detection:** The `notActions` list is checked for patterns that cover `Microsoft.Authorization` write operations. Any of these patterns qualify as an auth exclusion: `Microsoft.Authorization/*`, `Microsoft.Authorization/*/Write`, or `Microsoft.Authorization/*/Delete`. This is how the algorithm distinguishes Owner (tier 1, no exclusion) from Contributor (tier 4, auth excluded).
+
+**Provider wildcard scoring:** Tier 5 scores scale with the number of provider wildcards: `50 + min(count × 5, 15)`. A role with one provider wildcard scores 55; three or more score 65. This captures the intuition that broader provider access is riskier.
 
 ### Scope Multipliers
 
-After computing a base score, a multiplier is applied based on the ARM scope path of the role assignment:
+After computing a base permission score, a multiplier is applied based on the ARM scope path of the role assignment. The scope is read from the `scope` attribute of the `azurerm_role_assignment` resource in the Terraform plan.
 
-| Scope Level | Multiplier | Detection |
-|-------------|------------|-----------|
-| Management Group | 1.1x | Path contains `microsoft.management/managementgroups` |
-| Subscription | 1.0x | Path starts with `/subscriptions/` with no resource group |
-| Resource Group | 0.8x | Path contains `/resourceGroups/` with no `/providers/` after |
-| Resource | 0.6x | Path contains `/providers/` after resource group |
-| Unknown | 0.9x | Unrecognized scope format |
+| Scope Level | Multiplier | Detection Rule |
+|-------------|------------|----------------|
+| Management Group | 1.1× | Path contains `microsoft.management/managementgroups` (case-insensitive) |
+| Subscription | 1.0× | Path starts with `/subscriptions/` with no `/resourceGroups/` segment |
+| Resource Group | 0.8× | Path contains `/resourceGroups/` with no `/providers/` segment after it |
+| Resource | 0.6× | Path contains `/providers/` after the `/resourceGroups/` segment |
+| Unknown | 0.9× | Does not match any of the above patterns |
 
-The final score is clamped to [0, 100].
+**Scope parsing** is case-insensitive and trims trailing slashes. The parser checks for management group first, then subscription, then resource group vs. resource. If the path does not start with `/subscriptions/` and is not a management group, it falls through to unknown.
 
-### Scoring Example
+The multiplier reflects that the same role at a broader scope is riskier: Owner at management group scope (1.1×) affects all subscriptions beneath it, while Owner at resource scope (0.6×) is tightly constrained.
 
-Assigning the **Contributor** role at **subscription** scope:
+The final score is `round(base × multiplier)`, clamped to [0, 100]. A base score of 0 always stays 0 regardless of scope.
 
-1. Contributor has `Actions: ["*"]`, `NotActions: ["Microsoft.Authorization/*/Write", ...]`
-2. Tier 4 match: wildcard with auth excluded → base score **70**
-3. Subscription scope → multiplier **1.0**
-4. Final severity: **70**
+### Scoring Examples
 
-Assigning the **Owner** role at **resource group** scope:
+**Contributor at subscription scope:**
+
+1. Contributor has `Actions: ["*"]`, `NotActions: ["Microsoft.Authorization/*/Write", "Microsoft.Authorization/*/Delete", ...]`
+2. `actions` contains `*` → wildcard detected
+3. `notActions` covers `Microsoft.Authorization` write → auth excluded
+4. Tier 4 match → base score **70**
+5. Subscription scope → multiplier **1.0×**
+6. Final severity: **70**
+
+**Owner at resource group scope:**
 
 1. Owner has `Actions: ["*"]`, `NotActions: []`
-2. Tier 1 match: unrestricted wildcard → base score **95**
-3. Resource group scope → multiplier **0.8**
-4. Final severity: **76** (95 * 0.8, rounded)
+2. `actions` contains `*` → wildcard detected
+3. `notActions` is empty → auth NOT excluded
+4. Tier 1 match → base score **95**
+5. Resource group scope → multiplier **0.8×**
+6. Final severity: **76** (round(95 × 0.8))
+
+**Custom role with `Microsoft.Compute/*` and `Microsoft.Network/*` at subscription scope:**
+
+1. Two provider wildcards detected
+2. Tier 5 match → base score **60** (50 + 2×5)
+3. Subscription scope → multiplier **1.0×**
+4. Final severity: **60**
+
+**Reader at management group scope:**
+
+1. Reader has `Actions: ["*/read"]`, `NotActions: []`
+2. All actions end with `/read` → read-only
+3. Tier 7 match → base score **15**
+4. Management group scope → multiplier **1.1×**
+5. Final severity: **17** (round(15 × 1.1))
+
+### Score Interpretation
+
+| Score Range | Risk Level | Typical Roles |
+|-------------|-----------|---------------|
+| 90–100 | Very high | Owner, User Access Administrator at broad scope |
+| 70–89 | High | Contributor, roles with auth write, broad custom roles |
+| 50–69 | Medium | Roles with provider-level wildcards |
+| 20–49 | Low | Roles with limited write access |
+| 1–19 | Minimal | Read-only roles |
+| 0 | None | No permissions or no role specified |
 
 ## Role Resolution
 

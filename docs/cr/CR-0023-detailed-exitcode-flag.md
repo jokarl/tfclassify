@@ -2,7 +2,7 @@
 name: cr-0023-detailed-exitcode-flag
 description: Add --detailed-exitcode flag to control exit code behavior for CI-friendly operation.
 id: "CR-0023"
-status: "proposed"
+status: "approved"
 date: 2026-02-15
 requestor: jokarl
 stakeholders:
