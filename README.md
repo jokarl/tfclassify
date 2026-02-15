@@ -73,10 +73,11 @@ classification "critical" {
   description = "Requires security team approval"
 
   rule {
-    resource = ["*_role_*", "*_iam_*"]
-    actions  = ["delete"]
-    # Matches: azurerm_role_assignment being DELETED
-    # Skips:   azurerm_role_assignment being created or updated
+    description = "Deleting IAM or role resources requires security review"
+    resource    = ["*_role_*", "*_iam_*"]
+    actions     = ["delete"]
+    # Valid actions: "create", "read", "update", "delete", "no-op"
+    # Omit to match all actions.
   }
 }
 
@@ -88,7 +89,8 @@ classification "standard" {
   description = "Standard change process"
 
   rule {
-    resource = ["*"]
+    description = "All infrastructure changes not covered above"
+    resource    = ["*"]
   }
 }
 
@@ -97,8 +99,9 @@ classification "auto" {
   description = "Automatic approval"
 
   rule {
-    resource = ["*"]
-    actions  = ["no-op"]
+    description = "No actual changes detected"
+    resource    = ["*"]
+    actions     = ["no-op"]
   }
 }
 
@@ -131,14 +134,16 @@ Exit code: 2
 Resources: 3
 
 [critical] (1 resources)
+  Requires security team approval
   - azurerm_role_assignment.admin (azurerm_role_assignment) [delete]
-    Rule: critical rule 1 (resource: *_role_*, ...)
+    Rule: Deleting IAM or role resources requires security review
 
 [standard] (2 resources)
+  Standard change process
   - azurerm_virtual_network.main (azurerm_virtual_network) [create]
-    Rule: standard rule 1 (resource: *)
+    Rule: All infrastructure changes not covered above
   - azurerm_resource_group.production (azurerm_resource_group) [create]
-    Rule: standard rule 1 (resource: *)
+    Rule: All infrastructure changes not covered above
 ```
 
 ## CLI Reference
@@ -189,7 +194,7 @@ Supports `GITHUB_TOKEN` environment variable for authenticated requests.
       "actions": ["delete"],
       "classification": "critical",
       "classification_description": "Requires security team approval",
-      "matched_rule": "critical rule 1 (resource: *_role_*, ...)"
+      "matched_rule": "Deleting IAM or role resources requires security review"
     }
   ]
 }
@@ -217,12 +222,14 @@ classification "review" {
 
   # Rule 1: any change to security or firewall rules
   rule {
-    resource = ["*_security_rule", "*_firewall_*"]
+    description = "Network security changes affect access controls"
+    resource    = ["*_security_rule", "*_firewall_*"]
   }
 
   # Rule 2: any change to key vault children
   rule {
-    resource = ["*_key_vault_*"]
+    description = "Key vault secret/key changes need review"
+    resource    = ["*_key_vault_*"]
   }
 }
 ```
@@ -231,7 +238,7 @@ classification "review" {
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `description` | string | Optional. Appears in verbose/JSON output explaining why the rule matched. |
+| `description` | string | Optional. Appears in verbose and JSON output next to each classified resource, explaining **why** the rule matched. Without it, an auto-generated description is used (e.g. `critical rule 1 (resource: *_role_*, ...)`). |
 | `resource` | list of globs | Resource type must match at least one pattern. |
 | `not_resource` | list of globs | Resource type must match **none** of the patterns. Cannot combine with `resource` in the same rule. |
 | `actions` | list of strings | Terraform action must be one of: `create`, `update`, `delete`, `read`, `no-op`. Omit to match all actions. |
