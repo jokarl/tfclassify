@@ -76,7 +76,6 @@ classification "critical" {
     description = "Deleting IAM or role resources requires security review"
     resource    = ["*_role_*", "*_iam_*"]
     actions     = ["delete"]
-    # Valid actions: "create", "read", "update", "delete", "no-op"
     # Omit to match all actions.
   }
 }
@@ -241,7 +240,21 @@ classification "review" {
 | `description` | string | Optional. Appears in verbose and JSON output next to each classified resource, explaining **why** the rule matched. Without it, an auto-generated description is used (e.g. `critical rule 1 (resource: *_role_*, ...)`). |
 | `resource` | list of globs | Resource type must match at least one pattern. |
 | `not_resource` | list of globs | Resource type must match **none** of the patterns. Cannot combine with `resource` in the same rule. |
-| `actions` | list of strings | Terraform action must be one of: `create`, `update`, `delete`, `read`, `no-op`. Omit to match all actions. |
+| `actions` | list of strings | Terraform plan action. Omit to match all actions. See **Action Values** below. |
+
+### Action Values
+
+These values come directly from the Terraform plan JSON format — tfclassify does not define or remap them.
+
+| Action | When Terraform emits it |
+|--------|------------------------|
+| `create` | A new resource will be created. |
+| `update` | An existing resource will be modified in-place (no recreation). |
+| `delete` | An existing resource will be destroyed. Also appears as part of replacement (see below). |
+| `read` | A data source will be read during apply. Only appears for `data` resources whose values are not yet known at plan time. |
+| `no-op` | Terraform evaluated the resource and found no difference between config and state. The resource appears in the plan but nothing will change. |
+
+**Replacement** is not a single action — it is a composite of `["delete", "create"]` (destroy-then-create) or `["create", "delete"]` (create-before-destroy, when `lifecycle { create_before_destroy = true }` is set). A rule with `actions = ["delete"]` will match replacements because the action list contains `"delete"`.
 
 Glob patterns use `*` to match any sequence of characters. Some useful patterns:
 
