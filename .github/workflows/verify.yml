@@ -63,6 +63,9 @@ jobs:
           - nsg-open-inbound
           - route-table
           - role-assignment-reader
+          - role-escalation-threshold
+          - role-exclusion
+          - keyvault-destructive
     steps:
       - name: Checkout
         uses: actions/checkout@v4
