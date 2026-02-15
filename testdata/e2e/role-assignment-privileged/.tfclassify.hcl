@@ -1,11 +1,7 @@
 plugin "azurerm" {
   enabled = true
-
-  config {
-    privilege_enabled = true
-    network_enabled   = false
-    keyvault_enabled  = false
-  }
+  source  = "github.com/jokarl/tfclassify"
+  version = "0.1.0"
 }
 
 classification "critical" {

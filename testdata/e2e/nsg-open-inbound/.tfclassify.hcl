@@ -1,13 +1,3 @@
-plugin "azurerm" {
-  enabled = true
-
-  config {
-    privilege_enabled = false
-    network_enabled   = true
-    keyvault_enabled  = false
-  }
-}
-
 classification "critical" {
   description = "Requires security review"
 
