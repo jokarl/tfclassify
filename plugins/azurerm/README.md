@@ -11,7 +11,7 @@ Deep inspection plugin for Azure Resource Manager (azurerm) resources. Analyzes 
   - [Key Vault Access](#key-vault-access)
 - [Configuration](#configuration)
   - [Enabling the Plugin](#enabling-the-plugin)
-  - [Plugin Config Options](#plugin-config-options)
+  - [Classification-Scoped Plugin Configuration](#classification-scoped-plugin-configuration)
   - [Full Configuration Example](#full-configuration-example)
 - [How Scoring Works](#how-scoring-works)
   - [Permission Tiers](#permission-tiers)
@@ -44,7 +44,6 @@ Detects privilege escalation in Azure role assignments by computing a severity s
 **What it detects:**
 - New privileged role assignments (e.g., assigning Owner to a principal)
 - Role escalations (e.g., changing Reader to Contributor)
-- Role de-escalations (e.g., removing Owner, always severity 40)
 
 **How it works:**
 1. Resolves the role being assigned (see [Role Resolution](#role-resolution))
@@ -57,7 +56,6 @@ Detects privilege escalation in Azure role assignments by computing a severity s
 ```
 privileged role "Owner" assigned (severity: 95)
 role escalated from "Reader" to "Contributor" (severity: 70)
-role de-escalated from "Owner" to "Reader" (severity: 40)
 ```
 
 ### Network Exposure
@@ -118,17 +116,71 @@ Then install:
 tfclassify init
 ```
 
-### Plugin Config Options
+### Classification-Scoped Plugin Configuration
 
-All options are set inside the `config {}` block of the plugin declaration. Every option has a sensible default -- you only need to specify values you want to override.
+Plugin configuration is now defined **per-classification** inside classification blocks, rather than at the top-level plugin block. This allows different thresholds and settings for each classification level.
+
+Inside each classification block, add an `azurerm {}` block with sub-blocks for each analyzer:
+
+```hcl
+classification "critical" {
+  description = "Requires security team approval"
+
+  rule {
+    resource = ["*_role_*"]
+    actions  = ["create", "update"]
+  }
+
+  # Plugin-specific configuration for this classification level
+  azurerm {
+    # Privilege escalation analyzer settings
+    privilege_escalation {
+      score_threshold = 80              # Only emit decisions if severity >= 80
+      exclude         = ["AcrPush"]     # Ignore these roles entirely
+      roles           = ["Owner", "Contributor"]  # Only analyze these roles
+    }
+
+    # Network exposure analyzer (empty = use defaults)
+    network_exposure {}
+
+    # Key vault access analyzer
+    keyvault_access {}
+  }
+}
+```
+
+#### Analyzer Sub-blocks
+
+Each analyzer has its own sub-block with specific options:
+
+**`privilege_escalation {}`**
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `privilege_enabled` | bool | `true` | Enable the privilege escalation analyzer |
-| `network_enabled` | bool | `true` | Enable the network exposure analyzer |
-| `keyvault_enabled` | bool | `true` | Enable the key vault access analyzer |
+| `score_threshold` | int | `0` | Only emit decisions when severity >= this value |
+| `exclude` | list(string) | `[]` | Role names to skip entirely (no decisions emitted) |
+| `roles` | list(string) | `[]` | If non-empty, only analyze these specific roles |
 
-The following options are available programmatically via `PluginConfig` but are not currently exposed through HCL config:
+**`network_exposure {}`**
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `permissive_sources` | list(string) | `["*", "0.0.0.0/0", "Internet"]` | Network sources that trigger detection |
+
+**`keyvault_access {}`**
+
+Uses default settings. Include an empty block to enable the analyzer for the classification.
+
+#### Behavior Notes
+
+- If no `azurerm {}` block is present in a classification, the plugin does not emit decisions for resources matching that classification
+- An analyzer sub-block (e.g., `privilege_escalation {}`) enables that analyzer for the classification
+- Empty sub-blocks use default settings
+- The `score_threshold` option is useful for tiered classification: use a high threshold (80+) for "critical" and a lower threshold (or no threshold) for "high"
+
+#### Programmatic Options
+
+The following options are available via `PluginConfig` but are not exposed through HCL config:
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
@@ -149,12 +201,8 @@ plugin "azurerm" {
   enabled = true
   source  = "github.com/jokarl/tfclassify"
   version = "0.1.0"
-
-  config {
-    privilege_enabled = true
-    network_enabled   = true
-    keyvault_enabled  = true
-  }
+  # Note: plugin-specific configuration is defined per-classification
+  # inside classification blocks below (not at the top-level plugin block).
 }
 
 # ─── Classifications ─────────────────────────────────────────────────
@@ -177,6 +225,16 @@ classification "critical" {
     resource    = ["*_key_vault"]
     actions     = ["delete"]
   }
+
+  # Plugin analyzer configuration for "critical" level.
+  # High threshold ensures only the most privileged roles trigger critical.
+  azurerm {
+    privilege_escalation {
+      score_threshold = 80  # Only Owner (95) and UAA (85) trigger critical
+    }
+    network_exposure {}
+    keyvault_access {}
+  }
 }
 
 classification "high" {
@@ -196,6 +254,16 @@ classification "high" {
   rule {
     description = "Key vault secret/key changes"
     resource    = ["*_key_vault_*"]
+  }
+
+  # Plugin analyzer configuration for "high" level.
+  # Lower threshold captures mid-tier privilege escalations.
+  azurerm {
+    privilege_escalation {
+      # No threshold = any privilege escalation triggers "high"
+    }
+    network_exposure {}
+    keyvault_access {}
   }
 }
 

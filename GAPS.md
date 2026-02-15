@@ -1,29 +1,35 @@
 # Remaining Gaps
 
-All previously identified gaps have been addressed.
+## Important
 
-## Resolved (CR-0023/CR-0024 Implementation)
+None - all gaps have been resolved.
 
-### Critical (Resolved)
+## Resolved
 
-- ~~**Missing E2E test scenarios from CR-0024 Test Strategy**~~ - Added:
-  - `testdata/e2e/role-escalation-threshold/` - Tests graduated thresholds across classifications
-  - `testdata/e2e/role-exclusion/` - Tests `exclude = ["AcrPush"]` filtering in privilege analyzer
-  - `testdata/e2e/keyvault-destructive/` - Tests key vault destructive permission detection
+### Plugin README Documentation (CR-0024)
+- Removed de-escalation detection references (previously lines 47, 60)
+- Removed old `config {}` syntax inside plugin block
+- Added new "Classification-Scoped Plugin Configuration" section with:
+  - `azurerm {}` block syntax inside classification blocks
+  - `privilege_escalation {}` sub-block with `score_threshold`, `exclude`, `roles` options
+  - `network_exposure {}` sub-block with `permissive_sources` option
+  - `keyvault_access {}` sub-block documentation
+  - Behavior notes for classification-scoped configuration
+- Updated Table of Contents to reflect new section
+- Updated Full Configuration Example to use new syntax
 
-- ~~**E2E workflow matrix not updated**~~ - Updated `.github/workflows/verify.yml` to include all three new test scenarios
+### Functional Implementation
+- CR-0023 `--detailed-exitcode` flag: Fully implemented and tested
+- CR-0024 classification-scoped plugin config: Fully implemented and tested
+- All unit tests pass across all three modules
+- All E2E test scenarios created (role-escalation-threshold, role-exclusion, keyvault-destructive)
+- E2E workflow matrix updated
+- Proto definition updated with `classification` and `analyzer_config` fields
+- SDK `ClassificationAwareAnalyzer` interface implemented
+- Privilege analyzer: score_threshold gating, role exclusion, roles filter all implemented
+- De-escalation detection removed
+- Go version updated to 1.25.7 for vulnerability fix
 
-### Important (Resolved)
-
-- ~~**Unit tests for classification-aware privilege analyzer features**~~ - Added to `plugins/azurerm/privilege_test.go`:
-  - `TestPrivilege_AnalyzeWithClassification_ScoreThreshold` - Tests score threshold gating
-  - `TestPrivilege_AnalyzeWithClassification_RoleExclusion` - Tests role exclusion
-  - `TestPrivilege_AnalyzeWithClassification_RolesFilter` - Tests roles filter
-  - `TestPrivilege_AnalyzeWithClassification_EmitsClassification` - Tests classification emission
-  - `TestPrivilege_AnalyzeWithClassification_EmptyClassification` - Tests backward compatibility
-  - `TestPrivilege_AnalyzeWithClassification_CombinedFilters` - Tests combined score_threshold + exclude + roles
-  - `TestPrivilege_AnalyzeWithClassification_InvalidJSON` - Tests error handling
-
-## Additional Changes
-
-- Updated Go version from 1.25.6 to 1.25.7 to fix GO-2026-4337 vulnerability (crypto/tls session resumption)
+### Documentation
+- Main README updated with `--detailed-exitcode` documentation
+- Full reference example (`docs/examples/full-reference/.tfclassify.hcl`) fully updated with new syntax
