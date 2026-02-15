@@ -24,6 +24,10 @@ func Validate(cfg *Config) error {
 		return err
 	}
 
+	if err := validatePluginReferences(cfg); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -88,6 +92,28 @@ func validateRules(cfg *Config) error {
 			if len(rule.Resource) == 0 && len(rule.NotResource) == 0 {
 				return fmt.Errorf("classification %q rule %d: rule must specify resource or not_resource",
 					classification.Name, i+1)
+			}
+		}
+	}
+	return nil
+}
+
+// validatePluginReferences checks that plugin blocks in classifications reference enabled plugins.
+func validatePluginReferences(cfg *Config) error {
+	// Build a map of enabled plugins
+	enabledPlugins := make(map[string]bool)
+	for _, p := range cfg.Plugins {
+		if p.Enabled {
+			enabledPlugins[p.Name] = true
+		}
+	}
+
+	// Check each classification's plugin references
+	for _, classification := range cfg.Classifications {
+		for pluginName := range classification.PluginAnalyzerConfigs {
+			if !enabledPlugins[pluginName] {
+				return fmt.Errorf("classification %q references plugin %q which is not enabled",
+					classification.Name, pluginName)
 			}
 		}
 	}

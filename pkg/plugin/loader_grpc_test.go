@@ -18,7 +18,7 @@ func TestRunPluginAnalysis_ClientNotFound(t *testing.T) {
 		Path: "/nonexistent/plugin",
 	}
 
-	err := host.runPluginAnalysis(context.Background(), "missing", plugin)
+	err := host.runPluginAnalysis(context.Background(), "missing", plugin, "", nil)
 	if err == nil {
 		t.Fatal("expected error when plugin client not found")
 	}

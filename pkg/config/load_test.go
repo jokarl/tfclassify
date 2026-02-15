@@ -197,3 +197,156 @@ func TestDiscover_HomeDirectory(t *testing.T) {
 		t.Errorf("expected path %q, got %q", configPath, path)
 	}
 }
+
+func TestLoad_ClassificationScopedPluginConfig(t *testing.T) {
+	cfg, err := Load("testdata/classification_plugin_config.hcl")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(cfg.Classifications) != 3 {
+		t.Fatalf("expected 3 classifications, got %d", len(cfg.Classifications))
+	}
+
+	// Test critical classification has plugin config
+	critical := cfg.Classifications[0]
+	if critical.Name != "critical" {
+		t.Errorf("expected first classification 'critical', got %q", critical.Name)
+	}
+
+	if critical.PluginAnalyzerConfigs == nil {
+		t.Fatal("expected PluginAnalyzerConfigs to be set for 'critical'")
+	}
+
+	azurermCfg, ok := critical.PluginAnalyzerConfigs["azurerm"]
+	if !ok {
+		t.Fatal("expected 'azurerm' plugin config in 'critical' classification")
+	}
+
+	// Test privilege_escalation config
+	if azurermCfg.PrivilegeEscalation == nil {
+		t.Fatal("expected PrivilegeEscalation config")
+	}
+	if azurermCfg.PrivilegeEscalation.ScoreThreshold != 80 {
+		t.Errorf("expected ScoreThreshold 80, got %d", azurermCfg.PrivilegeEscalation.ScoreThreshold)
+	}
+	if len(azurermCfg.PrivilegeEscalation.Exclude) != 2 {
+		t.Errorf("expected 2 Exclude roles, got %d", len(azurermCfg.PrivilegeEscalation.Exclude))
+	}
+	if azurermCfg.PrivilegeEscalation.Exclude[0] != "AcrPush" {
+		t.Errorf("expected first Exclude role 'AcrPush', got %q", azurermCfg.PrivilegeEscalation.Exclude[0])
+	}
+
+	// Test network_exposure config
+	if azurermCfg.NetworkExposure == nil {
+		t.Fatal("expected NetworkExposure config")
+	}
+	if len(azurermCfg.NetworkExposure.PermissiveSources) != 3 {
+		t.Errorf("expected 3 PermissiveSources, got %d", len(azurermCfg.NetworkExposure.PermissiveSources))
+	}
+
+	// Test keyvault_access config (empty block)
+	if azurermCfg.KeyVaultAccess == nil {
+		t.Fatal("expected KeyVaultAccess config (even if empty)")
+	}
+
+	// Test high classification has partial plugin config
+	high := cfg.Classifications[1]
+	if high.Name != "high" {
+		t.Errorf("expected second classification 'high', got %q", high.Name)
+	}
+
+	azurermHighCfg, ok := high.PluginAnalyzerConfigs["azurerm"]
+	if !ok {
+		t.Fatal("expected 'azurerm' plugin config in 'high' classification")
+	}
+
+	if azurermHighCfg.PrivilegeEscalation == nil {
+		t.Fatal("expected PrivilegeEscalation config in 'high'")
+	}
+	if len(azurermHighCfg.PrivilegeEscalation.Roles) != 2 {
+		t.Errorf("expected 2 Roles, got %d", len(azurermHighCfg.PrivilegeEscalation.Roles))
+	}
+
+	// Test standard classification has no plugin config
+	standard := cfg.Classifications[2]
+	if standard.Name != "standard" {
+		t.Errorf("expected third classification 'standard', got %q", standard.Name)
+	}
+
+	if len(standard.PluginAnalyzerConfigs) != 0 {
+		t.Errorf("expected no plugin configs for 'standard', got %d", len(standard.PluginAnalyzerConfigs))
+	}
+}
+
+func TestLoad_ClassificationScopedPluginConfig_UnknownPlugin(t *testing.T) {
+	configContent := `
+plugin "azurerm" {
+  enabled = true
+  source  = "github.com/example/plugin"
+  version = "0.1.0"
+}
+
+classification "critical" {
+  description = "Critical"
+  rule {
+    resource = ["*"]
+  }
+
+  # Reference to plugin that doesn't exist
+  nonexistent {
+    some_analyzer {}
+  }
+}
+
+precedence = ["critical"]
+
+defaults {
+  unclassified = "critical"
+  no_changes   = "critical"
+}
+`
+	_, err := Parse([]byte(configContent), "test.hcl")
+	if err == nil {
+		t.Fatal("expected error for plugin reference to non-existent plugin")
+	}
+	if !strings.Contains(err.Error(), "nonexistent") || !strings.Contains(err.Error(), "not enabled") {
+		t.Errorf("expected error about unknown plugin reference, got: %v", err)
+	}
+}
+
+func TestLoad_ClassificationScopedPluginConfig_DisabledPlugin(t *testing.T) {
+	configContent := `
+plugin "azurerm" {
+  enabled = false
+  source  = "github.com/example/plugin"
+  version = "0.1.0"
+}
+
+classification "critical" {
+  description = "Critical"
+  rule {
+    resource = ["*"]
+  }
+
+  # Reference to disabled plugin
+  azurerm {
+    privilege_escalation {}
+  }
+}
+
+precedence = ["critical"]
+
+defaults {
+  unclassified = "critical"
+  no_changes   = "critical"
+}
+`
+	_, err := Parse([]byte(configContent), "test.hcl")
+	if err == nil {
+		t.Fatal("expected error for plugin reference to disabled plugin")
+	}
+	if !strings.Contains(err.Error(), "azurerm") || !strings.Contains(err.Error(), "not enabled") {
+		t.Errorf("expected error about disabled plugin reference, got: %v", err)
+	}
+}

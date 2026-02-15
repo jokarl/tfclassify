@@ -62,7 +62,8 @@ func TestPrivilegeEscalation_ReaderToOwner(t *testing.T) {
 	}
 }
 
-func TestPrivilegeEscalation_OwnerToReader(t *testing.T) {
+func TestPrivilegeEscalation_OwnerToReader_NoDecision(t *testing.T) {
+	// De-escalation is no longer detected (CR-0024)
 	config := DefaultConfig()
 	analyzer := NewPrivilegeEscalationAnalyzer(config)
 
@@ -89,25 +90,9 @@ func TestPrivilegeEscalation_OwnerToReader(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if len(runner.decisions) != 1 {
-		t.Fatalf("expected 1 decision, got %d", len(runner.decisions))
-	}
-
-	decision := runner.decisions[0]
-	// De-escalation always emits severity 40
-	if decision.Severity != 40 {
-		t.Errorf("expected severity 40, got %d", decision.Severity)
-	}
-
-	if decision.Metadata["direction"] != "de-escalation" {
-		t.Errorf("expected direction de-escalation, got %v", decision.Metadata["direction"])
-	}
-	// Check enriched metadata
-	if decision.Metadata["before_score"] == nil {
-		t.Error("expected before_score in metadata")
-	}
-	if decision.Metadata["after_score"] == nil {
-		t.Error("expected after_score in metadata")
+	// De-escalation is no longer detected (CR-0024)
+	if len(runner.decisions) != 0 {
+		t.Fatalf("expected 0 decisions for de-escalation (no longer detected), got %d", len(runner.decisions))
 	}
 }
 
@@ -365,7 +350,8 @@ func TestPrivilegeEscalation_Name(t *testing.T) {
 	}
 }
 
-func TestPrivilegeEscalation_RoleRemoval(t *testing.T) {
+func TestPrivilegeEscalation_RoleRemoval_NoDecision(t *testing.T) {
+	// De-escalation (role removal) is no longer detected (CR-0024)
 	config := DefaultConfig()
 	analyzer := NewPrivilegeEscalationAnalyzer(config)
 
@@ -389,16 +375,9 @@ func TestPrivilegeEscalation_RoleRemoval(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if len(runner.decisions) != 1 {
-		t.Fatalf("expected 1 decision for privileged role removal, got %d", len(runner.decisions))
-	}
-
-	decision := runner.decisions[0]
-	if decision.Metadata["direction"] != "de-escalation" {
-		t.Errorf("expected direction de-escalation, got %v", decision.Metadata["direction"])
-	}
-	if decision.Severity != 40 {
-		t.Errorf("expected severity 40 for de-escalation, got %d", decision.Severity)
+	// De-escalation is no longer detected (CR-0024)
+	if len(runner.decisions) != 0 {
+		t.Fatalf("expected 0 decisions for role removal (de-escalation no longer detected), got %d", len(runner.decisions))
 	}
 }
 
@@ -1301,21 +1280,26 @@ func TestResolveRole_UnknownIDOnly(t *testing.T) {
 }
 
 func TestScopeFromBeforeState(t *testing.T) {
+	// Test that scope is taken from Before when After has no scope
+	// This tests escalation where scope comes from Before
 	config := DefaultConfig()
 	analyzer := NewPrivilegeEscalationAnalyzer(config)
 
-	// Test that scope is taken from Before when After has no scope
+	// Test an escalation scenario where After is new role at the same scope
 	runner := &mockRunner{
 		changes: []*sdk.ResourceChange{
 			{
 				Address: "azurerm_role_assignment.test",
 				Type:    "azurerm_role_assignment",
-				Actions: []string{"delete"},
+				Actions: []string{"update"},
 				Before: map[string]interface{}{
-					"role_definition_name": "Owner",
+					"role_definition_name": "Reader",
 					"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
 				},
-				After: nil,
+				After: map[string]interface{}{
+					"role_definition_name": "Owner",
+					// No scope in After - should fall back to Before
+				},
 			},
 		},
 	}
@@ -1494,36 +1478,37 @@ func (r *mockRunnerWithEmitError) EmitDecision(analyzer sdk.Analyzer, change *sd
 	return errMockEmit
 }
 
-func TestAnalyze_EmitDecisionError_Deescalation(t *testing.T) {
-	// Test emit error on de-escalation path
+func TestAnalyze_NoDeescalation(t *testing.T) {
+	// De-escalation is no longer detected (CR-0024)
+	// This test verifies that no decision is emitted for de-escalation
 	config := DefaultConfig()
 	analyzer := NewPrivilegeEscalationAnalyzer(config)
 
-	runner := &mockRunnerWithEmitError{
-		mockRunner: mockRunner{
-			changes: []*sdk.ResourceChange{
-				{
-					Address: "azurerm_role_assignment.test",
-					Type:    "azurerm_role_assignment",
-					Actions: []string{"update"},
-					Before: map[string]interface{}{
-						"role_definition_name": "Owner",
-						"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
-					},
-					After: map[string]interface{}{
-						"role_definition_name": "Reader",
-						"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
-					},
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			{
+				Address: "azurerm_role_assignment.test",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"update"},
+				Before: map[string]interface{}{
+					"role_definition_name": "Owner",
+					"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
+				},
+				After: map[string]interface{}{
+					"role_definition_name": "Reader",
+					"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
 				},
 			},
 		},
 	}
 
 	err := analyzer.Analyze(runner)
-	if err == nil {
-		t.Fatal("expected error from EmitDecision on de-escalation, got nil")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
-	if !errors.Is(err, errMockEmit) {
-		t.Errorf("expected errMockEmit, got %v", err)
+
+	// De-escalation is no longer detected (CR-0024)
+	if len(runner.decisions) != 0 {
+		t.Fatalf("expected 0 decisions for de-escalation (no longer detected), got %d", len(runner.decisions))
 	}
 }

@@ -248,8 +248,8 @@ func TestKeyVaultAccess_Name(t *testing.T) {
 	config := DefaultConfig()
 	analyzer := NewKeyVaultAccessAnalyzer(config)
 
-	if analyzer.Name() != "key-vault-access" {
-		t.Errorf("expected name 'key-vault-access', got %q", analyzer.Name())
+	if analyzer.Name() != "keyvault-access" {
+		t.Errorf("expected name 'keyvault-access', got %q", analyzer.Name())
 	}
 }
 

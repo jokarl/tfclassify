@@ -18,3 +18,16 @@ type Analyzer interface {
 	// This is called by the host after the plugin has been configured.
 	Analyze(runner Runner) error
 }
+
+// ClassificationAwareAnalyzer is an optional interface that analyzers can implement
+// to receive classification context. Analyzers that implement this interface receive
+// the classification name and JSON-encoded per-analyzer configuration, allowing them
+// to apply different thresholds or behaviors per classification level.
+type ClassificationAwareAnalyzer interface {
+	Analyzer
+
+	// AnalyzeWithClassification inspects resources with classification context.
+	// classification is the name of the classification block (e.g., "critical")
+	// analyzerConfig is JSON-encoded per-analyzer configuration from the classification block
+	AnalyzeWithClassification(runner Runner, classification string, analyzerConfig []byte) error
+}

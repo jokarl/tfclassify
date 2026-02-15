@@ -43,14 +43,15 @@ terraform show -json tfplan > plan.json
 tfclassify -p plan.json
 ```
 
-Exit codes map to precedence position, making tfclassify usable as a gate in CI/CD pipelines:
+By default, tfclassify exits `0` for any successful classification (CI-friendly). Use `--detailed-exitcode` to get classification-based exit codes for pipeline gating:
 
-| Precedence position | Exit code | Typical meaning |
-|---------------------|-----------|-----------------|
-| 1st (highest) | N-1 | Critical — block pipeline |
-| 2nd | N-2 | Review — require approval |
-| ... | ... | ... |
-| Last (lowest) | 0 | Auto — proceed |
+```bash
+# Default: exit 0 on success, parse output for classification
+tfclassify -p tfplan --output json | jq .overall
+
+# With --detailed-exitcode: non-zero exit for non-auto classifications
+tfclassify -p tfplan --detailed-exitcode
+```
 
 ## Quick Start
 
@@ -159,6 +160,22 @@ tfclassify [flags]
 | `--config` | `-c` | auto-discover | Path to `.tfclassify.hcl` config file |
 | `--output` | `-o` | `text` | Output format: `text`, `json`, `github` |
 | `--verbose` | `-v` | `false` | Show per-resource rule match details |
+| `--detailed-exitcode` | `-d` | `false` | Use classification-based exit codes (see below) |
+
+### Exit Codes
+
+By default, tfclassify exits `0` for any successful classification, making it CI-friendly. Non-zero exit codes are reserved for errors (e.g., config load failure, plan parse failure).
+
+With `--detailed-exitcode`, tfclassify uses classification-based exit codes:
+
+| Precedence position | Exit code | Typical meaning |
+|---------------------|-----------|-----------------|
+| 1st (highest) | N-1 | Critical — block pipeline |
+| 2nd | N-2 | Review — require approval |
+| ... | ... | ... |
+| Last (lowest) | 0 | Auto — proceed |
+
+The `exit_code` field in JSON and GitHub output formats always contains the precedence-derived code, regardless of the `--detailed-exitcode` flag.
 
 ### Init Command
 

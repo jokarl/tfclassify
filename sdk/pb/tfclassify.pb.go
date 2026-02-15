@@ -285,9 +285,13 @@ func (*ApplyConfigResponse) Descriptor() ([]byte, []int) {
 type AnalyzeRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// broker_id is used by the plugin to dial back to the Runner server.
-	BrokerId      uint32 `protobuf:"varint,1,opt,name=broker_id,json=brokerId,proto3" json:"broker_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	BrokerId uint32 `protobuf:"varint,1,opt,name=broker_id,json=brokerId,proto3" json:"broker_id,omitempty"`
+	// classification is the classification name (e.g., "critical") for which analysis is being run.
+	Classification string `protobuf:"bytes,2,opt,name=classification,proto3" json:"classification,omitempty"`
+	// analyzer_config contains JSON-encoded per-analyzer configuration for this classification.
+	AnalyzerConfig []byte        `protobuf:"bytes,3,opt,name=analyzer_config,json=analyzerConfig,proto3" json:"analyzer_config,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *AnalyzeRequest) Reset() {
@@ -325,6 +329,20 @@ func (x *AnalyzeRequest) GetBrokerId() uint32 {
 		return x.BrokerId
 	}
 	return 0
+}
+
+func (x *AnalyzeRequest) GetClassification() string {
+	if x != nil {
+		return x.Classification
+	}
+	return ""
+}
+
+func (x *AnalyzeRequest) GetAnalyzerConfig() []byte {
+	if x != nil {
+		return x.AnalyzerConfig
+	}
+	return nil
 }
 
 // AnalyzeResponse indicates analysis completion.

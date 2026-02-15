@@ -65,6 +65,11 @@ message ApplyConfigResponse {}
 message AnalyzeRequest {
     // broker_id is used by the plugin to dial back to the Runner server.
     uint32 broker_id = 1;
+    // classification is the classification name (e.g., "critical") for which analysis is being run.
+    // Plugins should emit decisions with this classification.
+    string classification = 2;
+    // analyzer_config contains JSON-encoded per-analyzer configuration for this classification.
+    bytes analyzer_config = 3;
 }
 
 // AnalyzeResponse indicates analysis completion.

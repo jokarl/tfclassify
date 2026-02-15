@@ -64,6 +64,8 @@ func (s *PluginServiceServer) ApplyConfig(ctx context.Context, req *pb.ApplyConf
 }
 
 // Analyze runs all enabled analyzers in the plugin.
+// If classification and analyzerConfig are provided, only analyzers that implement
+// ClassificationAwareAnalyzer are called with the classification context.
 func (s *PluginServiceServer) Analyze(ctx context.Context, req *pb.AnalyzeRequest) (*pb.AnalyzeResponse, error) {
 	conn, err := s.broker.Dial(req.BrokerId)
 	if err != nil {
@@ -71,17 +73,33 @@ func (s *PluginServiceServer) Analyze(ctx context.Context, req *pb.AnalyzeReques
 	}
 	defer conn.Close()
 
-	runner := NewRunnerClient(conn)
+	// Create a classification-aware runner that sets the classification on emitted decisions
+	runner := NewClassificationAwareRunnerClient(conn, req.Classification)
 
 	builtinSet, ok := s.impl.(*sdk.BuiltinPluginSet)
 	if !ok {
 		return &pb.AnalyzeResponse{}, nil
 	}
 
+	classification := req.Classification
+	analyzerConfig := req.AnalyzerConfig
+
 	for _, analyzer := range builtinSet.Analyzers {
 		if !analyzer.Enabled() {
 			continue
 		}
+
+		// If we have a classification, try classification-aware analysis
+		if classification != "" {
+			if classificationAware, ok := analyzer.(sdk.ClassificationAwareAnalyzer); ok {
+				if err := classificationAware.AnalyzeWithClassification(runner, classification, analyzerConfig); err != nil {
+					continue
+				}
+				continue
+			}
+		}
+
+		// Fallback to standard analysis (backward compatible)
 		if err := analyzer.Analyze(runner); err != nil {
 			continue
 		}
@@ -98,6 +116,31 @@ type RunnerClient struct {
 // NewRunnerClient creates a new runner client.
 func NewRunnerClient(conn *grpc.ClientConn) *RunnerClient {
 	return &RunnerClient{client: pb.NewRunnerServiceClient(conn)}
+}
+
+// ClassificationAwareRunnerClient wraps RunnerClient and automatically sets
+// the classification on emitted decisions.
+type ClassificationAwareRunnerClient struct {
+	*RunnerClient
+	classification string
+}
+
+// NewClassificationAwareRunnerClient creates a runner client that sets the classification
+// on all emitted decisions.
+func NewClassificationAwareRunnerClient(conn *grpc.ClientConn, classification string) *ClassificationAwareRunnerClient {
+	return &ClassificationAwareRunnerClient{
+		RunnerClient:   NewRunnerClient(conn),
+		classification: classification,
+	}
+}
+
+// EmitDecision records a classification decision, automatically setting the classification.
+func (r *ClassificationAwareRunnerClient) EmitDecision(analyzer sdk.Analyzer, change *sdk.ResourceChange, decision *sdk.Decision) error {
+	// If the decision doesn't have a classification set, use the one from the request
+	if decision.Classification == "" && r.classification != "" {
+		decision.Classification = r.classification
+	}
+	return r.RunnerClient.EmitDecision(analyzer, change, decision)
 }
 
 // GetResourceChanges returns resource changes matching the given patterns.
