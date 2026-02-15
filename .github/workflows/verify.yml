@@ -33,17 +33,11 @@ jobs:
         run: |
           RG="${{ env.RESOURCE_GROUP }}"
 
-          # Remove role assignments first (scoped resources, not listed by az resource list)
-          echo "Removing role assignments..."
-          ASSIGNMENTS=$(az role assignment list --resource-group "$RG" --query "[].id" -o tsv)
-          if [ -n "$ASSIGNMENTS" ]; then
-            echo "$ASSIGNMENTS" | while read -r id; do
-              echo "  Deleting role assignment: $id"
-              az role assignment delete --ids "$id" || true
-            done
-          fi
-
-          # Delete remaining resources with retry passes to handle dependency ordering
+          # Delete resources with retry passes to handle dependency ordering.
+          # Role assignments are NOT deleted here — az role assignment list
+          # returns ALL assignments scoped to the RG, including the service
+          # principal's own access. Deleting those would lock us out.
+          # Orphaned role assignments (from deleted test identities) are harmless.
           for pass in 1 2 3; do
             RESOURCE_IDS=$(az resource list --resource-group "$RG" --query "[].id" -o tsv)
             if [ -z "$RESOURCE_IDS" ]; then
