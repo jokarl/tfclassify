@@ -3,8 +3,33 @@ name: CI
 on:
   pull_request:
     branches: [main]
+    paths:
+      - '**/*.go'
+      - '**/go.mod'
+      - '**/go.sum'
+      - 'go.work'
+      - 'go.work.sum'
+      - 'proto/**'
+      - 'testdata/e2e/**'
+      - '.github/workflows/ci.yml'
+      - '.github/workflows/e2e.yml'
   push:
     branches: [main]
+    paths:
+      - '**/*.go'
+      - '**/go.mod'
+      - '**/go.sum'
+      - 'go.work'
+      - 'go.work.sum'
+      - 'proto/**'
+      - 'testdata/e2e/**'
+      - '.github/workflows/ci.yml'
+      - '.github/workflows/e2e.yml'
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
 
 jobs:
   build:
@@ -43,3 +68,22 @@ jobs:
           go-version-file: go.mod
       - run: go install golang.org/x/vuln/cmd/govulncheck@latest
       - run: govulncheck ./...
+
+  e2e:
+    needs: [build, test, vet, vuln]
+    strategy:
+      fail-fast: false
+      matrix:
+        use-case:
+          - role-assignment-privileged
+          - nsg-open-inbound
+          - route-table
+          - role-assignment-reader
+          - role-escalation-threshold
+          - role-exclusion
+          - keyvault-destructive
+    uses: ./.github/workflows/e2e.yml
+    with:
+      use-case: ${{ matrix.use-case }}
+      binary-source: build
+      plan-formats: both

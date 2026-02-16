@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"testing"
 
@@ -62,7 +63,8 @@ func TestPrivilegeEscalation_ReaderToOwner(t *testing.T) {
 	}
 }
 
-func TestPrivilegeEscalation_OwnerToReader(t *testing.T) {
+func TestPrivilegeEscalation_OwnerToReader_NoDecision(t *testing.T) {
+	// De-escalation is no longer detected (CR-0024)
 	config := DefaultConfig()
 	analyzer := NewPrivilegeEscalationAnalyzer(config)
 
@@ -89,25 +91,9 @@ func TestPrivilegeEscalation_OwnerToReader(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if len(runner.decisions) != 1 {
-		t.Fatalf("expected 1 decision, got %d", len(runner.decisions))
-	}
-
-	decision := runner.decisions[0]
-	// De-escalation always emits severity 40
-	if decision.Severity != 40 {
-		t.Errorf("expected severity 40, got %d", decision.Severity)
-	}
-
-	if decision.Metadata["direction"] != "de-escalation" {
-		t.Errorf("expected direction de-escalation, got %v", decision.Metadata["direction"])
-	}
-	// Check enriched metadata
-	if decision.Metadata["before_score"] == nil {
-		t.Error("expected before_score in metadata")
-	}
-	if decision.Metadata["after_score"] == nil {
-		t.Error("expected after_score in metadata")
+	// De-escalation is no longer detected (CR-0024)
+	if len(runner.decisions) != 0 {
+		t.Fatalf("expected 0 decisions for de-escalation (no longer detected), got %d", len(runner.decisions))
 	}
 }
 
@@ -365,7 +351,8 @@ func TestPrivilegeEscalation_Name(t *testing.T) {
 	}
 }
 
-func TestPrivilegeEscalation_RoleRemoval(t *testing.T) {
+func TestPrivilegeEscalation_RoleRemoval_NoDecision(t *testing.T) {
+	// De-escalation (role removal) is no longer detected (CR-0024)
 	config := DefaultConfig()
 	analyzer := NewPrivilegeEscalationAnalyzer(config)
 
@@ -389,16 +376,9 @@ func TestPrivilegeEscalation_RoleRemoval(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if len(runner.decisions) != 1 {
-		t.Fatalf("expected 1 decision for privileged role removal, got %d", len(runner.decisions))
-	}
-
-	decision := runner.decisions[0]
-	if decision.Metadata["direction"] != "de-escalation" {
-		t.Errorf("expected direction de-escalation, got %v", decision.Metadata["direction"])
-	}
-	if decision.Severity != 40 {
-		t.Errorf("expected severity 40 for de-escalation, got %d", decision.Severity)
+	// De-escalation is no longer detected (CR-0024)
+	if len(runner.decisions) != 0 {
+		t.Fatalf("expected 0 decisions for role removal (de-escalation no longer detected), got %d", len(runner.decisions))
 	}
 }
 
@@ -1301,21 +1281,26 @@ func TestResolveRole_UnknownIDOnly(t *testing.T) {
 }
 
 func TestScopeFromBeforeState(t *testing.T) {
+	// Test that scope is taken from Before when After has no scope
+	// This tests escalation where scope comes from Before
 	config := DefaultConfig()
 	analyzer := NewPrivilegeEscalationAnalyzer(config)
 
-	// Test that scope is taken from Before when After has no scope
+	// Test an escalation scenario where After is new role at the same scope
 	runner := &mockRunner{
 		changes: []*sdk.ResourceChange{
 			{
 				Address: "azurerm_role_assignment.test",
 				Type:    "azurerm_role_assignment",
-				Actions: []string{"delete"},
+				Actions: []string{"update"},
 				Before: map[string]interface{}{
-					"role_definition_name": "Owner",
+					"role_definition_name": "Reader",
 					"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
 				},
-				After: nil,
+				After: map[string]interface{}{
+					"role_definition_name": "Owner",
+					// No scope in After - should fall back to Before
+				},
 			},
 		},
 	}
@@ -1494,36 +1479,464 @@ func (r *mockRunnerWithEmitError) EmitDecision(analyzer sdk.Analyzer, change *sd
 	return errMockEmit
 }
 
-func TestAnalyze_EmitDecisionError_Deescalation(t *testing.T) {
-	// Test emit error on de-escalation path
+func TestAnalyze_NoDeescalation(t *testing.T) {
+	// De-escalation is no longer detected (CR-0024)
+	// This test verifies that no decision is emitted for de-escalation
 	config := DefaultConfig()
 	analyzer := NewPrivilegeEscalationAnalyzer(config)
 
-	runner := &mockRunnerWithEmitError{
-		mockRunner: mockRunner{
-			changes: []*sdk.ResourceChange{
-				{
-					Address: "azurerm_role_assignment.test",
-					Type:    "azurerm_role_assignment",
-					Actions: []string{"update"},
-					Before: map[string]interface{}{
-						"role_definition_name": "Owner",
-						"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
-					},
-					After: map[string]interface{}{
-						"role_definition_name": "Reader",
-						"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
-					},
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			{
+				Address: "azurerm_role_assignment.test",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"update"},
+				Before: map[string]interface{}{
+					"role_definition_name": "Owner",
+					"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
+				},
+				After: map[string]interface{}{
+					"role_definition_name": "Reader",
+					"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
 				},
 			},
 		},
 	}
 
 	err := analyzer.Analyze(runner)
-	if err == nil {
-		t.Fatal("expected error from EmitDecision on de-escalation, got nil")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
-	if !errors.Is(err, errMockEmit) {
-		t.Errorf("expected errMockEmit, got %v", err)
+
+	// De-escalation is no longer detected (CR-0024)
+	if len(runner.decisions) != 0 {
+		t.Fatalf("expected 0 decisions for de-escalation (no longer detected), got %d", len(runner.decisions))
+	}
+}
+
+// Tests for classification-aware analyzer features (CR-0024)
+
+func TestPrivilege_AnalyzeWithClassification_ScoreThreshold(t *testing.T) {
+	config := DefaultConfig()
+	analyzer := NewPrivilegeEscalationAnalyzer(config)
+
+	tests := []struct {
+		name             string
+		role             string
+		scope            string
+		scoreThreshold   int
+		expectDecision   bool
+		expectedSeverity int
+	}{
+		{
+			name:             "Owner at subscription, threshold 80 - should trigger",
+			role:             "Owner",
+			scope:            "/subscriptions/00000000-0000-0000-0000-000000000000",
+			scoreThreshold:   80,
+			expectDecision:   true,
+			expectedSeverity: 95,
+		},
+		{
+			name:           "Contributor at subscription, threshold 80 - should not trigger",
+			role:           "Contributor",
+			scope:          "/subscriptions/00000000-0000-0000-0000-000000000000",
+			scoreThreshold: 80,
+			expectDecision: false,
+		},
+		{
+			name:             "Contributor at subscription, threshold 0 - should trigger",
+			role:             "Contributor",
+			scope:            "/subscriptions/00000000-0000-0000-0000-000000000000",
+			scoreThreshold:   0,
+			expectDecision:   true,
+			expectedSeverity: 70,
+		},
+		{
+			name:             "Owner at RG scope, threshold 70 - should trigger (95*0.8=76)",
+			role:             "Owner",
+			scope:            "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg",
+			scoreThreshold:   70,
+			expectDecision:   true,
+			expectedSeverity: 76,
+		},
+		{
+			name:           "Contributor at RG scope, threshold 70 - should not trigger (70*0.8=56)",
+			role:           "Contributor",
+			scope:          "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg",
+			scoreThreshold: 70,
+			expectDecision: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			runner := &mockRunner{
+				changes: []*sdk.ResourceChange{
+					{
+						Address: "azurerm_role_assignment.test",
+						Type:    "azurerm_role_assignment",
+						Actions: []string{"create"},
+						After: map[string]interface{}{
+							"role_definition_name": tt.role,
+							"scope":                tt.scope,
+						},
+					},
+				},
+			}
+
+			analyzerConfig := &PluginAnalyzerConfig{
+				PrivilegeEscalation: &PrivilegeEscalationAnalyzerConfig{
+					ScoreThreshold: tt.scoreThreshold,
+				},
+			}
+			configJSON, _ := json.Marshal(analyzerConfig)
+
+			err := analyzer.AnalyzeWithClassification(runner, "critical", configJSON)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if tt.expectDecision {
+				if len(runner.decisions) != 1 {
+					t.Fatalf("expected 1 decision, got %d", len(runner.decisions))
+				}
+				if runner.decisions[0].Severity != tt.expectedSeverity {
+					t.Errorf("expected severity %d, got %d", tt.expectedSeverity, runner.decisions[0].Severity)
+				}
+				if runner.decisions[0].Classification != "critical" {
+					t.Errorf("expected classification 'critical', got %q", runner.decisions[0].Classification)
+				}
+				// Verify score_threshold is in metadata
+				if runner.decisions[0].Metadata["score_threshold"] != tt.scoreThreshold {
+					t.Errorf("expected score_threshold %d in metadata, got %v", tt.scoreThreshold, runner.decisions[0].Metadata["score_threshold"])
+				}
+			} else {
+				if len(runner.decisions) != 0 {
+					t.Errorf("expected 0 decisions, got %d", len(runner.decisions))
+				}
+			}
+		})
+	}
+}
+
+func TestPrivilege_AnalyzeWithClassification_RoleExclusion(t *testing.T) {
+	config := DefaultConfig()
+	analyzer := NewPrivilegeEscalationAnalyzer(config)
+
+	tests := []struct {
+		name           string
+		role           string
+		exclude        []string
+		expectDecision bool
+	}{
+		{
+			name:           "Owner not excluded - should trigger",
+			role:           "Owner",
+			exclude:        []string{"AcrPush", "Reader"},
+			expectDecision: true,
+		},
+		{
+			name:           "Owner excluded - should not trigger",
+			role:           "Owner",
+			exclude:        []string{"Owner", "Contributor"},
+			expectDecision: false,
+		},
+		{
+			name:           "Owner excluded case-insensitive - should not trigger",
+			role:           "Owner",
+			exclude:        []string{"OWNER"},
+			expectDecision: false,
+		},
+		{
+			name:           "AcrPush excluded - should not trigger",
+			role:           "AcrPush",
+			exclude:        []string{"AcrPush"},
+			expectDecision: false,
+		},
+		{
+			name:           "Empty exclude list - should trigger",
+			role:           "Contributor",
+			exclude:        []string{},
+			expectDecision: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			runner := &mockRunner{
+				changes: []*sdk.ResourceChange{
+					{
+						Address: "azurerm_role_assignment.test",
+						Type:    "azurerm_role_assignment",
+						Actions: []string{"create"},
+						After: map[string]interface{}{
+							"role_definition_name": tt.role,
+							"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
+						},
+					},
+				},
+			}
+
+			analyzerConfig := &PluginAnalyzerConfig{
+				PrivilegeEscalation: &PrivilegeEscalationAnalyzerConfig{
+					Exclude: tt.exclude,
+				},
+			}
+			configJSON, _ := json.Marshal(analyzerConfig)
+
+			err := analyzer.AnalyzeWithClassification(runner, "critical", configJSON)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if tt.expectDecision {
+				if len(runner.decisions) == 0 {
+					t.Fatalf("expected a decision, got none")
+				}
+			} else {
+				if len(runner.decisions) != 0 {
+					t.Errorf("expected 0 decisions, got %d", len(runner.decisions))
+				}
+			}
+		})
+	}
+}
+
+func TestPrivilege_AnalyzeWithClassification_RolesFilter(t *testing.T) {
+	config := DefaultConfig()
+	analyzer := NewPrivilegeEscalationAnalyzer(config)
+
+	tests := []struct {
+		name           string
+		role           string
+		roles          []string
+		expectDecision bool
+	}{
+		{
+			name:           "Owner in roles filter - should trigger",
+			role:           "Owner",
+			roles:          []string{"Owner", "User Access Administrator"},
+			expectDecision: true,
+		},
+		{
+			name:           "Contributor not in roles filter - should not trigger",
+			role:           "Contributor",
+			roles:          []string{"Owner", "User Access Administrator"},
+			expectDecision: false,
+		},
+		{
+			name:           "Owner case-insensitive in roles filter - should trigger",
+			role:           "Owner",
+			roles:          []string{"OWNER"},
+			expectDecision: true,
+		},
+		{
+			name:           "Empty roles filter - should trigger (no filter)",
+			role:           "Contributor",
+			roles:          []string{},
+			expectDecision: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			runner := &mockRunner{
+				changes: []*sdk.ResourceChange{
+					{
+						Address: "azurerm_role_assignment.test",
+						Type:    "azurerm_role_assignment",
+						Actions: []string{"create"},
+						After: map[string]interface{}{
+							"role_definition_name": tt.role,
+							"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
+						},
+					},
+				},
+			}
+
+			analyzerConfig := &PluginAnalyzerConfig{
+				PrivilegeEscalation: &PrivilegeEscalationAnalyzerConfig{
+					Roles: tt.roles,
+				},
+			}
+			configJSON, _ := json.Marshal(analyzerConfig)
+
+			err := analyzer.AnalyzeWithClassification(runner, "standard", configJSON)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if tt.expectDecision {
+				if len(runner.decisions) == 0 {
+					t.Fatalf("expected a decision, got none")
+				}
+				if runner.decisions[0].Classification != "standard" {
+					t.Errorf("expected classification 'standard', got %q", runner.decisions[0].Classification)
+				}
+			} else {
+				if len(runner.decisions) != 0 {
+					t.Errorf("expected 0 decisions, got %d", len(runner.decisions))
+				}
+			}
+		})
+	}
+}
+
+func TestPrivilege_AnalyzeWithClassification_EmitsClassification(t *testing.T) {
+	config := DefaultConfig()
+	analyzer := NewPrivilegeEscalationAnalyzer(config)
+
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			{
+				Address: "azurerm_role_assignment.test",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"role_definition_name": "Owner",
+					"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
+				},
+			},
+		},
+	}
+
+	// Test with classification context
+	err := analyzer.AnalyzeWithClassification(runner, "critical", []byte("{}"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(runner.decisions) != 1 {
+		t.Fatalf("expected 1 decision, got %d", len(runner.decisions))
+	}
+
+	if runner.decisions[0].Classification != "critical" {
+		t.Errorf("expected Classification 'critical', got %q", runner.decisions[0].Classification)
+	}
+}
+
+func TestPrivilege_AnalyzeWithClassification_EmptyClassification(t *testing.T) {
+	// When called without classification context (backward compatibility)
+	config := DefaultConfig()
+	analyzer := NewPrivilegeEscalationAnalyzer(config)
+
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			{
+				Address: "azurerm_role_assignment.test",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"role_definition_name": "Owner",
+					"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
+				},
+			},
+		},
+	}
+
+	// Call the non-classification-aware method
+	err := analyzer.Analyze(runner)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(runner.decisions) != 1 {
+		t.Fatalf("expected 1 decision, got %d", len(runner.decisions))
+	}
+
+	// Should have empty classification (no classification context provided)
+	if runner.decisions[0].Classification != "" {
+		t.Errorf("expected empty Classification without classification context, got %q", runner.decisions[0].Classification)
+	}
+}
+
+func TestPrivilege_AnalyzeWithClassification_CombinedFilters(t *testing.T) {
+	// Test score_threshold + exclude + roles together
+	config := DefaultConfig()
+	analyzer := NewPrivilegeEscalationAnalyzer(config)
+
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			// Owner - passes all filters
+			{
+				Address: "azurerm_role_assignment.owner",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"role_definition_name": "Owner",
+					"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
+				},
+			},
+			// User Access Administrator - excluded
+			{
+				Address: "azurerm_role_assignment.uaa",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"role_definition_name": "User Access Administrator",
+					"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
+				},
+			},
+			// Contributor - not in roles filter
+			{
+				Address: "azurerm_role_assignment.contributor",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"role_definition_name": "Contributor",
+					"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
+				},
+			},
+		},
+	}
+
+	analyzerConfig := &PluginAnalyzerConfig{
+		PrivilegeEscalation: &PrivilegeEscalationAnalyzerConfig{
+			ScoreThreshold: 80,
+			Roles:          []string{"Owner", "User Access Administrator"},
+			Exclude:        []string{"User Access Administrator"},
+		},
+	}
+	configJSON, _ := json.Marshal(analyzerConfig)
+
+	err := analyzer.AnalyzeWithClassification(runner, "critical", configJSON)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Only Owner should trigger:
+	// - User Access Administrator is excluded
+	// - Contributor is not in roles filter
+	if len(runner.decisions) != 1 {
+		t.Fatalf("expected 1 decision, got %d", len(runner.decisions))
+	}
+
+	if runner.decisions[0].Metadata["after_role"] != "Owner" {
+		t.Errorf("expected after_role 'Owner', got %v", runner.decisions[0].Metadata["after_role"])
+	}
+}
+
+func TestPrivilege_AnalyzeWithClassification_InvalidJSON(t *testing.T) {
+	config := DefaultConfig()
+	analyzer := NewPrivilegeEscalationAnalyzer(config)
+
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			{
+				Address: "azurerm_role_assignment.test",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"role_definition_name": "Owner",
+					"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
+				},
+			},
+		},
+	}
+
+	// Pass invalid JSON
+	err := analyzer.AnalyzeWithClassification(runner, "critical", []byte("not valid json"))
+	if err == nil {
+		t.Fatal("expected error for invalid JSON, got nil")
 	}
 }

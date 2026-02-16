@@ -2,6 +2,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -38,12 +39,33 @@ func (a *NetworkExposureAnalyzer) ResourcePatterns() []string {
 
 // Analyze inspects network security rules for overly permissive sources.
 func (a *NetworkExposureAnalyzer) Analyze(runner sdk.Runner) error {
+	return a.analyzeWithConfig(runner, "", nil)
+}
+
+// AnalyzeWithClassification implements sdk.ClassificationAwareAnalyzer.
+func (a *NetworkExposureAnalyzer) AnalyzeWithClassification(runner sdk.Runner, classification string, analyzerConfigJSON []byte) error {
+	var pluginConfig PluginAnalyzerConfig
+	if len(analyzerConfigJSON) > 0 {
+		if err := json.Unmarshal(analyzerConfigJSON, &pluginConfig); err != nil {
+			return fmt.Errorf("failed to parse analyzer config: %w", err)
+		}
+	}
+	return a.analyzeWithConfig(runner, classification, pluginConfig.NetworkExposure)
+}
+
+// analyzeWithConfig is the core analysis logic with optional classification-scoped config.
+func (a *NetworkExposureAnalyzer) analyzeWithConfig(runner sdk.Runner, classification string, analyzerCfg *NetworkExposureAnalyzerConfig) error {
 	changes, err := runner.GetResourceChanges(a.ResourcePatterns())
 	if err != nil {
 		return fmt.Errorf("failed to get resource changes: %w", err)
 	}
 
-	permissive := toSet(a.config.PermissiveSources)
+	// Use classification-scoped permissive sources if provided, otherwise use global config
+	permissiveSources := a.config.PermissiveSources
+	if analyzerCfg != nil && len(analyzerCfg.PermissiveSources) > 0 {
+		permissiveSources = analyzerCfg.PermissiveSources
+	}
+	permissive := toSet(permissiveSources)
 
 	for _, change := range changes {
 		// Inspect the "after" state (what the rule will become)
@@ -76,7 +98,7 @@ func (a *NetworkExposureAnalyzer) Analyze(runner sdk.Runner) error {
 
 		if permissive[source] {
 			decision := &sdk.Decision{
-				Classification: "",
+				Classification: classification, // Set classification from context
 				Reason:         fmt.Sprintf("inbound allow rule with overly permissive source %q", source),
 				Severity:       85,
 				Metadata: map[string]interface{}{

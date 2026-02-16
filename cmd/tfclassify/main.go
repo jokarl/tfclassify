@@ -18,10 +18,11 @@ import (
 var Version = "dev"
 
 var (
-	planPath   string
-	configPath string
-	outputFmt  string
-	verbose    bool
+	planPath       string
+	configPath     string
+	outputFmt      string
+	verbose        bool
+	detailedExitCode bool
 )
 
 // builtinAnalyzers returns the default set of builtin analyzers.
@@ -68,6 +69,7 @@ func init() {
 	rootCmd.Flags().StringVarP(&configPath, "config", "c", "", "Path to configuration file")
 	rootCmd.Flags().StringVarP(&outputFmt, "output", "o", "text", "Output format: json, text, github")
 	rootCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose output")
+	rootCmd.Flags().BoolVarP(&detailedExitCode, "detailed-exitcode", "d", false, "Use classification-based exit codes (0=auto, 1+=higher precedence)")
 
 	rootCmd.MarkFlagRequired("plan")
 
@@ -145,7 +147,12 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	// Exit with appropriate code
-	os.Exit(result.OverallExitCode)
+	// When --detailed-exitcode is set, use classification-based exit codes.
+	// Otherwise, exit 0 for any successful classification (CI-friendly default).
+	if detailedExitCode {
+		os.Exit(result.OverallExitCode)
+	}
+	os.Exit(0)
 	return nil
 }
 

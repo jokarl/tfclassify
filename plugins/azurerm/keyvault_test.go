@@ -210,6 +210,39 @@ func TestKeyVaultAccess_CustomPermissions(t *testing.T) {
 	}
 }
 
+func TestKeyVaultAccess_TitleCasePermissions(t *testing.T) {
+	config := DefaultConfig()
+	analyzer := NewKeyVaultAccessAnalyzer(config)
+
+	// Azure providers often return title case permissions (e.g. "Delete", "Purge")
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			{
+				Address: "azurerm_key_vault_access_policy.test",
+				Type:    "azurerm_key_vault_access_policy",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"secret_permissions": []interface{}{"Get", "List", "Delete", "Purge"},
+				},
+			},
+		},
+	}
+
+	err := analyzer.Analyze(runner)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(runner.decisions) != 1 {
+		t.Fatalf("expected 1 decision for title case permissions, got %d", len(runner.decisions))
+	}
+
+	permissions := runner.decisions[0].Metadata["permissions"].([]string)
+	if len(permissions) != 2 {
+		t.Errorf("expected 2 destructive permissions, got %v", permissions)
+	}
+}
+
 func TestKeyVaultAccess_GetResourceChangesError(t *testing.T) {
 	config := DefaultConfig()
 	analyzer := NewKeyVaultAccessAnalyzer(config)
@@ -248,8 +281,8 @@ func TestKeyVaultAccess_Name(t *testing.T) {
 	config := DefaultConfig()
 	analyzer := NewKeyVaultAccessAnalyzer(config)
 
-	if analyzer.Name() != "key-vault-access" {
-		t.Errorf("expected name 'key-vault-access', got %q", analyzer.Name())
+	if analyzer.Name() != "keyvault-access" {
+		t.Errorf("expected name 'keyvault-access', got %q", analyzer.Name())
 	}
 }
 

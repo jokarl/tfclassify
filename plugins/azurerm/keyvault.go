@@ -2,7 +2,9 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/jokarl/tfclassify/sdk"
 )
@@ -22,7 +24,7 @@ func NewKeyVaultAccessAnalyzer(config *PluginConfig) *KeyVaultAccessAnalyzer {
 
 // Name returns the analyzer name.
 func (a *KeyVaultAccessAnalyzer) Name() string {
-	return "key-vault-access"
+	return "keyvault-access"
 }
 
 // Enabled returns whether this analyzer is enabled.
@@ -37,12 +39,39 @@ func (a *KeyVaultAccessAnalyzer) ResourcePatterns() []string {
 
 // Analyze inspects key vault access policies for destructive permissions.
 func (a *KeyVaultAccessAnalyzer) Analyze(runner sdk.Runner) error {
+	return a.analyzeWithConfig(runner, "", nil)
+}
+
+// AnalyzeWithClassification implements sdk.ClassificationAwareAnalyzer.
+func (a *KeyVaultAccessAnalyzer) AnalyzeWithClassification(runner sdk.Runner, classification string, analyzerConfigJSON []byte) error {
+	var pluginConfig PluginAnalyzerConfig
+	if len(analyzerConfigJSON) > 0 {
+		if err := json.Unmarshal(analyzerConfigJSON, &pluginConfig); err != nil {
+			return fmt.Errorf("failed to parse analyzer config: %w", err)
+		}
+	}
+	return a.analyzeWithConfig(runner, classification, pluginConfig.KeyVaultAccess)
+}
+
+// analyzeWithConfig is the core analysis logic with optional classification-scoped config.
+func (a *KeyVaultAccessAnalyzer) analyzeWithConfig(runner sdk.Runner, classification string, analyzerCfg *KeyVaultAccessAnalyzerConfig) error {
 	changes, err := runner.GetResourceChanges(a.ResourcePatterns())
 	if err != nil {
 		return fmt.Errorf("failed to get resource changes: %w", err)
 	}
 
-	destructive := toSet(a.config.DestructiveKVPermissions)
+	// Use classification-scoped destructive permissions if provided, otherwise use global config
+	destructivePermissions := a.config.DestructiveKVPermissions
+	if analyzerCfg != nil && len(analyzerCfg.DestructivePermissions) > 0 {
+		destructivePermissions = analyzerCfg.DestructivePermissions
+	}
+	// Normalize to lowercase for case-insensitive comparison since
+	// Azure providers may use title case (e.g. "Delete") or lowercase
+	lowered := make([]string, len(destructivePermissions))
+	for i, p := range destructivePermissions {
+		lowered[i] = strings.ToLower(p)
+	}
+	destructive := toSet(lowered)
 
 	// Permission fields to check
 	permissionFields := []string{
@@ -63,18 +92,18 @@ func (a *KeyVaultAccessAnalyzer) Analyze(runner sdk.Runner) error {
 			if permissions, ok := after[field].([]interface{}); ok {
 				foundDestructive := []string{}
 				for _, p := range permissions {
-					if perm, ok := p.(string); ok && destructive[perm] {
+					if perm, ok := p.(string); ok && destructive[strings.ToLower(perm)] {
 						foundDestructive = append(foundDestructive, perm)
 					}
 				}
 
 				if len(foundDestructive) > 0 {
 					decision := &sdk.Decision{
-						Classification: "",
+						Classification: classification, // Set classification from context
 						Reason:         fmt.Sprintf("key vault access policy grants destructive permissions: %v on %s", foundDestructive, field),
 						Severity:       80,
 						Metadata: map[string]interface{}{
-							"analyzer":         "key-vault-access",
+							"analyzer":         "keyvault-access",
 							"permission_field": field,
 							"permissions":      foundDestructive,
 						},

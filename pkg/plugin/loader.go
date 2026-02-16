@@ -80,6 +80,9 @@ func (h *Host) startPlugin(name string, plugin *DiscoveredPlugin) error {
 }
 
 // RunAnalysis runs all plugins against the plan changes.
+// For each classification that has plugin analyzer config, the plugin is called
+// with the classification name and analyzer config. This enables graduated
+// thresholds per classification level.
 func (h *Host) RunAnalysis(changes []plan.ResourceChange) ([]classify.ResourceDecision, error) {
 	h.changes = changes
 	h.decisions = make([]classify.ResourceDecision, 0)
@@ -93,23 +96,65 @@ func (h *Host) RunAnalysis(changes []plan.ResourceChange) ([]classify.ResourceDe
 		}
 	}
 
-	// Run each plugin with timeout
-	for name, plugin := range h.plugins {
-		ctx, cancel := context.WithTimeout(context.Background(), timeout)
-		err := h.runPluginAnalysis(ctx, name, plugin)
-		cancel()
+	// Collect all classification-scoped plugin configs
+	// Map of plugin name -> list of (classification name, analyzer config)
+	classificationConfigs := make(map[string][]classificationAnalysisRequest)
+	for _, classification := range h.cfg.Classifications {
+		for pluginName, analyzerConfig := range classification.PluginAnalyzerConfigs {
+			configJSON, err := analyzerConfig.ToJSON()
+			if err != nil {
+				return nil, fmt.Errorf("failed to serialize analyzer config for %s/%s: %w",
+					classification.Name, pluginName, err)
+			}
+			classificationConfigs[pluginName] = append(classificationConfigs[pluginName],
+				classificationAnalysisRequest{
+					classificationName: classification.Name,
+					analyzerConfig:     configJSON,
+				})
+		}
+	}
 
-		if err != nil {
-			// Log error but continue with other plugins
-			fmt.Fprintf(os.Stderr, "Warning: plugin %q failed: %v\n", name, err)
+	// Run each plugin
+	for name, plugin := range h.plugins {
+		// Get classification-scoped configs for this plugin
+		configs := classificationConfigs[name]
+
+		// If no classification-scoped configs, run with empty classification
+		if len(configs) == 0 {
+			ctx, cancel := context.WithTimeout(context.Background(), timeout)
+			err := h.runPluginAnalysis(ctx, name, plugin, "", nil)
+			cancel()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: plugin %q failed: %v\n", name, err)
+			}
+			continue
+		}
+
+		// Run analysis for each classification that has config for this plugin
+		for _, cfg := range configs {
+			ctx, cancel := context.WithTimeout(context.Background(), timeout)
+			err := h.runPluginAnalysis(ctx, name, plugin, cfg.classificationName, cfg.analyzerConfig)
+			cancel()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: plugin %q failed for classification %q: %v\n",
+					name, cfg.classificationName, err)
+			}
 		}
 	}
 
 	return h.decisions, nil
 }
 
+// classificationAnalysisRequest holds the classification name and serialized analyzer config
+// for a per-classification plugin analysis call.
+type classificationAnalysisRequest struct {
+	classificationName string
+	analyzerConfig     []byte
+}
+
 // runPluginAnalysis runs a single plugin's analysis using gRPC.
-func (h *Host) runPluginAnalysis(ctx context.Context, name string, plugin *DiscoveredPlugin) error {
+// If classification is non-empty, it's passed to the plugin for classification-scoped analysis.
+func (h *Host) runPluginAnalysis(ctx context.Context, name string, plugin *DiscoveredPlugin, classification string, analyzerConfig []byte) error {
 	client, ok := h.clients[name]
 	if !ok {
 		return fmt.Errorf("plugin client not found: %s", name)
@@ -175,8 +220,13 @@ func (h *Host) runPluginAnalysis(ctx context.Context, name string, plugin *Disco
 		return fmt.Errorf("failed to apply config: %w", err)
 	}
 
-	// Call Analyze on the plugin, passing the broker ID for callback
-	if _, err := pluginSvcClient.Analyze(ctx, &pb.AnalyzeRequest{BrokerId: brokerID}); err != nil {
+	// Call Analyze on the plugin, passing the broker ID, classification, and analyzer config
+	req := &pb.AnalyzeRequest{
+		BrokerId:       brokerID,
+		Classification: classification,
+		AnalyzerConfig: analyzerConfig,
+	}
+	if _, err := pluginSvcClient.Analyze(ctx, req); err != nil {
 		return fmt.Errorf("analysis failed: %w", err)
 	}
 

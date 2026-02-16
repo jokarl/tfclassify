@@ -37,16 +37,9 @@ plugin "azurerm" {
   # Semantic version to download.
   version = "0.1.0"
 
-  # Plugin-specific configuration. The contents of this block are opaque to
-  # the core — they are forwarded to the plugin as-is via the SDK's ApplyConfig
-  # RPC. Consult the plugin's documentation for available options.
-  config {
-    # Example: the azurerm plugin accepts these options.
-    # (Remove or adjust for your plugin.)
-    privilege_enabled = true
-    network_enabled   = true
-    keyvault_enabled  = true
-  }
+  # Note: plugin-specific configuration is now defined per-classification
+  # inside classification blocks (see "critical" and "high" below).
+  # The old top-level "config {}" block is deprecated.
 }
 
 # Disabled plugin — declared but not executed. Useful for temporarily turning
@@ -100,6 +93,24 @@ classification "critical" {
     resource    = ["*_subscription*", "*_management_group*"]
     # No "actions" field — matches create, update, delete, read, and no-op.
   }
+
+  # Plugin-specific analyzer configuration for this classification level.
+  # Each enabled plugin can have per-analyzer sub-blocks here.
+  azurerm {
+    # Privilege escalation detection with high threshold (tier 1-2 roles only)
+    privilege_escalation {
+      score_threshold = 80  # Only Owner (95) and UAA (85) trigger critical
+      exclude = ["AcrPush", "AcrPull"]  # Exclude container registry roles
+    }
+
+    # Network exposure detection
+    network_exposure {
+      permissive_sources = ["*", "0.0.0.0/0", "Internet"]
+    }
+
+    # Key vault destructive permission detection
+    keyvault_access {}  # Empty block = use defaults
+  }
 }
 
 classification "high" {
@@ -131,6 +142,15 @@ classification "high" {
   rule {
     description = "DNS changes can cause outages"
     resource    = ["*_dns_*"]
+  }
+
+  # Plugin analyzer configuration for "high" — lower thresholds than "critical"
+  azurerm {
+    privilege_escalation {
+      # Any privilege escalation triggers "high" (no threshold = any score)
+    }
+    network_exposure {}
+    keyvault_access {}
   }
 }
 

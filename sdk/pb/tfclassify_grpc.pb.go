@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.1
 // - protoc             v6.33.4
-// source: tfclassify.proto
+// source: proto/tfclassify.proto
 
 package pb
 
@@ -245,7 +245,7 @@ var PluginService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "tfclassify.proto",
+	Metadata: "proto/tfclassify.proto",
 }
 
 const (
@@ -433,5 +433,5 @@ var RunnerService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "tfclassify.proto",
+	Metadata: "proto/tfclassify.proto",
 }

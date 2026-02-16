@@ -407,6 +407,115 @@ func TestCLI_ExitCodes(t *testing.T) {
 	}
 }
 
+func TestCLI_DefaultExitCodeZeroOnSuccess(t *testing.T) {
+	binary := buildBinary(t)
+
+	tmpDir, err := os.MkdirTemp("", "tfclassify-cli")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	configPath := writeTestConfig(t, tmpDir)
+	planPath := writeTestPlan(t, tmpDir) // Plan with critical changes
+
+	// Without --detailed-exitcode, should exit 0 even with critical classification
+	cmd := exec.Command(binary, "--plan", planPath, "--config", configPath, "--output", "json")
+	output, err := cmd.CombinedOutput()
+
+	if err != nil {
+		t.Errorf("expected exit code 0 without --detailed-exitcode, got error: %v\nOutput:\n%s", err, output)
+	}
+
+	// Verify the output still contains "critical"
+	var result map[string]interface{}
+	if err := json.Unmarshal(output, &result); err != nil {
+		t.Fatalf("expected valid JSON output, got error: %v\nOutput:\n%s", err, string(output))
+	}
+
+	if result["overall"] != "critical" {
+		t.Errorf("expected overall 'critical', got %v", result["overall"])
+	}
+}
+
+func TestCLI_DetailedExitCodeFlag(t *testing.T) {
+	binary := buildBinary(t)
+
+	tmpDir, err := os.MkdirTemp("", "tfclassify-cli")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	configPath := writeTestConfig(t, tmpDir)
+	planPath := writeTestPlan(t, tmpDir) // Plan with critical changes
+
+	// With --detailed-exitcode, should exit with non-zero code for critical
+	cmd := exec.Command(binary, "--plan", planPath, "--config", configPath, "--output", "json", "--detailed-exitcode")
+	output, err := cmd.CombinedOutput()
+
+	if err == nil {
+		t.Errorf("expected non-zero exit code with --detailed-exitcode for critical classification")
+	}
+
+	// Verify the exit code is correct (critical = 2 for 3-level precedence)
+	exitErr, ok := err.(*exec.ExitError)
+	if !ok {
+		t.Fatalf("expected *exec.ExitError, got %T: %v", err, err)
+	}
+	if exitErr.ExitCode() != 2 {
+		t.Errorf("expected exit code 2 for critical, got %d", exitErr.ExitCode())
+	}
+
+	// Verify the output still contains correct classification info
+	var result map[string]interface{}
+	if err := json.Unmarshal(output, &result); err != nil {
+		t.Fatalf("expected valid JSON output, got error: %v\nOutput:\n%s", err, string(output))
+	}
+
+	if result["overall"] != "critical" {
+		t.Errorf("expected overall 'critical', got %v", result["overall"])
+	}
+	// The exit_code in JSON should always contain the precedence-derived code
+	if int(result["exit_code"].(float64)) != 2 {
+		t.Errorf("expected exit_code 2 in JSON, got %v", result["exit_code"])
+	}
+}
+
+func TestCLI_ErrorExitCodeUnaffectedByFlag(t *testing.T) {
+	binary := buildBinary(t)
+
+	tmpDir, err := os.MkdirTemp("", "tfclassify-cli")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	configPath := writeTestConfig(t, tmpDir)
+
+	// Without --detailed-exitcode
+	cmd := exec.Command(binary, "--plan", "/nonexistent/plan.json", "--config", configPath)
+	output, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatal("expected non-zero exit code for nonexistent plan")
+	}
+	outputStr := string(output)
+	if !strings.Contains(outputStr, "failed to parse plan") {
+		t.Errorf("expected error about parsing plan, got:\n%s", outputStr)
+	}
+
+	// With --detailed-exitcode - same behavior for errors
+	cmd = exec.Command(binary, "--plan", "/nonexistent/plan.json", "--config", configPath, "--detailed-exitcode")
+	output, err = cmd.CombinedOutput()
+	if err == nil {
+		t.Fatal("expected non-zero exit code for nonexistent plan with --detailed-exitcode")
+	}
+	outputStr = string(output)
+	if !strings.Contains(outputStr, "failed to parse plan") {
+		t.Errorf("expected error about parsing plan, got:\n%s", outputStr)
+	}
+}
+
 func TestCLI_InvalidPlanJSON(t *testing.T) {
 	binary := buildBinary(t)
 

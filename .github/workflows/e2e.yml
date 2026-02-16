@@ -1,0 +1,232 @@
+name: E2E Tests
+
+on:
+  workflow_call:
+    inputs:
+      use-case:
+        required: true
+        type: string
+        description: Name of the e2e test case directory under testdata/e2e/
+      binary-source:
+        required: true
+        type: string
+        description: How to get binaries — "build" (from source) or "release" (download latest)
+      plan-formats:
+        required: false
+        type: string
+        default: json
+        description: Plan formats to test — "json", "binary", or "both"
+      open-issue-on-failure:
+        required: false
+        type: boolean
+        default: false
+        description: Create a GitHub issue when the e2e test fails
+
+env:
+  ARM_CLIENT_ID: "415fa556-f0eb-4ed0-8eb0-9d7b66944996"
+  ARM_SUBSCRIPTION_ID: "0a271008-02cf-4a50-9bb3-afc7c4aed74c"
+  ARM_TENANT_ID: "9fc151d1-62b8-402f-b07e-91533ff07e0d"
+  ARM_USE_OIDC: "true"
+  TFCLASSIFY_PLUGIN_DIR: /tmp/tfclassify-plugins
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        if: inputs.binary-source == 'build'
+        with:
+          go-version-file: go.mod
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Build from source
+        if: inputs.binary-source == 'build'
+        run: |
+          go build -o /usr/local/bin/tfclassify ./cmd/tfclassify
+          mkdir -p "$TFCLASSIFY_PLUGIN_DIR"
+          go build -o "$TFCLASSIFY_PLUGIN_DIR/tfclassify-plugin-azurerm" ./plugins/azurerm
+
+      - name: Download release
+        if: inputs.binary-source == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Download latest CLI release
+          LATEST_CLI_TAG=$(gh release list --json tagName --jq \
+            '[.[] | select(.tagName | startswith("tfclassify-v"))][0].tagName')
+          gh release download "$LATEST_CLI_TAG" --pattern 'tfclassify_*_linux_amd64.zip'
+          unzip -o tfclassify_*.zip -d /usr/local/bin
+          chmod +x /usr/local/bin/tfclassify
+          rm -f tfclassify_*.zip
+
+          # Download latest plugin release
+          LATEST_PLUGIN_TAG=$(gh release list --json tagName --jq \
+            '[.[] | select(.tagName | startswith("tfclassify-plugin-azurerm-v"))][0].tagName')
+          gh release download "$LATEST_PLUGIN_TAG" --pattern 'tfclassify-plugin-azurerm_*_linux_amd64.zip'
+          mkdir -p "$TFCLASSIFY_PLUGIN_DIR"
+          unzip -o tfclassify-plugin-azurerm_*.zip -d "$TFCLASSIFY_PLUGIN_DIR"
+          chmod +x "$TFCLASSIFY_PLUGIN_DIR/tfclassify-plugin-azurerm"
+          rm -f tfclassify-plugin-azurerm_*.zip
+
+      - name: Record versions
+        id: versions
+        run: |
+          echo "tfclassify=$(tfclassify --version)" >> "$GITHUB_OUTPUT"
+          echo "terraform=$(terraform --version -json | jq -r .terraform_version)" >> "$GITHUB_OUTPUT"
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ env.ARM_CLIENT_ID }}
+          tenant-id: ${{ env.ARM_TENANT_ID }}
+          subscription-id: ${{ env.ARM_SUBSCRIPTION_ID }}
+
+      - name: Terraform init
+        run: terraform -chdir=testdata/e2e/${{ inputs.use-case }} init
+
+      - name: Create plan
+        run: |
+          terraform -chdir=testdata/e2e/${{ inputs.use-case }} plan -out=create.tfplan
+          terraform -chdir=testdata/e2e/${{ inputs.use-case }} show -json create.tfplan \
+            > testdata/e2e/${{ inputs.use-case }}/create.json
+          echo "::group::Create plan JSON"
+          jq . testdata/e2e/${{ inputs.use-case }}/create.json
+          echo "::endgroup::"
+
+      - name: Classify create plan (JSON)
+        id: classify-create-json
+        if: inputs.plan-formats == 'json' || inputs.plan-formats == 'both'
+        run: |
+          EXPECTED_EXIT=$(jq -r '.create.exit_code' testdata/e2e/${{ inputs.use-case }}/expected.json)
+          set +e
+          tfclassify \
+            -p testdata/e2e/${{ inputs.use-case }}/create.json \
+            -c testdata/e2e/${{ inputs.use-case }}/.tfclassify.hcl \
+            -o json --detailed-exitcode > testdata/e2e/${{ inputs.use-case }}/create-result.json
+          ACTUAL_EXIT=$?
+          set -e
+          echo "::group::Classification result (JSON)"
+          jq . testdata/e2e/${{ inputs.use-case }}/create-result.json
+          echo "::endgroup::"
+          echo "expected=$EXPECTED_EXIT" >> "$GITHUB_OUTPUT"
+          echo "actual=$ACTUAL_EXIT" >> "$GITHUB_OUTPUT"
+          if [ "$ACTUAL_EXIT" != "$EXPECTED_EXIT" ]; then
+            echo "::error::Create phase (JSON): expected exit code $EXPECTED_EXIT, got $ACTUAL_EXIT"
+            exit 1
+          fi
+
+      - name: Classify create plan (binary)
+        id: classify-create-binary
+        if: inputs.plan-formats == 'binary' || inputs.plan-formats == 'both'
+        run: |
+          EXPECTED_EXIT=$(jq -r '.create.exit_code' testdata/e2e/${{ inputs.use-case }}/expected.json)
+          set +e
+          tfclassify \
+            -p testdata/e2e/${{ inputs.use-case }}/create.tfplan \
+            -c testdata/e2e/${{ inputs.use-case }}/.tfclassify.hcl \
+            -o json --detailed-exitcode > testdata/e2e/${{ inputs.use-case }}/create-result-binary.json
+          ACTUAL_EXIT=$?
+          set -e
+          echo "::group::Classification result (binary)"
+          jq . testdata/e2e/${{ inputs.use-case }}/create-result-binary.json
+          echo "::endgroup::"
+          if [ "$ACTUAL_EXIT" != "$EXPECTED_EXIT" ]; then
+            echo "::error::Create phase (binary): expected exit code $EXPECTED_EXIT, got $ACTUAL_EXIT"
+            exit 1
+          fi
+
+      - name: Apply
+        id: apply
+        run: terraform -chdir=testdata/e2e/${{ inputs.use-case }} apply -auto-approve create.tfplan
+
+      - name: Destroy plan
+        run: |
+          terraform -chdir=testdata/e2e/${{ inputs.use-case }} plan -destroy -out=destroy.tfplan
+          terraform -chdir=testdata/e2e/${{ inputs.use-case }} show -json destroy.tfplan \
+            > testdata/e2e/${{ inputs.use-case }}/destroy.json
+          echo "::group::Destroy plan JSON"
+          jq . testdata/e2e/${{ inputs.use-case }}/destroy.json
+          echo "::endgroup::"
+
+      - name: Classify destroy plan (JSON)
+        id: classify-destroy-json
+        if: inputs.plan-formats == 'json' || inputs.plan-formats == 'both'
+        run: |
+          EXPECTED_EXIT=$(jq -r '.destroy.exit_code' testdata/e2e/${{ inputs.use-case }}/expected.json)
+          set +e
+          tfclassify \
+            -p testdata/e2e/${{ inputs.use-case }}/destroy.json \
+            -c testdata/e2e/${{ inputs.use-case }}/.tfclassify.hcl \
+            -o json --detailed-exitcode > testdata/e2e/${{ inputs.use-case }}/destroy-result.json
+          ACTUAL_EXIT=$?
+          set -e
+          echo "::group::Classification result (JSON)"
+          jq . testdata/e2e/${{ inputs.use-case }}/destroy-result.json
+          echo "::endgroup::"
+          echo "expected=$EXPECTED_EXIT" >> "$GITHUB_OUTPUT"
+          echo "actual=$ACTUAL_EXIT" >> "$GITHUB_OUTPUT"
+          if [ "$ACTUAL_EXIT" != "$EXPECTED_EXIT" ]; then
+            echo "::error::Destroy phase (JSON): expected exit code $EXPECTED_EXIT, got $ACTUAL_EXIT"
+            exit 1
+          fi
+
+      - name: Classify destroy plan (binary)
+        id: classify-destroy-binary
+        if: inputs.plan-formats == 'binary' || inputs.plan-formats == 'both'
+        run: |
+          EXPECTED_EXIT=$(jq -r '.destroy.exit_code' testdata/e2e/${{ inputs.use-case }}/expected.json)
+          set +e
+          tfclassify \
+            -p testdata/e2e/${{ inputs.use-case }}/destroy.tfplan \
+            -c testdata/e2e/${{ inputs.use-case }}/.tfclassify.hcl \
+            -o json --detailed-exitcode > testdata/e2e/${{ inputs.use-case }}/destroy-result-binary.json
+          ACTUAL_EXIT=$?
+          set -e
+          echo "::group::Classification result (binary)"
+          jq . testdata/e2e/${{ inputs.use-case }}/destroy-result-binary.json
+          echo "::endgroup::"
+          if [ "$ACTUAL_EXIT" != "$EXPECTED_EXIT" ]; then
+            echo "::error::Destroy phase (binary): expected exit code $EXPECTED_EXIT, got $ACTUAL_EXIT"
+            exit 1
+          fi
+
+      - name: Cleanup
+        if: always() && steps.apply.outcome != 'skipped'
+        continue-on-error: true
+        run: terraform -chdir=testdata/e2e/${{ inputs.use-case }} destroy -auto-approve
+
+      - name: Open issue on failure
+        if: failure() && inputs.open-issue-on-failure
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh label create verification --color "d93f0b" \
+            --description "Nightly verification failure" --force 2>/dev/null || true
+
+          cat > /tmp/issue-body.md <<EOF
+          ## Verification failure: ${{ inputs.use-case }}
+
+          **Workflow run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+          ### Versions
+          - tfclassify: ${{ steps.versions.outputs.tfclassify }}
+          - terraform: ${{ steps.versions.outputs.terraform }}
+
+          ### Create phase
+          - Expected exit code: ${{ steps.classify-create-json.outputs.expected }}
+          - Actual exit code: ${{ steps.classify-create-json.outputs.actual }}
+
+          ### Destroy phase
+          - Expected exit code: ${{ steps.classify-destroy-json.outputs.expected }}
+          - Actual exit code: ${{ steps.classify-destroy-json.outputs.actual }}
+          EOF
+
+          gh issue create \
+            --title "[verify] ${{ inputs.use-case }} failed ($(date -u +%Y-%m-%d))" \
+            --label "verification" \
+            --body-file /tmp/issue-body.md

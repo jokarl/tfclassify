@@ -115,7 +115,7 @@ func TestNewAzurermPluginSet(t *testing.T) {
 	expectedNames := map[string]bool{
 		"privilege-escalation": true,
 		"network-exposure":     true,
-		"key-vault-access":     true,
+		"keyvault-access":      true,
 	}
 	for _, name := range names {
 		if !expectedNames[name] {
@@ -155,7 +155,7 @@ func TestAnalyzerResourcePatterns(t *testing.T) {
 	}{
 		{"privilege-escalation", []string{"azurerm_role_assignment"}},
 		{"network-exposure", []string{"azurerm_network_security_rule"}},
-		{"key-vault-access", []string{"azurerm_key_vault_access_policy"}},
+		{"keyvault-access", []string{"azurerm_key_vault_access_policy"}},
 	}
 
 	for _, tt := range tests {

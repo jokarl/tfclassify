@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.11
 // 	protoc        v6.33.4
-// source: tfclassify.proto
+// source: proto/tfclassify.proto
 
 package pb
 
@@ -39,7 +39,7 @@ type ResourceChange struct {
 
 func (x *ResourceChange) Reset() {
 	*x = ResourceChange{}
-	mi := &file_tfclassify_proto_msgTypes[0]
+	mi := &file_proto_tfclassify_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -51,7 +51,7 @@ func (x *ResourceChange) String() string {
 func (*ResourceChange) ProtoMessage() {}
 
 func (x *ResourceChange) ProtoReflect() protoreflect.Message {
-	mi := &file_tfclassify_proto_msgTypes[0]
+	mi := &file_proto_tfclassify_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -64,7 +64,7 @@ func (x *ResourceChange) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResourceChange.ProtoReflect.Descriptor instead.
 func (*ResourceChange) Descriptor() ([]byte, []int) {
-	return file_tfclassify_proto_rawDescGZIP(), []int{0}
+	return file_proto_tfclassify_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *ResourceChange) GetAddress() string {
@@ -143,7 +143,7 @@ type Decision struct {
 
 func (x *Decision) Reset() {
 	*x = Decision{}
-	mi := &file_tfclassify_proto_msgTypes[1]
+	mi := &file_proto_tfclassify_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -155,7 +155,7 @@ func (x *Decision) String() string {
 func (*Decision) ProtoMessage() {}
 
 func (x *Decision) ProtoReflect() protoreflect.Message {
-	mi := &file_tfclassify_proto_msgTypes[1]
+	mi := &file_proto_tfclassify_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -168,7 +168,7 @@ func (x *Decision) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Decision.ProtoReflect.Descriptor instead.
 func (*Decision) Descriptor() ([]byte, []int) {
-	return file_tfclassify_proto_rawDescGZIP(), []int{1}
+	return file_proto_tfclassify_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *Decision) GetClassification() string {
@@ -209,7 +209,7 @@ type ApplyConfigRequest struct {
 
 func (x *ApplyConfigRequest) Reset() {
 	*x = ApplyConfigRequest{}
-	mi := &file_tfclassify_proto_msgTypes[2]
+	mi := &file_proto_tfclassify_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -221,7 +221,7 @@ func (x *ApplyConfigRequest) String() string {
 func (*ApplyConfigRequest) ProtoMessage() {}
 
 func (x *ApplyConfigRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_tfclassify_proto_msgTypes[2]
+	mi := &file_proto_tfclassify_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -234,7 +234,7 @@ func (x *ApplyConfigRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ApplyConfigRequest.ProtoReflect.Descriptor instead.
 func (*ApplyConfigRequest) Descriptor() ([]byte, []int) {
-	return file_tfclassify_proto_rawDescGZIP(), []int{2}
+	return file_proto_tfclassify_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *ApplyConfigRequest) GetConfig() []byte {
@@ -253,7 +253,7 @@ type ApplyConfigResponse struct {
 
 func (x *ApplyConfigResponse) Reset() {
 	*x = ApplyConfigResponse{}
-	mi := &file_tfclassify_proto_msgTypes[3]
+	mi := &file_proto_tfclassify_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -265,7 +265,7 @@ func (x *ApplyConfigResponse) String() string {
 func (*ApplyConfigResponse) ProtoMessage() {}
 
 func (x *ApplyConfigResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_tfclassify_proto_msgTypes[3]
+	mi := &file_proto_tfclassify_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -278,21 +278,26 @@ func (x *ApplyConfigResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ApplyConfigResponse.ProtoReflect.Descriptor instead.
 func (*ApplyConfigResponse) Descriptor() ([]byte, []int) {
-	return file_tfclassify_proto_rawDescGZIP(), []int{3}
+	return file_proto_tfclassify_proto_rawDescGZIP(), []int{3}
 }
 
 // AnalyzeRequest starts the analysis.
 type AnalyzeRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// broker_id is used by the plugin to dial back to the Runner server.
-	BrokerId      uint32 `protobuf:"varint,1,opt,name=broker_id,json=brokerId,proto3" json:"broker_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	BrokerId uint32 `protobuf:"varint,1,opt,name=broker_id,json=brokerId,proto3" json:"broker_id,omitempty"`
+	// classification is the classification name (e.g., "critical") for which analysis is being run.
+	// Plugins should emit decisions with this classification.
+	Classification string `protobuf:"bytes,2,opt,name=classification,proto3" json:"classification,omitempty"`
+	// analyzer_config contains JSON-encoded per-analyzer configuration for this classification.
+	AnalyzerConfig []byte `protobuf:"bytes,3,opt,name=analyzer_config,json=analyzerConfig,proto3" json:"analyzer_config,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *AnalyzeRequest) Reset() {
 	*x = AnalyzeRequest{}
-	mi := &file_tfclassify_proto_msgTypes[4]
+	mi := &file_proto_tfclassify_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -304,7 +309,7 @@ func (x *AnalyzeRequest) String() string {
 func (*AnalyzeRequest) ProtoMessage() {}
 
 func (x *AnalyzeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_tfclassify_proto_msgTypes[4]
+	mi := &file_proto_tfclassify_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -317,7 +322,7 @@ func (x *AnalyzeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AnalyzeRequest.ProtoReflect.Descriptor instead.
 func (*AnalyzeRequest) Descriptor() ([]byte, []int) {
-	return file_tfclassify_proto_rawDescGZIP(), []int{4}
+	return file_proto_tfclassify_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *AnalyzeRequest) GetBrokerId() uint32 {
@@ -325,6 +330,20 @@ func (x *AnalyzeRequest) GetBrokerId() uint32 {
 		return x.BrokerId
 	}
 	return 0
+}
+
+func (x *AnalyzeRequest) GetClassification() string {
+	if x != nil {
+		return x.Classification
+	}
+	return ""
+}
+
+func (x *AnalyzeRequest) GetAnalyzerConfig() []byte {
+	if x != nil {
+		return x.AnalyzerConfig
+	}
+	return nil
 }
 
 // AnalyzeResponse indicates analysis completion.
@@ -336,7 +355,7 @@ type AnalyzeResponse struct {
 
 func (x *AnalyzeResponse) Reset() {
 	*x = AnalyzeResponse{}
-	mi := &file_tfclassify_proto_msgTypes[5]
+	mi := &file_proto_tfclassify_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -348,7 +367,7 @@ func (x *AnalyzeResponse) String() string {
 func (*AnalyzeResponse) ProtoMessage() {}
 
 func (x *AnalyzeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_tfclassify_proto_msgTypes[5]
+	mi := &file_proto_tfclassify_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -361,7 +380,7 @@ func (x *AnalyzeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AnalyzeResponse.ProtoReflect.Descriptor instead.
 func (*AnalyzeResponse) Descriptor() ([]byte, []int) {
-	return file_tfclassify_proto_rawDescGZIP(), []int{5}
+	return file_proto_tfclassify_proto_rawDescGZIP(), []int{5}
 }
 
 // GetResourceChangesRequest queries for matching resources.
@@ -374,7 +393,7 @@ type GetResourceChangesRequest struct {
 
 func (x *GetResourceChangesRequest) Reset() {
 	*x = GetResourceChangesRequest{}
-	mi := &file_tfclassify_proto_msgTypes[6]
+	mi := &file_proto_tfclassify_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -386,7 +405,7 @@ func (x *GetResourceChangesRequest) String() string {
 func (*GetResourceChangesRequest) ProtoMessage() {}
 
 func (x *GetResourceChangesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_tfclassify_proto_msgTypes[6]
+	mi := &file_proto_tfclassify_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -399,7 +418,7 @@ func (x *GetResourceChangesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetResourceChangesRequest.ProtoReflect.Descriptor instead.
 func (*GetResourceChangesRequest) Descriptor() ([]byte, []int) {
-	return file_tfclassify_proto_rawDescGZIP(), []int{6}
+	return file_proto_tfclassify_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *GetResourceChangesRequest) GetPatterns() []string {
@@ -419,7 +438,7 @@ type GetResourceChangesResponse struct {
 
 func (x *GetResourceChangesResponse) Reset() {
 	*x = GetResourceChangesResponse{}
-	mi := &file_tfclassify_proto_msgTypes[7]
+	mi := &file_proto_tfclassify_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -431,7 +450,7 @@ func (x *GetResourceChangesResponse) String() string {
 func (*GetResourceChangesResponse) ProtoMessage() {}
 
 func (x *GetResourceChangesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_tfclassify_proto_msgTypes[7]
+	mi := &file_proto_tfclassify_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -444,7 +463,7 @@ func (x *GetResourceChangesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetResourceChangesResponse.ProtoReflect.Descriptor instead.
 func (*GetResourceChangesResponse) Descriptor() ([]byte, []int) {
-	return file_tfclassify_proto_rawDescGZIP(), []int{7}
+	return file_proto_tfclassify_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *GetResourceChangesResponse) GetChanges() []*ResourceChange {
@@ -464,7 +483,7 @@ type GetResourceChangeRequest struct {
 
 func (x *GetResourceChangeRequest) Reset() {
 	*x = GetResourceChangeRequest{}
-	mi := &file_tfclassify_proto_msgTypes[8]
+	mi := &file_proto_tfclassify_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -476,7 +495,7 @@ func (x *GetResourceChangeRequest) String() string {
 func (*GetResourceChangeRequest) ProtoMessage() {}
 
 func (x *GetResourceChangeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_tfclassify_proto_msgTypes[8]
+	mi := &file_proto_tfclassify_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -489,7 +508,7 @@ func (x *GetResourceChangeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetResourceChangeRequest.ProtoReflect.Descriptor instead.
 func (*GetResourceChangeRequest) Descriptor() ([]byte, []int) {
-	return file_tfclassify_proto_rawDescGZIP(), []int{8}
+	return file_proto_tfclassify_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *GetResourceChangeRequest) GetAddress() string {
@@ -509,7 +528,7 @@ type GetResourceChangeResponse struct {
 
 func (x *GetResourceChangeResponse) Reset() {
 	*x = GetResourceChangeResponse{}
-	mi := &file_tfclassify_proto_msgTypes[9]
+	mi := &file_proto_tfclassify_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -521,7 +540,7 @@ func (x *GetResourceChangeResponse) String() string {
 func (*GetResourceChangeResponse) ProtoMessage() {}
 
 func (x *GetResourceChangeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_tfclassify_proto_msgTypes[9]
+	mi := &file_proto_tfclassify_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -534,7 +553,7 @@ func (x *GetResourceChangeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetResourceChangeResponse.ProtoReflect.Descriptor instead.
 func (*GetResourceChangeResponse) Descriptor() ([]byte, []int) {
-	return file_tfclassify_proto_rawDescGZIP(), []int{9}
+	return file_proto_tfclassify_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *GetResourceChangeResponse) GetChange() *ResourceChange {
@@ -556,7 +575,7 @@ type EmitDecisionRequest struct {
 
 func (x *EmitDecisionRequest) Reset() {
 	*x = EmitDecisionRequest{}
-	mi := &file_tfclassify_proto_msgTypes[10]
+	mi := &file_proto_tfclassify_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -568,7 +587,7 @@ func (x *EmitDecisionRequest) String() string {
 func (*EmitDecisionRequest) ProtoMessage() {}
 
 func (x *EmitDecisionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_tfclassify_proto_msgTypes[10]
+	mi := &file_proto_tfclassify_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -581,7 +600,7 @@ func (x *EmitDecisionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EmitDecisionRequest.ProtoReflect.Descriptor instead.
 func (*EmitDecisionRequest) Descriptor() ([]byte, []int) {
-	return file_tfclassify_proto_rawDescGZIP(), []int{10}
+	return file_proto_tfclassify_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *EmitDecisionRequest) GetAnalyzerName() string {
@@ -614,7 +633,7 @@ type EmitDecisionResponse struct {
 
 func (x *EmitDecisionResponse) Reset() {
 	*x = EmitDecisionResponse{}
-	mi := &file_tfclassify_proto_msgTypes[11]
+	mi := &file_proto_tfclassify_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -626,7 +645,7 @@ func (x *EmitDecisionResponse) String() string {
 func (*EmitDecisionResponse) ProtoMessage() {}
 
 func (x *EmitDecisionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_tfclassify_proto_msgTypes[11]
+	mi := &file_proto_tfclassify_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -639,7 +658,7 @@ func (x *EmitDecisionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EmitDecisionResponse.ProtoReflect.Descriptor instead.
 func (*EmitDecisionResponse) Descriptor() ([]byte, []int) {
-	return file_tfclassify_proto_rawDescGZIP(), []int{11}
+	return file_proto_tfclassify_proto_rawDescGZIP(), []int{11}
 }
 
 // GetPluginInfoRequest requests plugin metadata.
@@ -651,7 +670,7 @@ type GetPluginInfoRequest struct {
 
 func (x *GetPluginInfoRequest) Reset() {
 	*x = GetPluginInfoRequest{}
-	mi := &file_tfclassify_proto_msgTypes[12]
+	mi := &file_proto_tfclassify_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -663,7 +682,7 @@ func (x *GetPluginInfoRequest) String() string {
 func (*GetPluginInfoRequest) ProtoMessage() {}
 
 func (x *GetPluginInfoRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_tfclassify_proto_msgTypes[12]
+	mi := &file_proto_tfclassify_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -676,7 +695,7 @@ func (x *GetPluginInfoRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPluginInfoRequest.ProtoReflect.Descriptor instead.
 func (*GetPluginInfoRequest) Descriptor() ([]byte, []int) {
-	return file_tfclassify_proto_rawDescGZIP(), []int{12}
+	return file_proto_tfclassify_proto_rawDescGZIP(), []int{12}
 }
 
 // GetPluginInfoResponse contains plugin metadata for verification.
@@ -697,7 +716,7 @@ type GetPluginInfoResponse struct {
 
 func (x *GetPluginInfoResponse) Reset() {
 	*x = GetPluginInfoResponse{}
-	mi := &file_tfclassify_proto_msgTypes[13]
+	mi := &file_proto_tfclassify_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -709,7 +728,7 @@ func (x *GetPluginInfoResponse) String() string {
 func (*GetPluginInfoResponse) ProtoMessage() {}
 
 func (x *GetPluginInfoResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_tfclassify_proto_msgTypes[13]
+	mi := &file_proto_tfclassify_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -722,7 +741,7 @@ func (x *GetPluginInfoResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPluginInfoResponse.ProtoReflect.Descriptor instead.
 func (*GetPluginInfoResponse) Descriptor() ([]byte, []int) {
-	return file_tfclassify_proto_rawDescGZIP(), []int{13}
+	return file_proto_tfclassify_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *GetPluginInfoResponse) GetName() string {
@@ -762,7 +781,7 @@ type GetConfigSchemaRequest struct {
 
 func (x *GetConfigSchemaRequest) Reset() {
 	*x = GetConfigSchemaRequest{}
-	mi := &file_tfclassify_proto_msgTypes[14]
+	mi := &file_proto_tfclassify_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -774,7 +793,7 @@ func (x *GetConfigSchemaRequest) String() string {
 func (*GetConfigSchemaRequest) ProtoMessage() {}
 
 func (x *GetConfigSchemaRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_tfclassify_proto_msgTypes[14]
+	mi := &file_proto_tfclassify_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -787,7 +806,7 @@ func (x *GetConfigSchemaRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetConfigSchemaRequest.ProtoReflect.Descriptor instead.
 func (*GetConfigSchemaRequest) Descriptor() ([]byte, []int) {
-	return file_tfclassify_proto_rawDescGZIP(), []int{14}
+	return file_proto_tfclassify_proto_rawDescGZIP(), []int{14}
 }
 
 // GetConfigSchemaResponse contains the configuration schema for validation.
@@ -800,7 +819,7 @@ type GetConfigSchemaResponse struct {
 
 func (x *GetConfigSchemaResponse) Reset() {
 	*x = GetConfigSchemaResponse{}
-	mi := &file_tfclassify_proto_msgTypes[15]
+	mi := &file_proto_tfclassify_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -812,7 +831,7 @@ func (x *GetConfigSchemaResponse) String() string {
 func (*GetConfigSchemaResponse) ProtoMessage() {}
 
 func (x *GetConfigSchemaResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_tfclassify_proto_msgTypes[15]
+	mi := &file_proto_tfclassify_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -825,7 +844,7 @@ func (x *GetConfigSchemaResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetConfigSchemaResponse.ProtoReflect.Descriptor instead.
 func (*GetConfigSchemaResponse) Descriptor() ([]byte, []int) {
-	return file_tfclassify_proto_rawDescGZIP(), []int{15}
+	return file_proto_tfclassify_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *GetConfigSchemaResponse) GetAttributes() []*ConfigAttribute {
@@ -848,7 +867,7 @@ type ConfigAttribute struct {
 
 func (x *ConfigAttribute) Reset() {
 	*x = ConfigAttribute{}
-	mi := &file_tfclassify_proto_msgTypes[16]
+	mi := &file_proto_tfclassify_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -860,7 +879,7 @@ func (x *ConfigAttribute) String() string {
 func (*ConfigAttribute) ProtoMessage() {}
 
 func (x *ConfigAttribute) ProtoReflect() protoreflect.Message {
-	mi := &file_tfclassify_proto_msgTypes[16]
+	mi := &file_proto_tfclassify_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -873,7 +892,7 @@ func (x *ConfigAttribute) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConfigAttribute.ProtoReflect.Descriptor instead.
 func (*ConfigAttribute) Descriptor() ([]byte, []int) {
-	return file_tfclassify_proto_rawDescGZIP(), []int{16}
+	return file_proto_tfclassify_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *ConfigAttribute) GetName() string {
@@ -904,11 +923,11 @@ func (x *ConfigAttribute) GetDescription() string {
 	return ""
 }
 
-var File_tfclassify_proto protoreflect.FileDescriptor
+var File_proto_tfclassify_proto protoreflect.FileDescriptor
 
-const file_tfclassify_proto_rawDesc = "" +
+const file_proto_tfclassify_proto_rawDesc = "" +
 	"\n" +
-	"\x10tfclassify.proto\x12\n" +
+	"\x16proto/tfclassify.proto\x12\n" +
 	"tfclassify\"\x93\x02\n" +
 	"\x0eResourceChange\x12\x18\n" +
 	"\aaddress\x18\x01 \x01(\tR\aaddress\x12\x12\n" +
@@ -927,9 +946,11 @@ const file_tfclassify_proto_rawDesc = "" +
 	"\bmetadata\x18\x04 \x01(\fR\bmetadata\",\n" +
 	"\x12ApplyConfigRequest\x12\x16\n" +
 	"\x06config\x18\x01 \x01(\fR\x06config\"\x15\n" +
-	"\x13ApplyConfigResponse\"-\n" +
+	"\x13ApplyConfigResponse\"~\n" +
 	"\x0eAnalyzeRequest\x12\x1b\n" +
-	"\tbroker_id\x18\x01 \x01(\rR\bbrokerId\"\x11\n" +
+	"\tbroker_id\x18\x01 \x01(\rR\bbrokerId\x12&\n" +
+	"\x0eclassification\x18\x02 \x01(\tR\x0eclassification\x12'\n" +
+	"\x0fanalyzer_config\x18\x03 \x01(\fR\x0eanalyzerConfig\"\x11\n" +
 	"\x0fAnalyzeResponse\"7\n" +
 	"\x19GetResourceChangesRequest\x12\x1a\n" +
 	"\bpatterns\x18\x01 \x03(\tR\bpatterns\"R\n" +
@@ -972,19 +993,19 @@ const file_tfclassify_proto_rawDesc = "" +
 	"\fEmitDecision\x12\x1f.tfclassify.EmitDecisionRequest\x1a .tfclassify.EmitDecisionResponseB%Z#github.com/jokarl/tfclassify/sdk/pbb\x06proto3"
 
 var (
-	file_tfclassify_proto_rawDescOnce sync.Once
-	file_tfclassify_proto_rawDescData []byte
+	file_proto_tfclassify_proto_rawDescOnce sync.Once
+	file_proto_tfclassify_proto_rawDescData []byte
 )
 
-func file_tfclassify_proto_rawDescGZIP() []byte {
-	file_tfclassify_proto_rawDescOnce.Do(func() {
-		file_tfclassify_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_tfclassify_proto_rawDesc), len(file_tfclassify_proto_rawDesc)))
+func file_proto_tfclassify_proto_rawDescGZIP() []byte {
+	file_proto_tfclassify_proto_rawDescOnce.Do(func() {
+		file_proto_tfclassify_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_proto_tfclassify_proto_rawDesc), len(file_proto_tfclassify_proto_rawDesc)))
 	})
-	return file_tfclassify_proto_rawDescData
+	return file_proto_tfclassify_proto_rawDescData
 }
 
-var file_tfclassify_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
-var file_tfclassify_proto_goTypes = []any{
+var file_proto_tfclassify_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
+var file_proto_tfclassify_proto_goTypes = []any{
 	(*ResourceChange)(nil),             // 0: tfclassify.ResourceChange
 	(*Decision)(nil),                   // 1: tfclassify.Decision
 	(*ApplyConfigRequest)(nil),         // 2: tfclassify.ApplyConfigRequest
@@ -1003,7 +1024,7 @@ var file_tfclassify_proto_goTypes = []any{
 	(*GetConfigSchemaResponse)(nil),    // 15: tfclassify.GetConfigSchemaResponse
 	(*ConfigAttribute)(nil),            // 16: tfclassify.ConfigAttribute
 }
-var file_tfclassify_proto_depIdxs = []int32{
+var file_proto_tfclassify_proto_depIdxs = []int32{
 	0,  // 0: tfclassify.GetResourceChangesResponse.changes:type_name -> tfclassify.ResourceChange
 	0,  // 1: tfclassify.GetResourceChangeResponse.change:type_name -> tfclassify.ResourceChange
 	0,  // 2: tfclassify.EmitDecisionRequest.change:type_name -> tfclassify.ResourceChange
@@ -1030,26 +1051,26 @@ var file_tfclassify_proto_depIdxs = []int32{
 	0,  // [0:5] is the sub-list for field type_name
 }
 
-func init() { file_tfclassify_proto_init() }
-func file_tfclassify_proto_init() {
-	if File_tfclassify_proto != nil {
+func init() { file_proto_tfclassify_proto_init() }
+func file_proto_tfclassify_proto_init() {
+	if File_proto_tfclassify_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_tfclassify_proto_rawDesc), len(file_tfclassify_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_tfclassify_proto_rawDesc), len(file_proto_tfclassify_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   2,
 		},
-		GoTypes:           file_tfclassify_proto_goTypes,
-		DependencyIndexes: file_tfclassify_proto_depIdxs,
-		MessageInfos:      file_tfclassify_proto_msgTypes,
+		GoTypes:           file_proto_tfclassify_proto_goTypes,
+		DependencyIndexes: file_proto_tfclassify_proto_depIdxs,
+		MessageInfos:      file_proto_tfclassify_proto_msgTypes,
 	}.Build()
-	File_tfclassify_proto = out.File
-	file_tfclassify_proto_goTypes = nil
-	file_tfclassify_proto_depIdxs = nil
+	File_proto_tfclassify_proto = out.File
+	file_proto_tfclassify_proto_goTypes = nil
+	file_proto_tfclassify_proto_depIdxs = nil
 }

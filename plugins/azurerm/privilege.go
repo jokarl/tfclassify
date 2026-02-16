@@ -2,11 +2,37 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
 	"github.com/jokarl/tfclassify/sdk"
 )
+
+// PluginAnalyzerConfig holds per-analyzer configuration from classification blocks.
+// This matches the JSON structure sent from the host.
+type PluginAnalyzerConfig struct {
+	PrivilegeEscalation *PrivilegeEscalationAnalyzerConfig `json:"PrivilegeEscalation,omitempty"`
+	NetworkExposure     *NetworkExposureAnalyzerConfig     `json:"NetworkExposure,omitempty"`
+	KeyVaultAccess      *KeyVaultAccessAnalyzerConfig      `json:"KeyVaultAccess,omitempty"`
+}
+
+// PrivilegeEscalationAnalyzerConfig holds per-classification configuration for the privilege analyzer.
+type PrivilegeEscalationAnalyzerConfig struct {
+	ScoreThreshold int      `json:"score_threshold,omitempty"`
+	Roles          []string `json:"roles,omitempty"`
+	Exclude        []string `json:"exclude,omitempty"`
+}
+
+// NetworkExposureAnalyzerConfig holds per-classification configuration for the network analyzer.
+type NetworkExposureAnalyzerConfig struct {
+	PermissiveSources []string `json:"permissive_sources,omitempty"`
+}
+
+// KeyVaultAccessAnalyzerConfig holds per-classification configuration for the keyvault analyzer.
+type KeyVaultAccessAnalyzerConfig struct {
+	DestructivePermissions []string `json:"destructive_permissions,omitempty"`
+}
 
 // roleSource indicates where a role was resolved from.
 type roleSource string
@@ -55,6 +81,24 @@ func (a *PrivilegeEscalationAnalyzer) ResourcePatterns() []string {
 
 // Analyze inspects role assignments for privilege escalation using permission-based scoring.
 func (a *PrivilegeEscalationAnalyzer) Analyze(runner sdk.Runner) error {
+	return a.analyzeWithConfig(runner, "", nil)
+}
+
+// AnalyzeWithClassification implements sdk.ClassificationAwareAnalyzer.
+// It receives classification context and per-analyzer configuration.
+func (a *PrivilegeEscalationAnalyzer) AnalyzeWithClassification(runner sdk.Runner, classification string, analyzerConfigJSON []byte) error {
+	// Parse the analyzer config
+	var pluginConfig PluginAnalyzerConfig
+	if len(analyzerConfigJSON) > 0 {
+		if err := json.Unmarshal(analyzerConfigJSON, &pluginConfig); err != nil {
+			return fmt.Errorf("failed to parse analyzer config: %w", err)
+		}
+	}
+	return a.analyzeWithConfig(runner, classification, pluginConfig.PrivilegeEscalation)
+}
+
+// analyzeWithConfig is the core analysis logic with optional classification-scoped config.
+func (a *PrivilegeEscalationAnalyzer) analyzeWithConfig(runner sdk.Runner, classification string, analyzerCfg *PrivilegeEscalationAnalyzerConfig) error {
 	changes, err := runner.GetResourceChanges(a.ResourcePatterns())
 	if err != nil {
 		return fmt.Errorf("failed to get resource changes: %w", err)
@@ -72,6 +116,30 @@ func (a *PrivilegeEscalationAnalyzer) Analyze(runner sdk.Runner) error {
 	// Build privileged roles set for fallback
 	privilegedSet := toSet(a.config.PrivilegedRoles)
 
+	// Build exclude set from classification config
+	var excludeSet map[string]bool
+	if analyzerCfg != nil && len(analyzerCfg.Exclude) > 0 {
+		excludeSet = make(map[string]bool)
+		for _, role := range analyzerCfg.Exclude {
+			excludeSet[strings.ToLower(role)] = true
+		}
+	}
+
+	// Build roles filter from classification config (limit to specific roles)
+	var rolesFilter map[string]bool
+	if analyzerCfg != nil && len(analyzerCfg.Roles) > 0 {
+		rolesFilter = make(map[string]bool)
+		for _, role := range analyzerCfg.Roles {
+			rolesFilter[strings.ToLower(role)] = true
+		}
+	}
+
+	// Get score threshold
+	scoreThreshold := 0
+	if analyzerCfg != nil {
+		scoreThreshold = analyzerCfg.ScoreThreshold
+	}
+
 	for _, change := range changes {
 		scope := stringField(change.After, "scope")
 		if scope == "" {
@@ -85,8 +153,23 @@ func (a *PrivilegeEscalationAnalyzer) Analyze(runner sdk.Runner) error {
 		beforeScoreWeighted := ApplyScopeMultiplier(beforeRole.score.Total, scope)
 		afterScoreWeighted := ApplyScopeMultiplier(afterRole.score.Total, scope)
 
-		// Determine escalation direction
+		// Only detect escalation (not de-escalation - CR-0024 removes de-escalation detection)
 		if afterScoreWeighted > beforeScoreWeighted {
+			// Check if role is in exclude list
+			if excludeSet != nil && excludeSet[strings.ToLower(afterRole.name)] {
+				continue
+			}
+
+			// Check if we have a roles filter and the role isn't in it
+			if rolesFilter != nil && !rolesFilter[strings.ToLower(afterRole.name)] {
+				continue
+			}
+
+			// Check score threshold
+			if afterScoreWeighted < scoreThreshold {
+				continue
+			}
+
 			// Escalation: after is more privileged than before
 			reason := fmt.Sprintf("role escalated from %q to %q", beforeRole.name, afterRole.name)
 			if beforeRole.name == "" {
@@ -94,48 +177,21 @@ func (a *PrivilegeEscalationAnalyzer) Analyze(runner sdk.Runner) error {
 			}
 
 			decision := &sdk.Decision{
-				Classification: "",
+				Classification: classification, // Set classification from context
 				Reason:         reason,
 				Severity:       afterScoreWeighted,
 				Metadata: map[string]interface{}{
-					"analyzer":      "privilege-escalation",
-					"before_role":   beforeRole.name,
-					"after_role":    afterRole.name,
-					"direction":     "escalation",
-					"before_score":  beforeScoreWeighted,
-					"after_score":   afterScoreWeighted,
-					"scope":         scope,
-					"scope_level":   ParseScopeLevel(scope).String(),
-					"score_factors": afterRole.score.Factors,
-					"role_source":   string(afterRole.source),
-				},
-			}
-
-			if err := runner.EmitDecision(a, change, decision); err != nil {
-				return fmt.Errorf("failed to emit decision: %w", err)
-			}
-		} else if afterScoreWeighted < beforeScoreWeighted && beforeScoreWeighted > 0 {
-			// De-escalation: before was more privileged than after
-			reason := fmt.Sprintf("role de-escalated from %q to %q", beforeRole.name, afterRole.name)
-			if afterRole.name == "" {
-				reason = fmt.Sprintf("privileged role %q removed", beforeRole.name)
-			}
-
-			decision := &sdk.Decision{
-				Classification: "",
-				Reason:         reason,
-				Severity:       40, // De-escalation always emits severity 40
-				Metadata: map[string]interface{}{
-					"analyzer":      "privilege-escalation",
-					"before_role":   beforeRole.name,
-					"after_role":    afterRole.name,
-					"direction":     "de-escalation",
-					"before_score":  beforeScoreWeighted,
-					"after_score":   afterScoreWeighted,
-					"scope":         scope,
-					"scope_level":   ParseScopeLevel(scope).String(),
-					"score_factors": beforeRole.score.Factors,
-					"role_source":   string(beforeRole.source),
+					"analyzer":        "privilege-escalation",
+					"before_role":     beforeRole.name,
+					"after_role":      afterRole.name,
+					"direction":       "escalation",
+					"before_score":    beforeScoreWeighted,
+					"after_score":     afterScoreWeighted,
+					"scope":           scope,
+					"scope_level":     ParseScopeLevel(scope).String(),
+					"score_factors":   afterRole.score.Factors,
+					"role_source":     string(afterRole.source),
+					"score_threshold": scoreThreshold,
 				},
 			}
 
@@ -143,7 +199,7 @@ func (a *PrivilegeEscalationAnalyzer) Analyze(runner sdk.Runner) error {
 				return fmt.Errorf("failed to emit decision: %w", err)
 			}
 		}
-		// If scores are equal, no escalation/de-escalation
+		// De-escalation is no longer detected (removed per CR-0024)
 	}
 
 	return nil
