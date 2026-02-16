@@ -197,6 +197,7 @@ jobs:
 
       - name: Cleanup
         if: always() && steps.apply.outcome != 'skipped'
+        continue-on-error: true
         run: terraform -chdir=testdata/e2e/${{ inputs.use-case }} destroy -auto-approve
 
       - name: Open issue on failure
