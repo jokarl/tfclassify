@@ -22,6 +22,10 @@ type PrivilegeEscalationAnalyzerConfig struct {
 	ScoreThreshold int      `json:"score_threshold,omitempty"`
 	Roles          []string `json:"roles,omitempty"`
 	Exclude        []string `json:"exclude,omitempty"`
+	// DataActions is a list of Azure RBAC data-plane action patterns to match (CR-0027).
+	DataActions []string `json:"data_actions,omitempty"`
+	// Actions is a list of Azure RBAC control-plane action patterns to match (CR-0028).
+	Actions []string `json:"actions,omitempty"`
 }
 
 // NetworkExposureAnalyzerConfig holds per-classification configuration for the network analyzer.
@@ -46,9 +50,10 @@ const (
 
 // resolvedRole contains the resolved role information and score.
 type resolvedRole struct {
-	name   string
-	score  PermissionScore
-	source roleSource
+	name       string
+	score      PermissionScore
+	source     roleSource
+	definition *RoleDefinition // The full role definition (for pattern matching)
 }
 
 // PrivilegeEscalationAnalyzer detects privilege escalation in Azure role assignments.
@@ -134,11 +139,19 @@ func (a *PrivilegeEscalationAnalyzer) analyzeWithConfig(runner sdk.Runner, class
 		}
 	}
 
-	// Get score threshold
-	scoreThreshold := 0
+	// Get config options
+	var scoreThreshold int
+	var dataActionPatterns []string
+	var actionPatterns []string
 	if analyzerCfg != nil {
 		scoreThreshold = analyzerCfg.ScoreThreshold
+		dataActionPatterns = analyzerCfg.DataActions
+		actionPatterns = analyzerCfg.Actions
 	}
+
+	// Determine which detection modes are active
+	usePatternBasedControlPlane := len(actionPatterns) > 0
+	useDataPlaneDetection := len(dataActionPatterns) > 0
 
 	for _, change := range changes {
 		scope := stringField(change.After, "scope")
@@ -149,60 +162,181 @@ func (a *PrivilegeEscalationAnalyzer) analyzeWithConfig(runner sdk.Runner, class
 		beforeRole := a.resolveRole(change.Before, db, customRoles, privilegedSet)
 		afterRole := a.resolveRole(change.After, db, customRoles, privilegedSet)
 
-		// Apply scope weighting to scores
-		beforeScoreWeighted := ApplyScopeMultiplier(beforeRole.score.Total, scope)
-		afterScoreWeighted := ApplyScopeMultiplier(afterRole.score.Total, scope)
+		// Check if role is in exclude list
+		if excludeSet != nil && excludeSet[strings.ToLower(afterRole.name)] {
+			continue
+		}
 
-		// Only detect escalation (not de-escalation - CR-0024 removes de-escalation detection)
-		if afterScoreWeighted > beforeScoreWeighted {
-			// Check if role is in exclude list
-			if excludeSet != nil && excludeSet[strings.ToLower(afterRole.name)] {
-				continue
+		// Check if we have a roles filter and the role isn't in it
+		if rolesFilter != nil && !rolesFilter[strings.ToLower(afterRole.name)] {
+			continue
+		}
+
+		// Check for control-plane trigger
+		controlPlaneTriggered := false
+		var controlPlaneMatchedActions []string
+		var controlPlaneMatchedPatterns []string
+
+		if usePatternBasedControlPlane {
+			// CR-0028: Pattern-based control-plane detection
+			controlPlaneMatchedActions, controlPlaneMatchedPatterns = a.matchControlPlanePatterns(afterRole.definition, actionPatterns)
+			controlPlaneTriggered = len(controlPlaneMatchedActions) > 0
+		} else {
+			// Legacy score-based detection
+			beforeScoreWeighted := ApplyScopeMultiplier(beforeRole.score.Total, scope)
+			afterScoreWeighted := ApplyScopeMultiplier(afterRole.score.Total, scope)
+
+			// Only detect escalation (not de-escalation - CR-0024 removes de-escalation detection)
+			if afterScoreWeighted > beforeScoreWeighted && afterScoreWeighted >= scoreThreshold {
+				controlPlaneTriggered = true
+			}
+		}
+
+		// Check for data-plane trigger (CR-0027)
+		dataPlaneTriggered := false
+		var dataPlaneMatchedActions []string
+		var dataPlaneMatchedPatterns []string
+
+		if useDataPlaneDetection {
+			dataPlaneMatchedActions, dataPlaneMatchedPatterns = a.matchDataPlanePatterns(afterRole.definition, dataActionPatterns)
+			dataPlaneTriggered = len(dataPlaneMatchedActions) > 0
+		}
+
+		// Emit decision if either control-plane or data-plane triggered
+		if controlPlaneTriggered || dataPlaneTriggered {
+			beforeScoreWeighted := ApplyScopeMultiplier(beforeRole.score.Total, scope)
+			afterScoreWeighted := ApplyScopeMultiplier(afterRole.score.Total, scope)
+
+			// Determine trigger type and build reason/metadata
+			var trigger string
+			var reason string
+			metadata := map[string]interface{}{
+				"analyzer":    "privilege-escalation",
+				"before_role": beforeRole.name,
+				"after_role":  afterRole.name,
+				"scope":       scope,
+				"scope_level": ParseScopeLevel(scope).String(),
+				"role_source": string(afterRole.source),
 			}
 
-			// Check if we have a roles filter and the role isn't in it
-			if rolesFilter != nil && !rolesFilter[strings.ToLower(afterRole.name)] {
-				continue
+			if controlPlaneTriggered && dataPlaneTriggered {
+				trigger = "both"
+				reason = fmt.Sprintf("role %q grants control-plane and data-plane access matching configured patterns", afterRole.name)
+				metadata["matched_actions"] = controlPlaneMatchedActions
+				metadata["matched_patterns"] = controlPlaneMatchedPatterns
+				metadata["matched_data_actions"] = dataPlaneMatchedActions
+				metadata["matched_data_patterns"] = dataPlaneMatchedPatterns
+			} else if dataPlaneTriggered {
+				trigger = "data-plane"
+				reason = fmt.Sprintf("role %q grants data-plane access matching configured patterns", afterRole.name)
+				metadata["matched_data_actions"] = dataPlaneMatchedActions
+				metadata["matched_patterns"] = dataPlaneMatchedPatterns
+			} else if usePatternBasedControlPlane {
+				trigger = "control-plane"
+				reason = fmt.Sprintf("role %q grants control-plane access matching configured patterns", afterRole.name)
+				metadata["matched_actions"] = controlPlaneMatchedActions
+				metadata["matched_patterns"] = controlPlaneMatchedPatterns
+			} else {
+				// Legacy score-based trigger
+				trigger = "control-plane"
+				if beforeRole.name == "" {
+					reason = fmt.Sprintf("privileged role %q assigned", afterRole.name)
+				} else {
+					reason = fmt.Sprintf("role escalated from %q to %q", beforeRole.name, afterRole.name)
+				}
+				metadata["direction"] = "escalation"
+				metadata["before_score"] = beforeScoreWeighted
+				metadata["after_score"] = afterScoreWeighted
+				metadata["score_factors"] = afterRole.score.Factors
+				metadata["score_threshold"] = scoreThreshold
 			}
 
-			// Check score threshold
-			if afterScoreWeighted < scoreThreshold {
-				continue
-			}
-
-			// Escalation: after is more privileged than before
-			reason := fmt.Sprintf("role escalated from %q to %q", beforeRole.name, afterRole.name)
-			if beforeRole.name == "" {
-				reason = fmt.Sprintf("privileged role %q assigned", afterRole.name)
-			}
+			metadata["trigger"] = trigger
 
 			decision := &sdk.Decision{
-				Classification: classification, // Set classification from context
+				Classification: classification,
 				Reason:         reason,
 				Severity:       afterScoreWeighted,
-				Metadata: map[string]interface{}{
-					"analyzer":        "privilege-escalation",
-					"before_role":     beforeRole.name,
-					"after_role":      afterRole.name,
-					"direction":       "escalation",
-					"before_score":    beforeScoreWeighted,
-					"after_score":     afterScoreWeighted,
-					"scope":           scope,
-					"scope_level":     ParseScopeLevel(scope).String(),
-					"score_factors":   afterRole.score.Factors,
-					"role_source":     string(afterRole.source),
-					"score_threshold": scoreThreshold,
-				},
+				Metadata:       metadata,
 			}
 
 			if err := runner.EmitDecision(a, change, decision); err != nil {
 				return fmt.Errorf("failed to emit decision: %w", err)
 			}
 		}
-		// De-escalation is no longer detected (removed per CR-0024)
 	}
 
 	return nil
+}
+
+// matchControlPlanePatterns matches effective control-plane actions against patterns.
+// Returns the list of matched actions and the patterns they matched.
+func (a *PrivilegeEscalationAnalyzer) matchControlPlanePatterns(role *RoleDefinition, patterns []string) (matchedActions, matchedPatterns []string) {
+	if role == nil || len(patterns) == 0 {
+		return nil, nil
+	}
+
+	matchedActionsSet := make(map[string]bool)
+	matchedPatternsSet := make(map[string]bool)
+
+	for _, perm := range role.Permissions {
+		// Compute effective actions (Actions minus NotActions)
+		effectiveActions := computeEffectiveActions(perm.Actions, perm.NotActions)
+
+		for _, action := range effectiveActions {
+			for _, pattern := range patterns {
+				if actionMatchesPattern(action, pattern) {
+					matchedActionsSet[action] = true
+					matchedPatternsSet[pattern] = true
+				}
+			}
+		}
+	}
+
+	// Convert sets to slices
+	for action := range matchedActionsSet {
+		matchedActions = append(matchedActions, action)
+	}
+	for pattern := range matchedPatternsSet {
+		matchedPatterns = append(matchedPatterns, pattern)
+	}
+
+	return matchedActions, matchedPatterns
+}
+
+// matchDataPlanePatterns matches effective data-plane actions against patterns.
+// Returns the list of matched actions and the patterns they matched.
+func (a *PrivilegeEscalationAnalyzer) matchDataPlanePatterns(role *RoleDefinition, patterns []string) (matchedActions, matchedPatterns []string) {
+	if role == nil || len(patterns) == 0 {
+		return nil, nil
+	}
+
+	matchedActionsSet := make(map[string]bool)
+	matchedPatternsSet := make(map[string]bool)
+
+	for _, perm := range role.Permissions {
+		// Compute effective data actions (DataActions minus NotDataActions)
+		effectiveDataActions := computeEffectiveActions(perm.DataActions, perm.NotDataActions)
+
+		for _, action := range effectiveDataActions {
+			for _, pattern := range patterns {
+				if actionMatchesPattern(action, pattern) {
+					matchedActionsSet[action] = true
+					matchedPatternsSet[pattern] = true
+				}
+			}
+		}
+	}
+
+	// Convert sets to slices
+	for action := range matchedActionsSet {
+		matchedActions = append(matchedActions, action)
+	}
+	for pattern := range matchedPatternsSet {
+		matchedPatterns = append(matchedPatterns, pattern)
+	}
+
+	return matchedActions, matchedPatterns
 }
 
 // resolveRole resolves a role from the resource state using the four-level fallback chain:
@@ -231,9 +365,10 @@ func (a *PrivilegeEscalationAnalyzer) resolveRole(
 	if roleName != "" {
 		if role, found := db.LookupByName(roleName); found {
 			return resolvedRole{
-				name:   roleName,
-				score:  ScorePermissions(role),
-				source: roleSourceBuiltin,
+				name:       roleName,
+				score:      ScorePermissions(role),
+				source:     roleSourceBuiltin,
+				definition: role,
 			}
 		}
 	}
@@ -246,9 +381,10 @@ func (a *PrivilegeEscalationAnalyzer) resolveRole(
 				name = roleName // Prefer the name from the assignment
 			}
 			return resolvedRole{
-				name:   name,
-				score:  ScorePermissions(role),
-				source: roleSourceBuiltin,
+				name:       name,
+				score:      ScorePermissions(role),
+				source:     roleSourceBuiltin,
+				definition: role,
 			}
 		}
 	}
@@ -257,9 +393,10 @@ func (a *PrivilegeEscalationAnalyzer) resolveRole(
 	if roleName != "" && customRoles != nil {
 		if role, found := customRoles[strings.ToLower(roleName)]; found {
 			return resolvedRole{
-				name:   roleName,
-				score:  ScorePermissions(role),
-				source: roleSourcePlanCustom,
+				name:       roleName,
+				score:      ScorePermissions(role),
+				source:     roleSourcePlanCustom,
+				definition: role,
 			}
 		}
 	}

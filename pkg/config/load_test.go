@@ -279,6 +279,59 @@ func TestLoad_ClassificationScopedPluginConfig(t *testing.T) {
 	}
 }
 
+func TestLoad_PatternBasedDetection(t *testing.T) {
+	cfg, err := Load("testdata/pattern_based_detection.hcl")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(cfg.Classifications) != 2 {
+		t.Fatalf("expected 2 classifications, got %d", len(cfg.Classifications))
+	}
+
+	// Test critical classification has pattern-based detection config
+	critical := cfg.Classifications[0]
+	if critical.Name != "critical" {
+		t.Errorf("expected first classification 'critical', got %q", critical.Name)
+	}
+
+	if critical.PluginAnalyzerConfigs == nil {
+		t.Fatal("expected PluginAnalyzerConfigs to be set for 'critical'")
+	}
+
+	azurermCfg, ok := critical.PluginAnalyzerConfigs["azurerm"]
+	if !ok {
+		t.Fatal("expected 'azurerm' plugin config in 'critical' classification")
+	}
+
+	// Test privilege_escalation config with pattern-based detection
+	if azurermCfg.PrivilegeEscalation == nil {
+		t.Fatal("expected PrivilegeEscalation config")
+	}
+
+	// Test CR-0028: actions field (control-plane patterns)
+	if len(azurermCfg.PrivilegeEscalation.Actions) != 2 {
+		t.Errorf("expected 2 Actions patterns, got %d", len(azurermCfg.PrivilegeEscalation.Actions))
+	}
+	if azurermCfg.PrivilegeEscalation.Actions[0] != "*" {
+		t.Errorf("expected first Actions pattern '*', got %q", azurermCfg.PrivilegeEscalation.Actions[0])
+	}
+	if azurermCfg.PrivilegeEscalation.Actions[1] != "Microsoft.Authorization/*" {
+		t.Errorf("expected second Actions pattern 'Microsoft.Authorization/*', got %q", azurermCfg.PrivilegeEscalation.Actions[1])
+	}
+
+	// Test CR-0027: data_actions field (data-plane patterns)
+	if len(azurermCfg.PrivilegeEscalation.DataActions) != 2 {
+		t.Errorf("expected 2 DataActions patterns, got %d", len(azurermCfg.PrivilegeEscalation.DataActions))
+	}
+	if azurermCfg.PrivilegeEscalation.DataActions[0] != "*/read" {
+		t.Errorf("expected first DataActions pattern '*/read', got %q", azurermCfg.PrivilegeEscalation.DataActions[0])
+	}
+	if azurermCfg.PrivilegeEscalation.DataActions[1] != "*/write" {
+		t.Errorf("expected second DataActions pattern '*/write', got %q", azurermCfg.PrivilegeEscalation.DataActions[1])
+	}
+}
+
 func TestLoad_ClassificationScopedPluginConfig_UnknownPlugin(t *testing.T) {
 	configContent := `
 plugin "azurerm" {

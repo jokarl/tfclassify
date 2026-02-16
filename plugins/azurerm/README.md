@@ -18,6 +18,8 @@ Deep inspection plugin for Azure Resource Manager (azurerm) resources. Analyzes 
   - [Scope Multipliers](#scope-multipliers)
   - [Scoring Example](#scoring-example)
 - [Role Resolution](#role-resolution)
+- [Data-Plane Detection](#data-plane-detection)
+- [Pattern-Based Control-Plane Detection](#pattern-based-control-plane-detection)
 - [Building](#building)
 - [Development](#development)
 
@@ -157,9 +159,11 @@ Each analyzer has its own sub-block with specific options:
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `score_threshold` | int | `0` | Only emit decisions when severity >= this value |
+| `score_threshold` | int | `0` | Only emit decisions when severity >= this value (legacy mode) |
 | `exclude` | list(string) | `[]` | Role names to skip entirely (no decisions emitted) |
 | `roles` | list(string) | `[]` | If non-empty, only analyze these specific roles |
+| `data_actions` | list(string) | `[]` | Data-plane action patterns to match (e.g., `["*/read"]`). See [Data-Plane Detection](#data-plane-detection). |
+| `actions` | list(string) | `[]` | Control-plane action patterns to match (e.g., `["Microsoft.Authorization/*"]`). See [Pattern-Based Control-Plane Detection](#pattern-based-control-plane-detection). |
 
 **`network_exposure {}`**
 
@@ -412,6 +416,161 @@ The privilege escalation analyzer resolves roles through a four-level fallback c
 4. **Unknown**: Roles not found through any mechanism get `UnknownRoleSeverity` (default 50).
 
 Decision metadata includes a `role_source` field indicating which resolution path was used: `builtin`, `plan-custom-role`, `config-fallback`, or `unknown`.
+
+## Data-Plane Detection
+
+> CR-0027: Data-Plane Action Detection
+
+Azure RBAC distinguishes between control-plane actions (`Actions`/`NotActions`) and data-plane actions (`DataActions`/`NotDataActions`). Control-plane actions manage Azure resources; data-plane actions access data within resources (e.g., reading blob contents vs. managing blob containers).
+
+The `data_actions` option enables pattern-based detection for data-plane access. When configured, the analyzer computes effective data actions (`DataActions` minus `NotDataActions`) and matches them against your patterns.
+
+### Configuration
+
+```hcl
+classification "critical" {
+  azurerm {
+    privilege_escalation {
+      data_actions = ["*/read"]  # Flag roles with any data-plane read
+    }
+  }
+}
+```
+
+### Pattern Syntax
+
+Data-plane patterns use Azure RBAC matching rules:
+- `*` — matches everything
+- `Microsoft.Storage/*` — matches all storage data actions
+- `*/read` — matches any read action
+- `*/write` — matches any write action
+
+### How It Works
+
+1. For each role assignment, resolve the role definition
+2. Compute effective data actions: `DataActions - NotDataActions`
+3. Match effective actions against configured patterns
+4. If ANY action matches ANY pattern, emit a decision
+
+### NotDataActions Subtraction
+
+`NotDataActions` removes permissions before pattern matching. This naturally handles exclusion scenarios:
+
+```
+# Banking config: data_actions = ["*/read"]
+
+# Role: Storage Blob Data Owner
+# dataActions: ["Microsoft.Storage/.../blobs/*"]
+# notDataActions: []
+# → Effective includes reads → MATCHES → flagged as critical
+
+# Custom write-only role (notDataActions blocks reads)
+# dataActions: ["Microsoft.Storage/.../blobs/*"]
+# notDataActions: ["Microsoft.Storage/.../blobs/read"]
+# → Effective: write/delete only → NO reads → does NOT match
+# → Write-only is acceptable — not flagged
+```
+
+### Decision Metadata
+
+Data-plane triggers include metadata:
+- `trigger`: `"data-plane"`
+- `matched_data_actions`: list of effective actions that matched
+- `matched_patterns`: list of configured patterns that matched
+
+### Independence from Control-Plane
+
+Control-plane and data-plane triggers are independent — either can cause a role to be flagged. A role can trigger via:
+- Control-plane only (high score or pattern match)
+- Data-plane only (data action pattern match)
+- Both (triggers appear as `trigger: "both"`)
+
+## Pattern-Based Control-Plane Detection
+
+> CR-0028: Pattern-Based Control-Plane Detection
+
+The `actions` option provides pattern-based detection for control-plane actions, as an alternative to the score-based approach. When configured, it overrides the `score_threshold` behavior and instead matches effective control-plane actions against your patterns.
+
+### Configuration
+
+```hcl
+classification "critical" {
+  azurerm {
+    privilege_escalation {
+      actions = ["*", "Microsoft.Authorization/*"]  # Flag wildcard or auth control
+    }
+  }
+}
+
+classification "standard" {
+  azurerm {
+    privilege_escalation {
+      actions = ["*/write", "*/delete"]  # Flag write/delete operations
+    }
+  }
+}
+```
+
+### Pattern Syntax
+
+Control-plane patterns use Azure RBAC matching rules:
+- `*` — matches everything (Owner pattern)
+- `Microsoft.Authorization/*` — matches authorization control (User Access Administrator pattern)
+- `*/write` — matches any write action
+- `*/read` — matches any read action
+- `Microsoft.Compute/*` — matches all compute actions
+
+### How It Works
+
+1. For each role assignment, resolve the role definition
+2. Compute effective actions: `Actions - NotActions`
+3. Match effective actions against configured patterns
+4. If ANY action matches ANY pattern, emit a decision
+
+### NotActions Subtraction
+
+`NotActions` removes permissions before pattern matching:
+
+```
+# Config: actions = ["Microsoft.Authorization/*"]
+
+# Role: Owner (actions: ["*"], notActions: [])
+# → Effective: ["*"] → Does NOT match "Microsoft.Authorization/*" (wildcard isn't auth)
+# → But "*" matches if you include it in patterns
+
+# Role: Contributor (actions: ["*"], notActions: ["Microsoft.Authorization/*", ...])
+# → Effective: ["*"] minus auth exclusions
+# → Does NOT match "Microsoft.Authorization/*" (excluded by notActions)
+```
+
+### When to Use Pattern-Based vs. Score-Based
+
+**Use pattern-based (`actions`) when:**
+- You have specific action patterns that matter to your organization
+- You want to align critical/standard classifications with organizational policies
+- You need fine-grained control over what triggers each classification
+
+**Use score-based (`score_threshold`) when:**
+- You want a general-purpose privilege escalation detector
+- The built-in scoring tiers align with your risk model
+- You don't need pattern-level control
+
+### Combined Control-Plane and Data-Plane
+
+Both `actions` and `data_actions` can be configured together:
+
+```hcl
+classification "critical" {
+  azurerm {
+    privilege_escalation {
+      actions      = ["*", "Microsoft.Authorization/*"]
+      data_actions = ["*/read"]
+    }
+  }
+}
+```
+
+A role triggers if it matches EITHER the control-plane patterns OR the data-plane patterns. The decision metadata indicates which triggered via the `trigger` field.
 
 ## Building
 

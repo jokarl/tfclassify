@@ -170,6 +170,18 @@ func parsePrivilegeEscalationConfig(block *hclsyntax.Block, config *PrivilegeEsc
 				return fmt.Errorf("privilege_escalation.exclude: %v", diags.Error())
 			}
 			config.Exclude = toStringSlice(val)
+		case "data_actions":
+			val, diags := attr.Expr.Value(nil)
+			if diags.HasErrors() {
+				return fmt.Errorf("privilege_escalation.data_actions: %v", diags.Error())
+			}
+			config.DataActions = toStringSlice(val)
+		case "actions":
+			val, diags := attr.Expr.Value(nil)
+			if diags.HasErrors() {
+				return fmt.Errorf("privilege_escalation.actions: %v", diags.Error())
+			}
+			config.Actions = toStringSlice(val)
 		default:
 			return fmt.Errorf("privilege_escalation: unknown attribute %q", name)
 		}

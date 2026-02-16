@@ -64,6 +64,7 @@ type PluginAnalyzerConfig struct {
 type PrivilegeEscalationConfig struct {
 	// ScoreThreshold is the minimum score required to trigger this classification.
 	// Default: 0 (any score triggers)
+	// Deprecated: Use Actions for pattern-based control-plane detection (CR-0028).
 	ScoreThreshold int `hcl:"score_threshold,optional" json:"score_threshold,omitempty"`
 
 	// Roles limits triggering to specific role names (case-insensitive).
@@ -72,6 +73,20 @@ type PrivilegeEscalationConfig struct {
 
 	// Exclude is a list of role names to skip (case-insensitive).
 	Exclude []string `hcl:"exclude,optional" json:"exclude,omitempty"`
+
+	// DataActions is a list of Azure RBAC data-plane action patterns to match.
+	// When configured, roles with effective data actions matching ANY pattern trigger.
+	// Uses Azure RBAC pattern matching: "*", "Microsoft.Storage/*", "*/read".
+	// If omitted or empty, data-plane actions are not evaluated.
+	// CR-0027: Data-Plane Action Detection
+	DataActions []string `hcl:"data_actions,optional" json:"data_actions,omitempty"`
+
+	// Actions is a list of Azure RBAC control-plane action patterns to match.
+	// When configured, roles with effective actions matching ANY pattern trigger.
+	// Uses Azure RBAC pattern matching: "*", "Microsoft.Authorization/*", "*/write".
+	// If omitted or empty, falls back to ScoreThreshold-based detection.
+	// CR-0028: Pattern-Based Control-Plane Detection
+	Actions []string `hcl:"actions,optional" json:"actions,omitempty"`
 }
 
 // NetworkExposureConfig holds configuration for the network_exposure analyzer.

@@ -97,10 +97,21 @@ classification "critical" {
   # Plugin-specific analyzer configuration for this classification level.
   # Each enabled plugin can have per-analyzer sub-blocks here.
   azurerm {
-    # Privilege escalation detection with high threshold (tier 1-2 roles only)
+    # Privilege escalation detection with pattern-based control-plane and data-plane detection.
+    # CR-0027/CR-0028: Pattern-based detection gives fine-grained control over what triggers.
     privilege_escalation {
-      score_threshold = 80  # Only Owner (95) and UAA (85) trigger critical
-      exclude = ["AcrPush", "AcrPull"]  # Exclude container registry roles
+      # Pattern-based control-plane detection (CR-0028).
+      # When "actions" is set, it overrides score_threshold-based detection.
+      # Matches roles with effective control-plane actions matching these patterns.
+      actions = ["*", "Microsoft.Authorization/*"]  # Wildcard or auth control access
+
+      # Pattern-based data-plane detection (CR-0027).
+      # Matches roles with effective data-plane actions matching these patterns.
+      # Data-plane detection is independent from control-plane — either can trigger.
+      data_actions = ["*/read"]  # Any data-plane read access (e.g., blob reads)
+
+      # Exclude these roles even if they match patterns above.
+      exclude = ["AcrPush", "AcrPull"]
     }
 
     # Network exposure detection
@@ -144,10 +155,15 @@ classification "high" {
     resource    = ["*_dns_*"]
   }
 
-  # Plugin analyzer configuration for "high" — lower thresholds than "critical"
+  # Plugin analyzer configuration for "high" — catch roles with write access
   azurerm {
     privilege_escalation {
-      # Any privilege escalation triggers "high" (no threshold = any score)
+      # Pattern-based control-plane detection for write/delete operations.
+      # This catches roles that don't match the stricter "critical" patterns above.
+      actions = ["*/write", "*/delete"]
+
+      # Pattern-based data-plane detection for write/delete operations.
+      data_actions = ["*/write", "*/delete"]
     }
     network_exposure {}
     keyvault_access {}
