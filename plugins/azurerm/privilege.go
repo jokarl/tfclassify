@@ -368,12 +368,12 @@ func (a *PrivilegeEscalationAnalyzer) matchDataPlanePatterns(role *RoleDefinitio
 // resolveRole resolves a role from the resource state.
 // Resolution order:
 // 1. Built-in role database (by name or ID)
-// 2. Custom role from plan (azurerm_role_definition)
+// 2. Custom role from plan (azurerm_role_definition) by name or ID
 // 3. Unknown role (with resolution attempt details)
 func (a *PrivilegeEscalationAnalyzer) resolveRole(
 	state map[string]interface{},
 	db *RoleDatabase,
-	customRoles map[string]*RoleDefinition,
+	customRoles *customRoleLookup,
 ) resolvedRole {
 	if state == nil {
 		return resolvedRole{
@@ -424,24 +424,32 @@ func (a *PrivilegeEscalationAnalyzer) resolveRole(
 		}
 	}
 
-	// Try custom roles from plan
+	// Try custom roles from plan (by name)
 	if roleName != "" && customRoles != nil {
-		if role, found := customRoles[strings.ToLower(roleName)]; found {
+		if role, found := customRoles.lookupByName(roleName); found {
 			return resolvedRole{
 				name:       roleName,
 				source:     roleSourcePlanCustom,
 				definition: role,
 			}
 		}
-		attempts = append(attempts, "no azurerm_role_definition resource in plan")
-	} else if customRoles == nil {
-		attempts = append(attempts, "custom role cross-referencing disabled")
-	} else {
-		attempts = append(attempts, "no azurerm_role_definition resource in plan")
+		attempts = append(attempts, "no matching azurerm_role_definition by name in plan")
 	}
 
-	if roleID != "" {
-		attempts = append(attempts, "role definition ID not resolvable")
+	// Try custom roles from plan (by ID)
+	if roleID != "" && customRoles != nil {
+		if role, found := customRoles.lookupByID(roleID); found {
+			return resolvedRole{
+				name:       role.Name,
+				source:     roleSourcePlanCustom,
+				definition: role,
+			}
+		}
+		attempts = append(attempts, "no matching azurerm_role_definition by ID in plan")
+	}
+
+	if customRoles == nil {
+		attempts = append(attempts, "custom role cross-referencing disabled")
 	}
 
 	name := roleName
@@ -455,9 +463,33 @@ func (a *PrivilegeEscalationAnalyzer) resolveRole(
 	}
 }
 
+// customRoleLookup holds custom role definitions indexed by name and by resource ID.
+type customRoleLookup struct {
+	byName map[string]*RoleDefinition // lowercase name → definition
+	byID   map[string]*RoleDefinition // lowercase role_definition_resource_id → definition
+}
+
+// lookupByName finds a custom role by name.
+func (c *customRoleLookup) lookupByName(name string) (*RoleDefinition, bool) {
+	if c == nil {
+		return nil, false
+	}
+	role, ok := c.byName[strings.ToLower(name)]
+	return role, ok
+}
+
+// lookupByID finds a custom role by its role_definition_resource_id.
+func (c *customRoleLookup) lookupByID(id string) (*RoleDefinition, bool) {
+	if c == nil {
+		return nil, false
+	}
+	role, ok := c.byID[strings.ToLower(id)]
+	return role, ok
+}
+
 // buildCustomRoleLookup queries the runner for azurerm_role_definition resources
-// and builds a lookup map by role name.
-func (a *PrivilegeEscalationAnalyzer) buildCustomRoleLookup(runner sdk.Runner) map[string]*RoleDefinition {
+// and builds a lookup indexed by role name and role_definition_resource_id.
+func (a *PrivilegeEscalationAnalyzer) buildCustomRoleLookup(runner sdk.Runner) *customRoleLookup {
 	if !a.config.CrossReferenceCustomRoles {
 		return nil
 	}
@@ -467,7 +499,10 @@ func (a *PrivilegeEscalationAnalyzer) buildCustomRoleLookup(runner sdk.Runner) m
 		return nil
 	}
 
-	result := make(map[string]*RoleDefinition)
+	result := &customRoleLookup{
+		byName: make(map[string]*RoleDefinition),
+		byID:   make(map[string]*RoleDefinition),
+	}
 	for _, change := range changes {
 		state := change.After
 		if state == nil {
@@ -491,7 +526,13 @@ func (a *PrivilegeEscalationAnalyzer) buildCustomRoleLookup(runner sdk.Runner) m
 			Name:        name,
 			Permissions: perms,
 		}
-		result[strings.ToLower(name)] = role
+		result.byName[strings.ToLower(name)] = role
+
+		// Also index by role_definition_resource_id for ID-based lookups
+		resourceID := stringField(state, "role_definition_resource_id")
+		if resourceID != "" {
+			result.byID[strings.ToLower(resourceID)] = role
+		}
 	}
 
 	return result

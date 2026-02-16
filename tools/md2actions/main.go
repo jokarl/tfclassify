@@ -65,6 +65,7 @@ const rawBaseURL = "https://raw.githubusercontent.com/MicrosoftDocs/azure-docs/m
 
 func main() {
 	fromRoles := flag.String("from-roles", "", "Extract actions from role database JSON file instead of Microsoft Docs")
+	merge := flag.String("merge", "", "Merge actions from role database JSON file into the Microsoft Docs results")
 	flag.Parse()
 
 	var registry *actionRegistry
@@ -79,6 +80,19 @@ func main() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "md2actions: %v\n", err)
 		os.Exit(1)
+	}
+
+	// Merge role database actions into the registry if requested
+	if *merge != "" {
+		roleRegistry, mergeErr := extractFromRoles(*merge)
+		if mergeErr != nil {
+			fmt.Fprintf(os.Stderr, "md2actions: merge: %v\n", mergeErr)
+			os.Exit(1)
+		}
+		mergeRegistries(registry, roleRegistry)
+		fmt.Fprintf(os.Stderr, "After merge: %d control-plane actions, %d data-plane actions across %d providers\n",
+			countTotal(registry.Actions), countTotal(registry.DataActions),
+			countProviders(registry))
 	}
 
 	enc := json.NewEncoder(os.Stdout)
@@ -297,6 +311,27 @@ func extractProvider(action string) string {
 		return ""
 	}
 	return parts[0]
+}
+
+// mergeRegistries adds all actions from src into dst, deduplicating within each provider.
+func mergeRegistries(dst, src *actionRegistry) {
+	mergeMap := func(dstMap, srcMap map[string][]string) {
+		for provider, actions := range srcMap {
+			existing := make(map[string]bool)
+			for _, a := range dstMap[provider] {
+				existing[a] = true
+			}
+			for _, a := range actions {
+				if !existing[a] {
+					dstMap[provider] = append(dstMap[provider], a)
+					existing[a] = true
+				}
+			}
+			sort.Strings(dstMap[provider])
+		}
+	}
+	mergeMap(dst.Actions, src.Actions)
+	mergeMap(dst.DataActions, src.DataActions)
 }
 
 func countTotal(m map[string][]string) int {

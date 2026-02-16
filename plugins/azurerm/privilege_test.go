@@ -1992,6 +1992,77 @@ func TestPrivilege_ScopeFilter_AppliesToDataPlane(t *testing.T) {
 	}
 }
 
+// === Custom role cross-reference by ID (CR-0028) ===
+
+func TestCustomRoleCrossReference_ByRoleDefinitionID(t *testing.T) {
+	config := DefaultConfig()
+	analyzer := NewPrivilegeEscalationAnalyzer(config)
+
+	// Simulates a custom role definition with role_definition_resource_id
+	// and a role assignment that references it by role_definition_id (not name)
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			{
+				Address: "azurerm_role_definition.auth_writer",
+				Type:    "azurerm_role_definition",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"name": "Custom Auth Writer",
+					"role_definition_resource_id": "/subscriptions/00000000-0000-0000-0000-000000000000/providers/Microsoft.Authorization/roleDefinitions/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+					"permissions": []interface{}{
+						map[string]interface{}{
+							"actions":          []interface{}{"Microsoft.Authorization/roleAssignments/write", "Microsoft.Authorization/roleAssignments/delete"},
+							"not_actions":      []interface{}{},
+							"data_actions":     []interface{}{},
+							"not_data_actions": []interface{}{},
+						},
+					},
+				},
+			},
+			{
+				Address: "azurerm_role_assignment.custom",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					// Only role_definition_id, no role_definition_name — mirrors real Terraform behavior
+					"role_definition_id": "/subscriptions/00000000-0000-0000-0000-000000000000/providers/Microsoft.Authorization/roleDefinitions/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+					"scope":              "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-test",
+				},
+			},
+		},
+	}
+
+	analyzerConfig := &PluginAnalyzerConfig{
+		PrivilegeEscalation: &PrivilegeEscalationAnalyzerConfig{
+			Actions: []string{"Microsoft.Authorization/*"},
+		},
+	}
+	configJSON, _ := json.Marshal(analyzerConfig)
+
+	err := analyzer.AnalyzeWithClassification(runner, "critical", configJSON)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(runner.decisions) != 1 {
+		t.Fatalf("expected 1 decision (custom role matched by ID), got %d", len(runner.decisions))
+	}
+
+	decision := runner.decisions[0]
+	if decision.Classification != "critical" {
+		t.Errorf("expected classification 'critical', got %q", decision.Classification)
+	}
+	if decision.Metadata["role_source"] != "plan-custom-role" {
+		t.Errorf("expected role_source plan-custom-role, got %v", decision.Metadata["role_source"])
+	}
+	if decision.Metadata["trigger"] != "control-plane" {
+		t.Errorf("expected trigger control-plane, got %v", decision.Metadata["trigger"])
+	}
+	if decision.Metadata["after_role"] != "Custom Auth Writer" {
+		t.Errorf("expected after_role 'Custom Auth Writer', got %v", decision.Metadata["after_role"])
+	}
+}
+
 // === CR-0028 AC-9: No severity score on decisions ===
 
 func TestPrivilege_NoSeverityOnDecisions(t *testing.T) {

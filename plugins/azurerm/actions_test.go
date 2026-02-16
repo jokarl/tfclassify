@@ -9,14 +9,14 @@ func TestActionRegistry_EmbeddedData(t *testing.T) {
 	// AC-15: Action registry embedded data is valid
 	reg := DefaultActionRegistry()
 
-	if reg.ActionCount() < 3000 {
-		t.Errorf("expected at least 3000 control-plane actions, got %d", reg.ActionCount())
+	if reg.ActionCount() < 14000 {
+		t.Errorf("expected at least 14,000 control-plane actions, got %d", reg.ActionCount())
 	}
-	if reg.DataActionCount() < 500 {
-		t.Errorf("expected at least 500 data-plane actions, got %d", reg.DataActionCount())
+	if reg.DataActionCount() < 2500 {
+		t.Errorf("expected at least 2,500 data-plane actions, got %d", reg.DataActionCount())
 	}
-	if reg.ProviderCount() < 100 {
-		t.Errorf("expected at least 100 providers, got %d", reg.ProviderCount())
+	if reg.ProviderCount() < 200 {
+		t.Errorf("expected at least 200 providers, got %d", reg.ProviderCount())
 	}
 }
 
@@ -24,12 +24,12 @@ func TestActionRegistry_ExpandPattern_GlobalWildcard(t *testing.T) {
 	reg := DefaultActionRegistry()
 
 	result := reg.ExpandPattern("*", false)
-	if len(result) < 3000 {
+	if len(result) < 14000 {
 		t.Errorf("expanding * should return all actions, got %d", len(result))
 	}
 
 	resultData := reg.ExpandPattern("*", true)
-	if len(resultData) < 500 {
+	if len(resultData) < 2500 {
 		t.Errorf("expanding * (data-plane) should return all data actions, got %d", len(resultData))
 	}
 }

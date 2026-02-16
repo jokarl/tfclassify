@@ -217,9 +217,9 @@ Applies identically to both planes, using `computeEffectiveActions` enhanced wit
 # Contributor role:
 # Actions: ["*"]
 # NotActions: ["Microsoft.Authorization/*"]
-# Step 1: Expand ["*"] → [all ~17K concrete actions] via action registry
+# Step 1: Expand ["*"] → [all ~14.6K concrete actions] via action registry
 # Step 2: Subtract NotActions → removes all Microsoft.Authorization/* actions
-# Step 3: Effective set contains ~16.8K actions, none under Microsoft.Authorization/
+# Step 3: Effective set contains ~14.4K actions, none under Microsoft.Authorization/
 # Step 4: Match against config patterns → NO match → Contributor is safe ✓
 
 # User Access Administrator role:
@@ -316,7 +316,7 @@ Map keys are lowercase provider namespaces. Values preserve original casing from
 | `*/read` | Linear scan of flat slice, filter by suffix | O(N) |
 | Exact match | Return as-is (no expansion needed) | O(1) |
 
-With ~17K control-plane and ~3.7K data-plane actions, even O(N) scans complete in microseconds.
+With ~14.6K control-plane and ~2.9K data-plane actions, even O(N) scans complete in microseconds.
 
 ### Go Type
 
@@ -353,10 +353,10 @@ The enhanced function expands wildcards before subtraction:
 
 ### Generation Tool
 
-`tools/md2actions/main.go` — fetches 18 category markdown files from GitHub raw content, parses tables, groups by lowercase provider namespace, deduplicates, sorts, outputs JSON to stdout.
+`tools/md2actions/main.go` — fetches 18 category markdown files from GitHub raw content, parses tables, groups by lowercase provider namespace, deduplicates, sorts, outputs JSON to stdout. Supports `-merge` flag to merge role database actions into the result for maximum coverage.
 
 ```bash
-go run tools/md2actions/main.go > plugins/azurerm/actiondata/actions.json
+go run tools/md2actions/main.go -merge plugins/azurerm/roledata/roles.json > plugins/azurerm/actiondata/actions.json
 ```
 
 ### Maintenance
@@ -365,7 +365,7 @@ A scheduled GitHub Actions workflow refreshes the action data alongside existing
 
 | Aspect | Role Database | Action Registry |
 |--------|--------------|-----------------|
-| Data source | AzAdvertizer CSV | Microsoft Docs GitHub markdown |
+| Data source | AzAdvertizer CSV | Microsoft Docs GitHub markdown + role database |
 | Tool | `tools/csv2roles/main.go` | `tools/md2actions/main.go` |
 | Embedded data | `plugins/azurerm/roledata/roles.json` | `plugins/azurerm/actiondata/actions.json` |
 | Makefile target | `make generate-roles` | `make generate-actions` |
@@ -576,10 +576,12 @@ Then "Microsoft.Storage/*" is expanded to all concrete Microsoft.Storage actions
 ```gherkin
 Given the embedded action registry data
 When the plugin initializes
-Then the registry contains at least 15,000 control-plane actions
-  And the registry contains at least 3,000 data-plane actions
+Then the registry contains at least 14,000 control-plane actions
+  And the registry contains at least 2,500 data-plane actions
   And the registry contains at least 200 providers
 ```
+
+> **Note:** Thresholds reflect the union of Microsoft Docs GitHub markdown (primary source) and the built-in role database (supplementary source). Azure has approximately 14,600 documented control-plane operations and 2,900 data-plane operations across 235 providers as of December 2025.
 
 ### AC-16: Action registry refresh generates valid data
 
