@@ -38,7 +38,6 @@ func (a *NetworkExposureAnalyzer) ResourcePatterns() []string {
 }
 
 // Analyze inspects network security rules for overly permissive sources.
-// This is the backward-compatible method that doesn't use classification-scoped config.
 func (a *NetworkExposureAnalyzer) Analyze(runner sdk.Runner) error {
 	return a.analyzeWithConfig(runner, "", nil)
 }

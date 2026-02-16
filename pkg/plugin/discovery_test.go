@@ -8,12 +8,26 @@ import (
 	"github.com/jokarl/tfclassify/pkg/config"
 )
 
-func TestDiscoverPlugins_SourcelessPluginSkipped(t *testing.T) {
-	// Plugins with no source (e.g. legacy "terraform" block) are skipped
-	// because their functionality is now provided by builtin analyzers.
+func TestDiscoverPlugins_SourcelessPluginDiscovered(t *testing.T) {
+	// Plugins without source should still be discovered if binary exists.
+	tmpDir, err := os.MkdirTemp("", "tfclassify-plugins")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	pluginPath := filepath.Join(tmpDir, "tfclassify-plugin-test")
+	if err := os.WriteFile(pluginPath, []byte("#!/bin/sh\n"), 0755); err != nil {
+		t.Fatalf("failed to write plugin binary: %v", err)
+	}
+
+	oldEnv := os.Getenv("TFCLASSIFY_PLUGIN_DIR")
+	os.Setenv("TFCLASSIFY_PLUGIN_DIR", tmpDir)
+	defer os.Setenv("TFCLASSIFY_PLUGIN_DIR", oldEnv)
+
 	cfg := &config.Config{
 		Plugins: []config.PluginConfig{
-			{Name: "terraform", Enabled: true}, // no source = builtin, skipped
+			{Name: "test", Enabled: true}, // no source, but binary exists
 		},
 	}
 
@@ -22,8 +36,32 @@ func TestDiscoverPlugins_SourcelessPluginSkipped(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if len(discovered) != 0 {
-		t.Errorf("expected 0 plugins (sourceless skipped), got %d", len(discovered))
+	if len(discovered) != 1 {
+		t.Errorf("expected 1 plugin discovered, got %d", len(discovered))
+	}
+}
+
+func TestDiscoverPlugins_SourcelessPluginNotFound(t *testing.T) {
+	// Plugins without source should return error if binary is not found.
+	tmpDir, err := os.MkdirTemp("", "tfclassify-empty")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	oldEnv := os.Getenv("TFCLASSIFY_PLUGIN_DIR")
+	os.Setenv("TFCLASSIFY_PLUGIN_DIR", tmpDir)
+	defer os.Setenv("TFCLASSIFY_PLUGIN_DIR", oldEnv)
+
+	cfg := &config.Config{
+		Plugins: []config.PluginConfig{
+			{Name: "test", Enabled: true}, // no source, no binary
+		},
+	}
+
+	_, err = DiscoverPlugins(cfg, "/usr/bin/tfclassify")
+	if err == nil {
+		t.Fatal("expected error for plugin not found")
 	}
 }
 

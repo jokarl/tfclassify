@@ -37,7 +37,6 @@ func (a *KeyVaultAccessAnalyzer) ResourcePatterns() []string {
 }
 
 // Analyze inspects key vault access policies for destructive permissions.
-// This is the backward-compatible method that doesn't use classification-scoped config.
 func (a *KeyVaultAccessAnalyzer) Analyze(runner sdk.Runner) error {
 	return a.analyzeWithConfig(runner, "", nil)
 }

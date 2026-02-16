@@ -400,21 +400,17 @@ func TestHost_DiscoverAndStart_NoPlugins(t *testing.T) {
 	}
 }
 
-func TestHost_DiscoverAndStart_SourcelessPluginSkipped(t *testing.T) {
+func TestHost_DiscoverAndStart_SourcelessPluginNotFound(t *testing.T) {
 	cfg := &config.Config{
 		Plugins: []config.PluginConfig{
-			{Name: "terraform", Enabled: true}, // no source = builtin, skipped
+			{Name: "nonexistent", Enabled: true}, // no source, binary not found
 		},
 	}
 
 	host := NewHost(cfg)
 	err := host.DiscoverAndStart("/usr/bin/tfclassify")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if len(host.plugins) != 0 {
-		t.Errorf("expected 0 plugins (sourceless skipped), got %d", len(host.plugins))
+	if err == nil {
+		t.Fatal("expected error for enabled plugin with no binary")
 	}
 
 	// Cleanup

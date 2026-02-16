@@ -1844,9 +1844,9 @@ func TestPrivilege_AnalyzeWithClassification_EmptyClassification(t *testing.T) {
 		t.Fatalf("expected 1 decision, got %d", len(runner.decisions))
 	}
 
-	// Should have empty classification (backward compatible)
+	// Should have empty classification (no classification context provided)
 	if runner.decisions[0].Classification != "" {
-		t.Errorf("expected empty Classification for backward compatibility, got %q", runner.decisions[0].Classification)
+		t.Errorf("expected empty Classification without classification context, got %q", runner.decisions[0].Classification)
 	}
 }
 

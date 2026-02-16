@@ -99,7 +99,7 @@ func (s *PluginServiceServer) Analyze(ctx context.Context, req *pb.AnalyzeReques
 			}
 		}
 
-		// Fallback to standard analysis (backward compatible)
+		// Standard analysis (no classification context)
 		if err := analyzer.Analyze(runner); err != nil {
 			continue
 		}

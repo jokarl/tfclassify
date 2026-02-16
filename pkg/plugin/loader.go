@@ -119,7 +119,7 @@ func (h *Host) RunAnalysis(changes []plan.ResourceChange) ([]classify.ResourceDe
 		// Get classification-scoped configs for this plugin
 		configs := classificationConfigs[name]
 
-		// If no classification-scoped configs, run with empty classification (backward-compatible)
+		// If no classification-scoped configs, run with empty classification
 		if len(configs) == 0 {
 			ctx, cancel := context.WithTimeout(context.Background(), timeout)
 			err := h.runPluginAnalysis(ctx, name, plugin, "", nil)

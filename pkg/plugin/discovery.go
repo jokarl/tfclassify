@@ -32,20 +32,12 @@ type DiscoveredPlugin struct {
 
 // DiscoverPlugins finds plugin binaries for each enabled plugin in the config.
 // Returns a map from plugin name to discovered plugin info.
-// Plugins with no source (e.g. the legacy "terraform" plugin block) are skipped
-// since their functionality is now provided by builtin analyzers.
 func DiscoverPlugins(cfg *config.Config, selfPath string) (map[string]*DiscoveredPlugin, error) {
 	result := make(map[string]*DiscoveredPlugin)
 
 	for i := range cfg.Plugins {
 		pluginCfg := &cfg.Plugins[i]
 		if !pluginCfg.Enabled {
-			continue
-		}
-
-		// Skip plugins with no source — their functionality is now builtin.
-		// The "terraform" plugin block is accepted for backwards compatibility.
-		if pluginCfg.Source == "" {
 			continue
 		}
 
@@ -77,16 +69,11 @@ func discoverPlugin(pluginCfg *config.PluginConfig, cfg *config.Config, selfPath
 		}
 	}
 
-	// External plugin not found - return typed error if it has a source
-	if pluginCfg.Source != "" {
-		return nil, &PluginNotInstalledError{
-			PluginName: pluginCfg.Name,
-			Source:     pluginCfg.Source,
-			Version:    pluginCfg.Version,
-		}
+	return nil, &PluginNotInstalledError{
+		PluginName: pluginCfg.Name,
+		Source:     pluginCfg.Source,
+		Version:    pluginCfg.Version,
 	}
-
-	return nil, fmt.Errorf("plugin binary %q not found in search paths: %v", binaryName, paths)
 }
 
 // searchPaths returns the ordered list of directories to search for plugins.

@@ -80,7 +80,6 @@ func (a *PrivilegeEscalationAnalyzer) ResourcePatterns() []string {
 }
 
 // Analyze inspects role assignments for privilege escalation using permission-based scoring.
-// This is the backward-compatible method that doesn't use classification-scoped config.
 func (a *PrivilegeEscalationAnalyzer) Analyze(runner sdk.Runner) error {
 	return a.analyzeWithConfig(runner, "", nil)
 }

@@ -3,7 +3,11 @@ name: Verify
 on:
   schedule:
     - cron: '0 2 * * *'
-  workflow_dispatch: {}
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-azure
+  cancel-in-progress: true
 
 permissions:
   id-token: write
@@ -51,6 +55,7 @@ jobs:
             done
             [ "$pass" -lt 3 ] && sleep 15
           done
+
 
   verify:
     needs: cleanup
