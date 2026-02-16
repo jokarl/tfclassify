@@ -385,7 +385,11 @@ func (a *PrivilegeEscalationAnalyzer) resolveRole(
 	roleName := stringField(state, "role_definition_name")
 	roleID := stringField(state, "role_definition_id")
 
-	if roleName == "" && roleID == "" {
+	// Check if role_definition_id is present but unknown (computed reference in plan).
+	// Terraform puts the key with a null value for unknown computed attributes.
+	hasUnknownID := roleID == "" && hasField(state, "role_definition_id")
+
+	if roleName == "" && roleID == "" && !hasUnknownID {
 		return resolvedRole{
 			name:   "",
 			source: roleSourceUnknown,
@@ -452,9 +456,16 @@ func (a *PrivilegeEscalationAnalyzer) resolveRole(
 		attempts = append(attempts, "custom role cross-referencing disabled")
 	}
 
+	if hasUnknownID {
+		attempts = append(attempts, "role_definition_id is unknown (computed reference in plan)")
+	}
+
 	name := roleName
 	if name == "" {
 		name = roleID
+	}
+	if name == "" && hasUnknownID {
+		name = "(unknown computed role)"
 	}
 	return resolvedRole{
 		name:               name,

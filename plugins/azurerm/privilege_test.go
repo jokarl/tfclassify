@@ -2063,6 +2063,69 @@ func TestCustomRoleCrossReference_ByRoleDefinitionID(t *testing.T) {
 	}
 }
 
+func TestCustomRoleCrossReference_UnknownComputedID(t *testing.T) {
+	config := DefaultConfig()
+	analyzer := NewPrivilegeEscalationAnalyzer(config)
+
+	// Simulates a create plan where role_definition_id is unknown (computed reference).
+	// Terraform puts the key in the map with a nil value for unknown computed attributes.
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			{
+				Address: "azurerm_role_definition.auth_writer",
+				Type:    "azurerm_role_definition",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"name": "Custom Auth Writer",
+					"permissions": []interface{}{
+						map[string]interface{}{
+							"actions":          []interface{}{"Microsoft.Authorization/roleAssignments/write"},
+							"not_actions":      []interface{}{},
+							"data_actions":     []interface{}{},
+							"not_data_actions": []interface{}{},
+						},
+					},
+				},
+			},
+			{
+				Address: "azurerm_role_assignment.custom",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					// role_definition_id is present but nil (unknown computed reference)
+					"role_definition_id": nil,
+					"scope":              "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-test",
+				},
+			},
+		},
+	}
+
+	analyzerConfig := &PluginAnalyzerConfig{
+		PrivilegeEscalation: &PrivilegeEscalationAnalyzerConfig{
+			Actions: []string{"Microsoft.Authorization/*"},
+		},
+	}
+	configJSON, _ := json.Marshal(analyzerConfig)
+
+	err := analyzer.AnalyzeWithClassification(runner, "critical", configJSON)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Should flag as unknown role because role_definition_id is present but unknown
+	if len(runner.decisions) != 1 {
+		t.Fatalf("expected 1 decision (unknown computed role flagged), got %d", len(runner.decisions))
+	}
+
+	decision := runner.decisions[0]
+	if decision.Classification != "critical" {
+		t.Errorf("expected classification 'critical', got %q", decision.Classification)
+	}
+	if decision.Metadata["trigger"] != "unknown-role" {
+		t.Errorf("expected trigger unknown-role, got %v", decision.Metadata["trigger"])
+	}
+}
+
 // === CR-0028 AC-9: No severity score on decisions ===
 
 func TestPrivilege_NoSeverityOnDecisions(t *testing.T) {

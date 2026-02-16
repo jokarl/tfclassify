@@ -32,6 +32,16 @@ func stringField(m map[string]interface{}, key string) string {
 	return ""
 }
 
+// hasField checks if a key exists in a map (even if its value is nil/unknown).
+// This distinguishes "field not set" from "field set but value unknown at plan time."
+func hasField(m map[string]interface{}, key string) bool {
+	if m == nil {
+		return false
+	}
+	_, ok := m[key]
+	return ok
+}
+
 // toStringSlice converts an interface{} to []string for parsing permission arrays from plan JSON.
 // Handles nil, non-slice, and mixed-type inputs gracefully.
 func toStringSlice(v interface{}) []string {
