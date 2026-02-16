@@ -23,6 +23,7 @@ Classify Terraform plan changes based on organization-defined rules. tfclassify 
   - [Layer 2: Builtin Analyzers](#layer-2-builtin-analyzers)
   - [Layer 3: Deep Inspection Plugins](#layer-3-deep-inspection-plugins)
 - [Examples](#examples)
+- [E2E Test Scenarios](#e2e-test-scenarios)
 - [Project Structure](#project-structure)
 - [Development](#development)
 - [Architecture Decisions](#architecture-decisions)
@@ -405,6 +406,59 @@ tfclassify \
   -c docs/examples/basic-classification/.tfclassify.hcl \
   -v
 ```
+
+## E2E Test Scenarios
+
+The [`testdata/e2e/`](testdata/e2e/) directory contains end-to-end test scenarios that run against real Azure infrastructure via GitHub Actions CI. Each scenario has a `main.tf` (Terraform config), `.tfclassify.hcl` (classification rules), and `expected.json` (expected exit codes for create and destroy phases).
+
+These scenarios demonstrate real-world classification behavior across all three layers — core rules, builtin analyzers, and deep inspection plugins.
+
+### Core Rule Scenarios
+
+| Scenario | Config | What It Tests |
+|----------|--------|---------------|
+| [route-table](testdata/e2e/route-table/) | Glob rules only, no plugins | Baseline: route table + route classified as `standard` by `resource = ["*"]` catch-all. No plugin involvement. |
+| [role-assignment-reader](testdata/e2e/role-assignment-reader/) | Glob rules only, no plugins | Reader role assignment classified as `standard` on create (catch-all), `critical` on destroy (matches `*_role_*` + `delete`). |
+
+### Deep Inspection: Privilege Escalation
+
+| Scenario | Config | What It Tests |
+|----------|--------|---------------|
+| [role-assignment-privileged](testdata/e2e/role-assignment-privileged/) | Plugin enabled, default config | Owner role assignment at RG scope. Plugin scores permissions (tier 1, score 95 * 0.8 = 76) and emits escalation decision. No `score_threshold` configured so any score triggers. |
+| [role-escalation-threshold](testdata/e2e/role-escalation-threshold/) | `score_threshold = 70` on critical, default on standard | **Graduated thresholds.** Owner (76 at RG) triggers `critical` (>= 70). Contributor (56 at RG) skips critical, falls through to `standard` (any score). Demonstrates per-classification threshold gating. |
+| [role-exclusion](testdata/e2e/role-exclusion/) | `exclude = ["AcrPush"]` on both critical and standard | AcrPush role is excluded from privilege escalation detection in all classifications. Falls through to core rule `standard` on create, `critical` on destroy (glob `*_role_*` + `delete`). |
+
+### Deep Inspection: Network Exposure
+
+| Scenario | Config | What It Tests |
+|----------|--------|---------------|
+| [nsg-open-inbound](testdata/e2e/nsg-open-inbound/) | Glob rules only (no plugin block) | NSG rule allowing `*` inbound from `*`. Classified as `standard` on create (no network exposure plugin configured), `critical` on destroy (glob `*_security_rule` + `delete`). |
+
+### Deep Inspection: Key Vault
+
+| Scenario | Config | What It Tests |
+|----------|--------|---------------|
+| [keyvault-destructive](testdata/e2e/keyvault-destructive/) | `keyvault_access {}` on critical | Key vault access policy granting `Delete` and `Purge` secret permissions. Plugin detects destructive permissions and emits `critical`. Demonstrates attribute-level deep inspection of permission arrays. |
+
+### Deep Inspection: Data-Plane and Control-Plane Patterns
+
+| Scenario | Config | What It Tests |
+|----------|--------|---------------|
+| [data-plane-detection](testdata/e2e/data-plane-detection/) | `data_actions = ["Microsoft.Storage/*"]`, `score_threshold = 100` on critical | **CR-0027.** Storage Blob Data Owner triggers `critical` via data-plane pattern matching. Reader (no data actions) falls through to `standard`. Control-plane threshold set to 100 to isolate data-plane triggering. |
+| [control-plane-patterns](testdata/e2e/control-plane-patterns/) | `actions = ["Microsoft.Authorization/*", "*"]` on critical, `actions = ["*/read"]` on standard | **CR-0028.** User Access Administrator (has `Microsoft.Authorization/*`) triggers `critical`. Reader (only `*/read`) triggers `standard`. Demonstrates pattern-based control-plane detection replacing score thresholds. |
+
+### How E2E Tests Run
+
+Each scenario is executed by the reusable [e2e.yml](.github/workflows/e2e.yml) workflow:
+
+1. `terraform plan -out=create.tfplan` against real Azure infrastructure
+2. `tfclassify` classifies the create plan and compares exit code to `expected.json`
+3. `terraform apply` to create the resources
+4. `terraform plan -destroy -out=destroy.tfplan`
+5. `tfclassify` classifies the destroy plan and compares exit code
+6. `terraform destroy` to clean up
+
+CI ([ci.yml](.github/workflows/ci.yml)) runs all scenarios on PRs and pushes to main, building from source with both JSON and binary plan formats. The nightly [verify.yml](.github/workflows/verify.yml) runs against published releases.
 
 ## Project Structure
 
