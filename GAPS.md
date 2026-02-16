@@ -2,34 +2,36 @@
 
 ## Important
 
-None - all gaps have been resolved.
+(No remaining gaps.)
 
 ## Resolved
 
-### Plugin README Documentation (CR-0024)
-- Removed de-escalation detection references (previously lines 47, 60)
-- Removed old `config {}` syntax inside plugin block
-- Added new "Classification-Scoped Plugin Configuration" section with:
-  - `azurerm {}` block syntax inside classification blocks
-  - `privilege_escalation {}` sub-block with `score_threshold`, `exclude`, `roles` options
-  - `network_exposure {}` sub-block with `permissive_sources` option
-  - `keyvault_access {}` sub-block documentation
-  - Behavior notes for classification-scoped configuration
-- Updated Table of Contents to reflect new section
-- Updated Full Configuration Example to use new syntax
+### CI Workflow E2E Matrix Updated
+- Added `data-plane-detection` and `control-plane-patterns` to the e2e matrix in `.github/workflows/ci.yml` so both new test cases run in CI.
 
-### Functional Implementation
-- CR-0023 `--detailed-exitcode` flag: Fully implemented and tested
-- CR-0024 classification-scoped plugin config: Fully implemented and tested
-- All unit tests pass across all three modules
-- All E2E test scenarios created (role-escalation-threshold, role-exclusion, keyvault-destructive)
-- E2E workflow matrix updated
-- Proto definition updated with `classification` and `analyzer_config` fields
-- SDK `ClassificationAwareAnalyzer` interface implemented
-- Privilege analyzer: score_threshold gating, role exclusion, roles filter all implemented
-- De-escalation detection removed
-- Go version updated to 1.25.7 for vulnerability fix
 
-### Documentation
-- Main README updated with `--detailed-exitcode` documentation
-- Full reference example (`docs/examples/full-reference/.tfclassify.hcl`) fully updated with new syntax
+### CR-0027: Data-Plane Action Detection — Fully Implemented
+- `DataActions` field added to `PrivilegeEscalationConfig` (`pkg/config/config.go`) and `PrivilegeEscalationAnalyzerConfig` (`plugins/azurerm/privilege.go`)
+- `data_actions` parsing added to `parsePrivilegeEscalationConfig` (`pkg/config/loader.go`)
+- `matchDataPlanePatterns` implemented in `plugins/azurerm/privilege.go` using `computeEffectiveActions` and `actionMatchesPattern`
+- Independent data-plane and control-plane triggering with `trigger` metadata
+- All 10 unit tests from the CR test strategy pass
+- Config parsing test (`TestLoad_PatternBasedDetection`) passes
+- E2E test fixture created (`testdata/e2e/data-plane-detection/`)
+
+### CR-0028: Pattern-Based Control-Plane Detection — Implemented (Proportional to Skeleton CR)
+- `Actions` field added to config structs
+- `actions` parsing added to loader
+- `matchControlPlanePatterns` implemented, overrides `score_threshold` when configured
+- 6 unit tests covering pattern matching, NotActions subtraction, and override behavior
+- E2E test fixture created (`testdata/e2e/control-plane-patterns/`)
+
+### Documentation Updated
+- `plugins/azurerm/README.md`: Added "Data-Plane Detection" and "Pattern-Based Control-Plane Detection" sections
+- `docs/examples/full-reference/.tfclassify.hcl`: Updated with `actions` and `data_actions` examples
+
+### All CI Checks Pass Locally
+- `go build ./...` — success
+- `go test -race ./...` — all tests pass across all 3 modules
+- `go vet ./...` — no issues
+- `govulncheck ./...` — no vulnerabilities
