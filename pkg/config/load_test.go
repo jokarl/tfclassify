@@ -227,8 +227,10 @@ func TestLoad_ClassificationScopedPluginConfig(t *testing.T) {
 	if azurermCfg.PrivilegeEscalation == nil {
 		t.Fatal("expected PrivilegeEscalation config")
 	}
-	if azurermCfg.PrivilegeEscalation.ScoreThreshold != 80 {
-		t.Errorf("expected ScoreThreshold 80, got %d", azurermCfg.PrivilegeEscalation.ScoreThreshold)
+	if len(azurermCfg.PrivilegeEscalation.Actions) != 1 {
+		t.Errorf("expected 1 Actions pattern, got %d", len(azurermCfg.PrivilegeEscalation.Actions))
+	} else if azurermCfg.PrivilegeEscalation.Actions[0] != "Microsoft.Authorization/*" {
+		t.Errorf("expected Actions[0] 'Microsoft.Authorization/*', got %q", azurermCfg.PrivilegeEscalation.Actions[0])
 	}
 	if len(azurermCfg.PrivilegeEscalation.Exclude) != 2 {
 		t.Errorf("expected 2 Exclude roles, got %d", len(azurermCfg.PrivilegeEscalation.Exclude))
@@ -401,5 +403,42 @@ defaults {
 	}
 	if !strings.Contains(err.Error(), "azurerm") || !strings.Contains(err.Error(), "not enabled") {
 		t.Errorf("expected error about disabled plugin reference, got: %v", err)
+	}
+}
+
+func TestLoad_ScoreThresholdRejected(t *testing.T) {
+	configContent := `
+plugin "azurerm" {
+  enabled = true
+  source  = "github.com/example/plugin"
+  version = "0.1.0"
+}
+
+classification "critical" {
+  description = "Critical"
+  rule {
+    resource = ["*"]
+  }
+
+  azurerm {
+    privilege_escalation {
+      score_threshold = 80
+    }
+  }
+}
+
+precedence = ["critical"]
+
+defaults {
+  unclassified = "critical"
+  no_changes   = "critical"
+}
+`
+	_, err := Parse([]byte(configContent), "test.hcl")
+	if err == nil {
+		t.Fatal("expected error for score_threshold (removed in CR-0028)")
+	}
+	if !strings.Contains(err.Error(), "score_threshold") || !strings.Contains(err.Error(), "no longer supported") {
+		t.Errorf("expected 'score_threshold is no longer supported' error, got: %v", err)
 	}
 }

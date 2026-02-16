@@ -42,7 +42,7 @@ resource "azurerm_role_assignment" "storage_data_owner" {
   principal_id         = azurerm_user_assigned_identity.test.principal_id
 }
 
-# Reader - only has control-plane read actions (score 15), no data actions
+# Reader - only has control-plane read actions, no data actions
 # Should NOT trigger critical (no storage data actions), falls through to standard
 resource "azurerm_role_assignment" "reader" {
   scope                = data.azurerm_resource_group.lab.id

@@ -15,12 +15,10 @@ classification "critical" {
   # CR-0027: Trigger critical for data-plane access patterns
   # Storage Blob Data Owner has dataActions: ["Microsoft.Storage/.../blobs/*"]
   # Use "Microsoft.Storage/*" to match any storage data-plane action.
-  # Set score_threshold high to suppress legacy control-plane detection;
-  # only data-plane pattern matching should trigger critical.
+  # Only data-plane pattern matching triggers critical here.
   azurerm {
     privilege_escalation {
-      score_threshold = 100
-      data_actions    = ["Microsoft.Storage/*"]
+      data_actions = ["Microsoft.Storage/*"]
     }
   }
 }
@@ -32,9 +30,11 @@ classification "standard" {
     resource = ["*"]
   }
 
-  # Catch remaining privilege escalations without data-plane specific patterns
+  # Catch remaining role assignments with any control-plane write actions
   azurerm {
-    privilege_escalation {}
+    privilege_escalation {
+      actions = ["*/write", "*/delete", "*/action", "*/read"]
+    }
   }
 }
 

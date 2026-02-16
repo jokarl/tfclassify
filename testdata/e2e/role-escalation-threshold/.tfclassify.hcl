@@ -12,12 +12,12 @@ classification "critical" {
     actions  = ["delete"]
   }
 
-  # Trigger critical for privilege escalation with score >= 70
-  # Owner at RG scope = 95 * 0.8 = 76 (triggers)
-  # Contributor at RG scope = 70 * 0.8 = 56 (does not trigger)
+  # CR-0028: Pattern-based control-plane detection
+  # Owner has Microsoft.Authorization/* actions (triggers critical)
+  # Contributor has NotActions: ["Microsoft.Authorization/*"] so does NOT match
   azurerm {
     privilege_escalation {
-      score_threshold = 70
+      actions = ["Microsoft.Authorization/*"]
     }
   }
 }
@@ -29,10 +29,12 @@ classification "standard" {
     resource = ["*"]
   }
 
-  # Catch all privilege escalations not caught by critical (any score)
-  # Contributor at RG scope = 56 (triggers here)
+  # Catch all privilege escalations with any write action
+  # Contributor has many write actions (triggers here)
   azurerm {
-    privilege_escalation {}
+    privilege_escalation {
+      actions = ["*/write", "*/delete", "*/action"]
+    }
   }
 }
 

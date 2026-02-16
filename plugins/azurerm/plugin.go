@@ -35,14 +35,6 @@ type PluginConfig struct {
 	// If nil, DefaultRoleDatabase() is used.
 	RoleDatabase *RoleDatabase
 
-	// UnknownPrivilegedSeverity is the severity for roles in PrivilegedRoles but not in DB.
-	// Default: 80
-	UnknownPrivilegedSeverity int
-
-	// UnknownRoleSeverity is the severity for completely unknown roles.
-	// Default: 50
-	UnknownRoleSeverity int
-
 	// CrossReferenceCustomRoles enables lookup of azurerm_role_definition resources in the plan.
 	// Default: true
 	CrossReferenceCustomRoles bool
@@ -69,8 +61,6 @@ func DefaultConfig() *PluginConfig {
 		NetworkEnabled:            true,
 		KeyVaultEnabled:           true,
 		RoleDatabase:              DefaultRoleDatabase(),
-		UnknownPrivilegedSeverity: 80,
-		UnknownRoleSeverity:       50,
 		CrossReferenceCustomRoles: true,
 	}
 }

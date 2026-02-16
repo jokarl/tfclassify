@@ -32,14 +32,14 @@ resource "azurerm_user_assigned_identity" "test" {
   location            = data.azurerm_resource_group.lab.location
 }
 
-# Owner role assignment (score 95 at RG scope * 0.8 = 76) - should trigger critical (>= 70)
+# Owner role assignment - has Microsoft.Authorization/* actions, triggers critical
 resource "azurerm_role_assignment" "owner" {
   scope                = data.azurerm_resource_group.lab.id
   role_definition_name = "Owner"
   principal_id         = azurerm_user_assigned_identity.test.principal_id
 }
 
-# Contributor role assignment (score 70 at RG scope * 0.8 = 56) - should trigger standard (>= 0)
+# Contributor role assignment - has NotActions: ["Microsoft.Authorization/*"], triggers standard via */write
 resource "azurerm_role_assignment" "contributor" {
   scope                = data.azurerm_resource_group.lab.id
   role_definition_name = "Contributor"
