@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	tfjson "github.com/hashicorp/terraform-json"
@@ -62,8 +63,16 @@ func parseBinaryPlan(path string) (*ParseResult, error) {
 		return nil, fmt.Errorf("binary plan detected but terraform CLI not found: %w", err)
 	}
 
-	// Run terraform show -json
-	cmd := exec.Command(terraformPath, "show", "-json", path)
+	// Resolve to absolute path so the basename works from the plan's directory
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve plan path: %w", err)
+	}
+
+	// Run terraform show -json from the plan file's directory so that
+	// terraform can find the .terraform/ provider plugins created by init.
+	cmd := exec.Command(terraformPath, "show", "-json", filepath.Base(absPath))
+	cmd.Dir = filepath.Dir(absPath)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr

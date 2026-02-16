@@ -12,6 +12,7 @@ on:
       - 'proto/**'
       - 'testdata/e2e/**'
       - '.github/workflows/ci.yml'
+      - '.github/workflows/e2e.yml'
   push:
     branches: [main]
     paths:
@@ -23,6 +24,7 @@ on:
       - 'proto/**'
       - 'testdata/e2e/**'
       - '.github/workflows/ci.yml'
+      - '.github/workflows/e2e.yml'
   workflow_dispatch:
 
 jobs:
@@ -65,10 +67,6 @@ jobs:
 
   e2e:
     needs: [build, test, vet, vuln]
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -80,137 +78,11 @@ jobs:
           - role-escalation-threshold
           - role-exclusion
           - keyvault-destructive
-    env:
-      ARM_CLIENT_ID: "415fa556-f0eb-4ed0-8eb0-9d7b66944996"
-      ARM_SUBSCRIPTION_ID: "0a271008-02cf-4a50-9bb3-afc7c4aed74c"
-      ARM_TENANT_ID: "9fc151d1-62b8-402f-b07e-91533ff07e0d"
-      ARM_USE_OIDC: "true"
-      TFCLASSIFY_PLUGIN_DIR: /tmp/tfclassify-plugins
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-
-      - uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_wrapper: false
-
-      - name: Build from source
-        run: |
-          go build -o /usr/local/bin/tfclassify ./cmd/tfclassify
-          mkdir -p "$TFCLASSIFY_PLUGIN_DIR"
-          go build -o "$TFCLASSIFY_PLUGIN_DIR/tfclassify-plugin-azurerm" ./plugins/azurerm
-
-      - name: Azure login
-        uses: azure/login@v2
-        with:
-          client-id: ${{ env.ARM_CLIENT_ID }}
-          tenant-id: ${{ env.ARM_TENANT_ID }}
-          subscription-id: ${{ env.ARM_SUBSCRIPTION_ID }}
-
-      - name: Terraform init
-        run: terraform -chdir=testdata/e2e/${{ matrix.use-case }} init
-
-      - name: Create plan
-        run: |
-          terraform -chdir=testdata/e2e/${{ matrix.use-case }} plan -out=create.tfplan
-          terraform -chdir=testdata/e2e/${{ matrix.use-case }} show -json create.tfplan \
-            > testdata/e2e/${{ matrix.use-case }}/create.json
-          echo "::group::Create plan JSON"
-          jq . testdata/e2e/${{ matrix.use-case }}/create.json
-          echo "::endgroup::"
-
-      - name: Classify create plan (JSON)
-        id: classify-create-json
-        run: |
-          EXPECTED_EXIT=$(jq -r '.create.exit_code' testdata/e2e/${{ matrix.use-case }}/expected.json)
-          set +e
-          tfclassify \
-            -p testdata/e2e/${{ matrix.use-case }}/create.json \
-            -c testdata/e2e/${{ matrix.use-case }}/.tfclassify.hcl \
-            -o json --detailed-exitcode > testdata/e2e/${{ matrix.use-case }}/create-result.json
-          ACTUAL_EXIT=$?
-          set -e
-          echo "::group::Classification result (JSON)"
-          jq . testdata/e2e/${{ matrix.use-case }}/create-result.json
-          echo "::endgroup::"
-          if [ "$ACTUAL_EXIT" != "$EXPECTED_EXIT" ]; then
-            echo "::error::Create phase (JSON): expected exit code $EXPECTED_EXIT, got $ACTUAL_EXIT"
-            exit 1
-          fi
-
-      - name: Classify create plan (binary)
-        id: classify-create-binary
-        run: |
-          EXPECTED_EXIT=$(jq -r '.create.exit_code' testdata/e2e/${{ matrix.use-case }}/expected.json)
-          set +e
-          tfclassify \
-            -p testdata/e2e/${{ matrix.use-case }}/create.tfplan \
-            -c testdata/e2e/${{ matrix.use-case }}/.tfclassify.hcl \
-            -o json --detailed-exitcode > testdata/e2e/${{ matrix.use-case }}/create-result-binary.json
-          ACTUAL_EXIT=$?
-          set -e
-          echo "::group::Classification result (binary)"
-          jq . testdata/e2e/${{ matrix.use-case }}/create-result-binary.json
-          echo "::endgroup::"
-          if [ "$ACTUAL_EXIT" != "$EXPECTED_EXIT" ]; then
-            echo "::error::Create phase (binary): expected exit code $EXPECTED_EXIT, got $ACTUAL_EXIT"
-            exit 1
-          fi
-
-      - name: Apply
-        id: apply
-        run: terraform -chdir=testdata/e2e/${{ matrix.use-case }} apply -auto-approve create.tfplan
-
-      - name: Destroy plan
-        run: |
-          terraform -chdir=testdata/e2e/${{ matrix.use-case }} plan -destroy -out=destroy.tfplan
-          terraform -chdir=testdata/e2e/${{ matrix.use-case }} show -json destroy.tfplan \
-            > testdata/e2e/${{ matrix.use-case }}/destroy.json
-          echo "::group::Destroy plan JSON"
-          jq . testdata/e2e/${{ matrix.use-case }}/destroy.json
-          echo "::endgroup::"
-
-      - name: Classify destroy plan (JSON)
-        id: classify-destroy-json
-        run: |
-          EXPECTED_EXIT=$(jq -r '.destroy.exit_code' testdata/e2e/${{ matrix.use-case }}/expected.json)
-          set +e
-          tfclassify \
-            -p testdata/e2e/${{ matrix.use-case }}/destroy.json \
-            -c testdata/e2e/${{ matrix.use-case }}/.tfclassify.hcl \
-            -o json --detailed-exitcode > testdata/e2e/${{ matrix.use-case }}/destroy-result.json
-          ACTUAL_EXIT=$?
-          set -e
-          echo "::group::Classification result (JSON)"
-          jq . testdata/e2e/${{ matrix.use-case }}/destroy-result.json
-          echo "::endgroup::"
-          if [ "$ACTUAL_EXIT" != "$EXPECTED_EXIT" ]; then
-            echo "::error::Destroy phase (JSON): expected exit code $EXPECTED_EXIT, got $ACTUAL_EXIT"
-            exit 1
-          fi
-
-      - name: Classify destroy plan (binary)
-        id: classify-destroy-binary
-        run: |
-          EXPECTED_EXIT=$(jq -r '.destroy.exit_code' testdata/e2e/${{ matrix.use-case }}/expected.json)
-          set +e
-          tfclassify \
-            -p testdata/e2e/${{ matrix.use-case }}/destroy.tfplan \
-            -c testdata/e2e/${{ matrix.use-case }}/.tfclassify.hcl \
-            -o json --detailed-exitcode > testdata/e2e/${{ matrix.use-case }}/destroy-result-binary.json
-          ACTUAL_EXIT=$?
-          set -e
-          echo "::group::Classification result (binary)"
-          jq . testdata/e2e/${{ matrix.use-case }}/destroy-result-binary.json
-          echo "::endgroup::"
-          if [ "$ACTUAL_EXIT" != "$EXPECTED_EXIT" ]; then
-            echo "::error::Destroy phase (binary): expected exit code $EXPECTED_EXIT, got $ACTUAL_EXIT"
-            exit 1
-          fi
-
-      - name: Cleanup
-        if: always() && steps.apply.outcome != 'skipped'
-        run: terraform -chdir=testdata/e2e/${{ matrix.use-case }} destroy -auto-approve
+    uses: ./.github/workflows/e2e.yml
+    with:
+      use-case: ${{ matrix.use-case }}
+      binary-source: build
+      plan-formats: both
+    permissions:
+      id-token: write
+      contents: read

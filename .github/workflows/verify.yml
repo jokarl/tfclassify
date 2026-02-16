@@ -19,7 +19,6 @@ env:
   ARM_SUBSCRIPTION_ID: "0a271008-02cf-4a50-9bb3-afc7c4aed74c"
   ARM_TENANT_ID: "9fc151d1-62b8-402f-b07e-91533ff07e0d"
   ARM_USE_OIDC: "true"
-  TFCLASSIFY_PLUGIN_DIR: /tmp/tfclassify-plugins
   RESOURCE_GROUP: rg-lab-johan.karlsson
 
 jobs:
@@ -56,10 +55,8 @@ jobs:
             [ "$pass" -lt 3 ] && sleep 15
           done
 
-
   verify:
     needs: cleanup
-    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
@@ -71,140 +68,13 @@ jobs:
           - role-escalation-threshold
           - role-exclusion
           - keyvault-destructive
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_wrapper: false
-
-      - name: Download tfclassify
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Download latest CLI release
-          LATEST_CLI_TAG=$(gh release list --json tagName --jq \
-            '[.[] | select(.tagName | startswith("tfclassify-v"))][0].tagName')
-          gh release download "$LATEST_CLI_TAG" --pattern 'tfclassify_*_linux_amd64.zip'
-          unzip -o tfclassify_*.zip -d /usr/local/bin
-          chmod +x /usr/local/bin/tfclassify
-          rm -f tfclassify_*.zip
-
-          # Download latest plugin release
-          LATEST_PLUGIN_TAG=$(gh release list --json tagName --jq \
-            '[.[] | select(.tagName | startswith("tfclassify-plugin-azurerm-v"))][0].tagName')
-          gh release download "$LATEST_PLUGIN_TAG" --pattern 'tfclassify-plugin-azurerm_*_linux_amd64.zip'
-          mkdir -p "$TFCLASSIFY_PLUGIN_DIR"
-          unzip -o tfclassify-plugin-azurerm_*.zip -d "$TFCLASSIFY_PLUGIN_DIR"
-          chmod +x "$TFCLASSIFY_PLUGIN_DIR/tfclassify-plugin-azurerm"
-          rm -f tfclassify-plugin-azurerm_*.zip
-
-      - name: Record versions
-        id: versions
-        run: |
-          echo "tfclassify=$(tfclassify --version)" >> "$GITHUB_OUTPUT"
-          echo "terraform=$(terraform --version -json | jq -r .terraform_version)" >> "$GITHUB_OUTPUT"
-
-      - name: Terraform init
-        run: terraform -chdir=testdata/e2e/${{ matrix.use-case }} init
-
-      - name: Create plan
-        run: |
-          terraform -chdir=testdata/e2e/${{ matrix.use-case }} plan -out=create.tfplan
-          terraform -chdir=testdata/e2e/${{ matrix.use-case }} show -json create.tfplan \
-            > testdata/e2e/${{ matrix.use-case }}/create.json
-          echo "::group::Create plan JSON"
-          jq . testdata/e2e/${{ matrix.use-case }}/create.json
-          echo "::endgroup::"
-
-      - name: Classify create plan
-        id: classify-create
-        run: |
-          EXPECTED_EXIT=$(jq -r '.create.exit_code' testdata/e2e/${{ matrix.use-case }}/expected.json)
-          set +e
-          tfclassify \
-            -p testdata/e2e/${{ matrix.use-case }}/create.json \
-            -c testdata/e2e/${{ matrix.use-case }}/.tfclassify.hcl \
-            -o json --detailed-exitcode > testdata/e2e/${{ matrix.use-case }}/create-result.json
-          ACTUAL_EXIT=$?
-          set -e
-          echo "::group::Classification result"
-          jq . testdata/e2e/${{ matrix.use-case }}/create-result.json
-          echo "::endgroup::"
-          echo "expected=$EXPECTED_EXIT" >> "$GITHUB_OUTPUT"
-          echo "actual=$ACTUAL_EXIT" >> "$GITHUB_OUTPUT"
-          if [ "$ACTUAL_EXIT" != "$EXPECTED_EXIT" ]; then
-            echo "::error::Create phase: expected exit code $EXPECTED_EXIT, got $ACTUAL_EXIT"
-            exit 1
-          fi
-
-      - name: Apply
-        id: apply
-        run: terraform -chdir=testdata/e2e/${{ matrix.use-case }} apply -auto-approve create.tfplan
-
-      - name: Destroy plan
-        run: |
-          terraform -chdir=testdata/e2e/${{ matrix.use-case }} plan -destroy -out=destroy.tfplan
-          terraform -chdir=testdata/e2e/${{ matrix.use-case }} show -json destroy.tfplan \
-            > testdata/e2e/${{ matrix.use-case }}/destroy.json
-          echo "::group::Destroy plan JSON"
-          jq . testdata/e2e/${{ matrix.use-case }}/destroy.json
-          echo "::endgroup::"
-
-      - name: Classify destroy plan
-        id: classify-destroy
-        run: |
-          EXPECTED_EXIT=$(jq -r '.destroy.exit_code' testdata/e2e/${{ matrix.use-case }}/expected.json)
-          set +e
-          tfclassify \
-            -p testdata/e2e/${{ matrix.use-case }}/destroy.json \
-            -c testdata/e2e/${{ matrix.use-case }}/.tfclassify.hcl \
-            -o json --detailed-exitcode > testdata/e2e/${{ matrix.use-case }}/destroy-result.json
-          ACTUAL_EXIT=$?
-          set -e
-          echo "::group::Classification result"
-          jq . testdata/e2e/${{ matrix.use-case }}/destroy-result.json
-          echo "::endgroup::"
-          echo "expected=$EXPECTED_EXIT" >> "$GITHUB_OUTPUT"
-          echo "actual=$ACTUAL_EXIT" >> "$GITHUB_OUTPUT"
-          if [ "$ACTUAL_EXIT" != "$EXPECTED_EXIT" ]; then
-            echo "::error::Destroy phase: expected exit code $EXPECTED_EXIT, got $ACTUAL_EXIT"
-            exit 1
-          fi
-
-      - name: Cleanup
-        if: always() && steps.apply.outcome != 'skipped'
-        run: terraform -chdir=testdata/e2e/${{ matrix.use-case }} destroy -auto-approve
-
-      - name: Open issue on failure
-        if: failure()
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh label create verification --color "d93f0b" \
-            --description "Nightly verification failure" --force 2>/dev/null || true
-
-          cat > /tmp/issue-body.md <<EOF
-          ## Verification failure: ${{ matrix.use-case }}
-
-          **Workflow run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-          ### Versions
-          - tfclassify: ${{ steps.versions.outputs.tfclassify }}
-          - terraform: ${{ steps.versions.outputs.terraform }}
-
-          ### Create phase
-          - Expected exit code: ${{ steps.classify-create.outputs.expected }}
-          - Actual exit code: ${{ steps.classify-create.outputs.actual }}
-
-          ### Destroy phase
-          - Expected exit code: ${{ steps.classify-destroy.outputs.expected }}
-          - Actual exit code: ${{ steps.classify-destroy.outputs.actual }}
-          EOF
-
-          gh issue create \
-            --title "[verify] ${{ matrix.use-case }} failed ($(date -u +%Y-%m-%d))" \
-            --label "verification" \
-            --body-file /tmp/issue-body.md
+    uses: ./.github/workflows/e2e.yml
+    with:
+      use-case: ${{ matrix.use-case }}
+      binary-source: release
+      plan-formats: json
+      open-issue-on-failure: true
+    permissions:
+      id-token: write
+      contents: read
+      issues: write

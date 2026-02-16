@@ -4,6 +4,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/jokarl/tfclassify/sdk"
 )
@@ -64,7 +65,13 @@ func (a *KeyVaultAccessAnalyzer) analyzeWithConfig(runner sdk.Runner, classifica
 	if analyzerCfg != nil && len(analyzerCfg.DestructivePermissions) > 0 {
 		destructivePermissions = analyzerCfg.DestructivePermissions
 	}
-	destructive := toSet(destructivePermissions)
+	// Normalize to lowercase for case-insensitive comparison since
+	// Azure providers may use title case (e.g. "Delete") or lowercase
+	lowered := make([]string, len(destructivePermissions))
+	for i, p := range destructivePermissions {
+		lowered[i] = strings.ToLower(p)
+	}
+	destructive := toSet(lowered)
 
 	// Permission fields to check
 	permissionFields := []string{
@@ -85,7 +92,7 @@ func (a *KeyVaultAccessAnalyzer) analyzeWithConfig(runner sdk.Runner, classifica
 			if permissions, ok := after[field].([]interface{}); ok {
 				foundDestructive := []string{}
 				for _, p := range permissions {
-					if perm, ok := p.(string); ok && destructive[perm] {
+					if perm, ok := p.(string); ok && destructive[strings.ToLower(perm)] {
 						foundDestructive = append(foundDestructive, perm)
 					}
 				}
