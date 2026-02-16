@@ -669,7 +669,6 @@ func TestCustomRoleCrossReference(t *testing.T) {
 
 func TestCustomRoleCrossReference_Disabled(t *testing.T) {
 	config := &PluginConfig{
-		PrivilegedRoles:           []string{},
 		PrivilegeEnabled:          true,
 		RoleDatabase:              DefaultRoleDatabase(),
 		CrossReferenceCustomRoles: false,
@@ -1668,5 +1667,372 @@ func TestFlagUnknownRolesEnabled(t *testing.T) {
 				t.Errorf("flagUnknownRolesEnabled() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+// === CR-0027 AC-2: NotDataActions subtraction prevents false positives ===
+
+func TestPrivilege_DataActions_NotDataActionsSubtraction(t *testing.T) {
+	config := DefaultConfig()
+	analyzer := NewPrivilegeEscalationAnalyzer(config)
+
+	// Custom role with data actions partially blocked by notDataActions
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			{
+				Address: "azurerm_role_definition.partial_data",
+				Type:    "azurerm_role_definition",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"name": "Partial Data Access",
+					"permissions": []interface{}{
+						map[string]interface{}{
+							"actions":          []interface{}{},
+							"not_actions":      []interface{}{},
+							"data_actions":     []interface{}{"Microsoft.Storage/storageAccounts/blobServices/containers/blobs/*"},
+							"not_data_actions": []interface{}{"Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read"},
+						},
+					},
+				},
+			},
+			{
+				Address: "azurerm_role_assignment.test",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"role_definition_name": "Partial Data Access",
+					"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
+				},
+			},
+		},
+	}
+
+	// data_actions = ["*/read"] - should NOT match because notDataActions blocks reads
+	analyzerConfig := &PluginAnalyzerConfig{
+		PrivilegeEscalation: &PrivilegeEscalationAnalyzerConfig{
+			DataActions: []string{"*/read"},
+		},
+	}
+	configJSON, _ := json.Marshal(analyzerConfig)
+
+	err := analyzer.AnalyzeWithClassification(runner, "critical", configJSON)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// NotDataActions blocks reads, so */read should NOT trigger
+	if len(runner.decisions) != 0 {
+		t.Errorf("expected 0 decisions (NotDataActions blocks reads), got %d", len(runner.decisions))
+	}
+}
+
+// === CR-0027 AC-3: Write-only roles do not match read patterns ===
+
+func TestPrivilege_DataActions_WriteOnlyNotMatchingRead(t *testing.T) {
+	config := DefaultConfig()
+	analyzer := NewPrivilegeEscalationAnalyzer(config)
+
+	// Custom role with write-only data actions (no reads at all)
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			{
+				Address: "azurerm_role_definition.write_only",
+				Type:    "azurerm_role_definition",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"name": "Write Only Data",
+					"permissions": []interface{}{
+						map[string]interface{}{
+							"actions":          []interface{}{},
+							"not_actions":      []interface{}{},
+							"data_actions":     []interface{}{"Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write", "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/delete"},
+							"not_data_actions": []interface{}{},
+						},
+					},
+				},
+			},
+			{
+				Address: "azurerm_role_assignment.test",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"role_definition_name": "Write Only Data",
+					"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
+				},
+			},
+		},
+	}
+
+	// data_actions = ["*/read"] - should NOT match write-only role
+	analyzerConfig := &PluginAnalyzerConfig{
+		PrivilegeEscalation: &PrivilegeEscalationAnalyzerConfig{
+			DataActions: []string{"*/read"},
+		},
+	}
+	configJSON, _ := json.Marshal(analyzerConfig)
+
+	err := analyzer.AnalyzeWithClassification(runner, "critical", configJSON)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(runner.decisions) != 0 {
+		t.Errorf("expected 0 decisions (write-only role doesn't match */read), got %d", len(runner.decisions))
+	}
+
+	// But should match */write
+	runner.decisions = nil
+	analyzerConfig2 := &PluginAnalyzerConfig{
+		PrivilegeEscalation: &PrivilegeEscalationAnalyzerConfig{
+			DataActions: []string{"*/write"},
+		},
+	}
+	configJSON2, _ := json.Marshal(analyzerConfig2)
+
+	err = analyzer.AnalyzeWithClassification(runner, "critical", configJSON2)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(runner.decisions) != 1 {
+		t.Fatalf("expected 1 decision (write-only matches */write), got %d", len(runner.decisions))
+	}
+	if runner.decisions[0].Metadata["trigger"] != "data-plane" {
+		t.Errorf("expected trigger data-plane, got %v", runner.decisions[0].Metadata["trigger"])
+	}
+}
+
+// === CR-0027 AC-4: Empty effective data actions match nothing ===
+
+func TestPrivilege_DataActions_EmptyEffective(t *testing.T) {
+	config := DefaultConfig()
+	analyzer := NewPrivilegeEscalationAnalyzer(config)
+
+	// Custom role with all data actions neutralized by notDataActions
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			{
+				Address: "azurerm_role_definition.neutralized",
+				Type:    "azurerm_role_definition",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"name": "Fully Neutralized Data",
+					"permissions": []interface{}{
+						map[string]interface{}{
+							"actions":          []interface{}{},
+							"not_actions":      []interface{}{},
+							"data_actions":     []interface{}{"Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read"},
+							"not_data_actions": []interface{}{"Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read"},
+						},
+					},
+				},
+			},
+			{
+				Address: "azurerm_role_assignment.test",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"role_definition_name": "Fully Neutralized Data",
+					"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
+				},
+			},
+		},
+	}
+
+	// All data actions are neutralized - should match nothing even with wildcard pattern
+	analyzerConfig := &PluginAnalyzerConfig{
+		PrivilegeEscalation: &PrivilegeEscalationAnalyzerConfig{
+			DataActions: []string{"*"},
+		},
+	}
+	configJSON, _ := json.Marshal(analyzerConfig)
+
+	err := analyzer.AnalyzeWithClassification(runner, "critical", configJSON)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(runner.decisions) != 0 {
+		t.Errorf("expected 0 decisions (all data actions neutralized by notDataActions), got %d", len(runner.decisions))
+	}
+}
+
+// === CR-0027 AC-10: Different classifications match different data-plane patterns ===
+
+func TestPrivilege_DataActions_PerClassification(t *testing.T) {
+	config := DefaultConfig()
+	analyzer := NewPrivilegeEscalationAnalyzer(config)
+
+	// Role with both read and write data actions
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			{
+				Address: "azurerm_role_definition.readwrite",
+				Type:    "azurerm_role_definition",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"name": "Read Write Data",
+					"permissions": []interface{}{
+						map[string]interface{}{
+							"actions":          []interface{}{},
+							"not_actions":      []interface{}{},
+							"data_actions":     []interface{}{"Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read", "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write"},
+							"not_data_actions": []interface{}{},
+						},
+					},
+				},
+			},
+			{
+				Address: "azurerm_role_assignment.test",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"role_definition_name": "Read Write Data",
+					"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
+				},
+			},
+		},
+	}
+
+	// Critical classification: matches reads
+	analyzerConfigCritical := &PluginAnalyzerConfig{
+		PrivilegeEscalation: &PrivilegeEscalationAnalyzerConfig{
+			DataActions: []string{"*/read"},
+		},
+	}
+	configJSONCritical, _ := json.Marshal(analyzerConfigCritical)
+
+	err := analyzer.AnalyzeWithClassification(runner, "critical", configJSONCritical)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(runner.decisions) != 1 {
+		t.Fatalf("expected 1 decision for critical (matches */read), got %d", len(runner.decisions))
+	}
+	if runner.decisions[0].Classification != "critical" {
+		t.Errorf("expected classification 'critical', got %q", runner.decisions[0].Classification)
+	}
+
+	// Standard classification: matches writes
+	runner.decisions = nil
+	analyzerConfigStandard := &PluginAnalyzerConfig{
+		PrivilegeEscalation: &PrivilegeEscalationAnalyzerConfig{
+			DataActions: []string{"*/write"},
+		},
+	}
+	configJSONStandard, _ := json.Marshal(analyzerConfigStandard)
+
+	err = analyzer.AnalyzeWithClassification(runner, "standard", configJSONStandard)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(runner.decisions) != 1 {
+		t.Fatalf("expected 1 decision for standard (matches */write), got %d", len(runner.decisions))
+	}
+	if runner.decisions[0].Classification != "standard" {
+		t.Errorf("expected classification 'standard', got %q", runner.decisions[0].Classification)
+	}
+}
+
+// === CR-0028: Scopes filter applies to data-plane triggers too ===
+
+func TestPrivilege_ScopeFilter_AppliesToDataPlane(t *testing.T) {
+	config := DefaultConfig()
+	analyzer := NewPrivilegeEscalationAnalyzer(config)
+
+	// Custom role with data actions
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			{
+				Address: "azurerm_role_definition.data",
+				Type:    "azurerm_role_definition",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"name": "Data Reader",
+					"permissions": []interface{}{
+						map[string]interface{}{
+							"actions":      []interface{}{},
+							"not_actions":  []interface{}{},
+							"data_actions": []interface{}{"Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read"},
+						},
+					},
+				},
+			},
+			{
+				Address: "azurerm_role_assignment.test",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"role_definition_name": "Data Reader",
+					"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-test",
+				},
+			},
+		},
+	}
+
+	// scopes = ["subscription"] should filter out resource_group scope assignments
+	// even for data-plane triggers
+	analyzerConfig := &PluginAnalyzerConfig{
+		PrivilegeEscalation: &PrivilegeEscalationAnalyzerConfig{
+			DataActions: []string{"*/read"},
+			Scopes:      []string{"subscription"},
+		},
+	}
+	configJSON, _ := json.Marshal(analyzerConfig)
+
+	err := analyzer.AnalyzeWithClassification(runner, "critical", configJSON)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(runner.decisions) != 0 {
+		t.Errorf("expected 0 decisions (resource_group scope filtered out), got %d", len(runner.decisions))
+	}
+}
+
+// === CR-0028 AC-9: No severity score on decisions ===
+
+func TestPrivilege_NoSeverityOnDecisions(t *testing.T) {
+	config := DefaultConfig()
+	analyzer := NewPrivilegeEscalationAnalyzer(config)
+
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			{
+				Address: "azurerm_role_assignment.test",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"role_definition_name": "Owner",
+					"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
+				},
+			},
+		},
+	}
+
+	analyzerConfig := &PluginAnalyzerConfig{
+		PrivilegeEscalation: &PrivilegeEscalationAnalyzerConfig{
+			Actions: []string{"*"},
+		},
+	}
+	configJSON, _ := json.Marshal(analyzerConfig)
+
+	err := analyzer.AnalyzeWithClassification(runner, "critical", configJSON)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(runner.decisions) != 1 {
+		t.Fatalf("expected 1 decision, got %d", len(runner.decisions))
+	}
+
+	decision := runner.decisions[0]
+	if _, hasSeverity := decision.Metadata["severity"]; hasSeverity {
+		t.Error("decision should NOT contain a severity field")
+	}
+	if _, hasScore := decision.Metadata["score"]; hasScore {
+		t.Error("decision should NOT contain a score field")
 	}
 }

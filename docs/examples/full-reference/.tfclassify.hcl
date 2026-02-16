@@ -101,7 +101,6 @@ classification "critical" {
     # CR-0027/CR-0028: Pattern-based detection gives fine-grained control over what triggers.
     privilege_escalation {
       # Pattern-based control-plane detection (CR-0028).
-      # When "actions" is set, it overrides score_threshold-based detection.
       # Matches roles with effective control-plane actions matching these patterns.
       actions = ["*", "Microsoft.Authorization/*"]  # Wildcard or auth control access
 

@@ -19,6 +19,12 @@ classification "critical" {
 
       # CR-0027: Data-plane pattern detection
       data_actions = ["*/read", "*/write"]
+
+      # CR-0028: Scope filtering
+      scopes = ["subscription", "management_group"]
+
+      # CR-0028: Unknown role handling
+      flag_unknown_roles = false
     }
   }
 }

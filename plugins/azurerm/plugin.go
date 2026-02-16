@@ -16,10 +16,6 @@ type AzurermPluginSet struct {
 
 // PluginConfig holds the configuration for the azurerm plugin.
 type PluginConfig struct {
-	// PrivilegedRoles are roles that trigger privilege escalation detection.
-	// These serve as a fallback when the role is not found in the built-in database.
-	PrivilegedRoles []string
-
 	// PermissiveSources are network sources that trigger network exposure detection.
 	PermissiveSources []string
 
@@ -31,7 +27,7 @@ type PluginConfig struct {
 	NetworkEnabled   bool
 	KeyVaultEnabled  bool
 
-	// RoleDatabase is the built-in Azure role database for permission-based scoring.
+	// RoleDatabase is the built-in Azure role database for role permission lookup.
 	// If nil, DefaultRoleDatabase() is used.
 	RoleDatabase *RoleDatabase
 
@@ -43,11 +39,6 @@ type PluginConfig struct {
 // DefaultConfig returns the default configuration.
 func DefaultConfig() *PluginConfig {
 	return &PluginConfig{
-		PrivilegedRoles: []string{
-			"Owner",
-			"User Access Administrator",
-			"Contributor",
-		},
 		PermissiveSources: []string{
 			"*",
 			"0.0.0.0/0",

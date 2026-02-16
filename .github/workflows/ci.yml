@@ -84,6 +84,7 @@ jobs:
           - keyvault-destructive
           - data-plane-detection
           - control-plane-patterns
+          - custom-role-cross-reference
     uses: ./.github/workflows/e2e.yml
     with:
       use-case: ${{ matrix.use-case }}

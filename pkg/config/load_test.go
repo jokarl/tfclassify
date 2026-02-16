@@ -332,6 +332,25 @@ func TestLoad_PatternBasedDetection(t *testing.T) {
 	if azurermCfg.PrivilegeEscalation.DataActions[1] != "*/write" {
 		t.Errorf("expected second DataActions pattern '*/write', got %q", azurermCfg.PrivilegeEscalation.DataActions[1])
 	}
+
+	// Test CR-0028: scopes field
+	if len(azurermCfg.PrivilegeEscalation.Scopes) != 2 {
+		t.Errorf("expected 2 Scopes, got %d", len(azurermCfg.PrivilegeEscalation.Scopes))
+	}
+	if azurermCfg.PrivilegeEscalation.Scopes[0] != "subscription" {
+		t.Errorf("expected first Scope 'subscription', got %q", azurermCfg.PrivilegeEscalation.Scopes[0])
+	}
+	if azurermCfg.PrivilegeEscalation.Scopes[1] != "management_group" {
+		t.Errorf("expected second Scope 'management_group', got %q", azurermCfg.PrivilegeEscalation.Scopes[1])
+	}
+
+	// Test CR-0028: flag_unknown_roles field
+	if azurermCfg.PrivilegeEscalation.FlagUnknownRoles == nil {
+		t.Fatal("expected FlagUnknownRoles to be set")
+	}
+	if *azurermCfg.PrivilegeEscalation.FlagUnknownRoles != false {
+		t.Errorf("expected FlagUnknownRoles to be false, got %v", *azurermCfg.PrivilegeEscalation.FlagUnknownRoles)
+	}
 }
 
 func TestLoad_ClassificationScopedPluginConfig_UnknownPlugin(t *testing.T) {
