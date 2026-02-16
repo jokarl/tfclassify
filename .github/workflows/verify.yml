@@ -74,7 +74,3 @@ jobs:
       binary-source: release
       plan-formats: json
       open-issue-on-failure: true
-    permissions:
-      id-token: write
-      contents: read
-      issues: write
