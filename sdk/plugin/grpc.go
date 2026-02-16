@@ -63,6 +63,13 @@ func (s *PluginServiceServer) ApplyConfig(ctx context.Context, req *pb.ApplyConf
 	return &pb.ApplyConfigResponse{}, nil
 }
 
+// analyzerProvider is an interface for accessing analyzers from a PluginSet.
+// BuiltinPluginSet implements this, and any type embedding *BuiltinPluginSet
+// inherits the implementation automatically.
+type analyzerProvider interface {
+	GetAnalyzers() []sdk.Analyzer
+}
+
 // Analyze runs all enabled analyzers in the plugin.
 // If classification and analyzerConfig are provided, only analyzers that implement
 // ClassificationAwareAnalyzer are called with the classification context.
@@ -76,7 +83,9 @@ func (s *PluginServiceServer) Analyze(ctx context.Context, req *pb.AnalyzeReques
 	// Create a classification-aware runner that sets the classification on emitted decisions
 	runner := NewClassificationAwareRunnerClient(conn, req.Classification)
 
-	builtinSet, ok := s.impl.(*sdk.BuiltinPluginSet)
+	// Access analyzers via the analyzerProvider interface.
+	// This works for both *BuiltinPluginSet and any type that embeds it.
+	provider, ok := s.impl.(analyzerProvider)
 	if !ok {
 		return &pb.AnalyzeResponse{}, nil
 	}
@@ -84,7 +93,7 @@ func (s *PluginServiceServer) Analyze(ctx context.Context, req *pb.AnalyzeReques
 	classification := req.Classification
 	analyzerConfig := req.AnalyzerConfig
 
-	for _, analyzer := range builtinSet.Analyzers {
+	for _, analyzer := range provider.GetAnalyzers() {
 		if !analyzer.Enabled() {
 			continue
 		}

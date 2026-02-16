@@ -122,8 +122,8 @@ jobs:
           jq . testdata/e2e/${{ matrix.use-case }}/create.json
           echo "::endgroup::"
 
-      - name: Classify create plan
-        id: classify-create
+      - name: Classify create plan (JSON)
+        id: classify-create-json
         run: |
           EXPECTED_EXIT=$(jq -r '.create.exit_code' testdata/e2e/${{ matrix.use-case }}/expected.json)
           set +e
@@ -133,13 +133,30 @@ jobs:
             -o json --detailed-exitcode > testdata/e2e/${{ matrix.use-case }}/create-result.json
           ACTUAL_EXIT=$?
           set -e
-          echo "::group::Classification result"
+          echo "::group::Classification result (JSON)"
           jq . testdata/e2e/${{ matrix.use-case }}/create-result.json
           echo "::endgroup::"
-          echo "expected=$EXPECTED_EXIT" >> "$GITHUB_OUTPUT"
-          echo "actual=$ACTUAL_EXIT" >> "$GITHUB_OUTPUT"
           if [ "$ACTUAL_EXIT" != "$EXPECTED_EXIT" ]; then
-            echo "::error::Create phase: expected exit code $EXPECTED_EXIT, got $ACTUAL_EXIT"
+            echo "::error::Create phase (JSON): expected exit code $EXPECTED_EXIT, got $ACTUAL_EXIT"
+            exit 1
+          fi
+
+      - name: Classify create plan (binary)
+        id: classify-create-binary
+        run: |
+          EXPECTED_EXIT=$(jq -r '.create.exit_code' testdata/e2e/${{ matrix.use-case }}/expected.json)
+          set +e
+          tfclassify \
+            -p testdata/e2e/${{ matrix.use-case }}/create.tfplan \
+            -c testdata/e2e/${{ matrix.use-case }}/.tfclassify.hcl \
+            -o json --detailed-exitcode > testdata/e2e/${{ matrix.use-case }}/create-result-binary.json
+          ACTUAL_EXIT=$?
+          set -e
+          echo "::group::Classification result (binary)"
+          jq . testdata/e2e/${{ matrix.use-case }}/create-result-binary.json
+          echo "::endgroup::"
+          if [ "$ACTUAL_EXIT" != "$EXPECTED_EXIT" ]; then
+            echo "::error::Create phase (binary): expected exit code $EXPECTED_EXIT, got $ACTUAL_EXIT"
             exit 1
           fi
 
@@ -156,8 +173,8 @@ jobs:
           jq . testdata/e2e/${{ matrix.use-case }}/destroy.json
           echo "::endgroup::"
 
-      - name: Classify destroy plan
-        id: classify-destroy
+      - name: Classify destroy plan (JSON)
+        id: classify-destroy-json
         run: |
           EXPECTED_EXIT=$(jq -r '.destroy.exit_code' testdata/e2e/${{ matrix.use-case }}/expected.json)
           set +e
@@ -167,13 +184,30 @@ jobs:
             -o json --detailed-exitcode > testdata/e2e/${{ matrix.use-case }}/destroy-result.json
           ACTUAL_EXIT=$?
           set -e
-          echo "::group::Classification result"
+          echo "::group::Classification result (JSON)"
           jq . testdata/e2e/${{ matrix.use-case }}/destroy-result.json
           echo "::endgroup::"
-          echo "expected=$EXPECTED_EXIT" >> "$GITHUB_OUTPUT"
-          echo "actual=$ACTUAL_EXIT" >> "$GITHUB_OUTPUT"
           if [ "$ACTUAL_EXIT" != "$EXPECTED_EXIT" ]; then
-            echo "::error::Destroy phase: expected exit code $EXPECTED_EXIT, got $ACTUAL_EXIT"
+            echo "::error::Destroy phase (JSON): expected exit code $EXPECTED_EXIT, got $ACTUAL_EXIT"
+            exit 1
+          fi
+
+      - name: Classify destroy plan (binary)
+        id: classify-destroy-binary
+        run: |
+          EXPECTED_EXIT=$(jq -r '.destroy.exit_code' testdata/e2e/${{ matrix.use-case }}/expected.json)
+          set +e
+          tfclassify \
+            -p testdata/e2e/${{ matrix.use-case }}/destroy.tfplan \
+            -c testdata/e2e/${{ matrix.use-case }}/.tfclassify.hcl \
+            -o json --detailed-exitcode > testdata/e2e/${{ matrix.use-case }}/destroy-result-binary.json
+          ACTUAL_EXIT=$?
+          set -e
+          echo "::group::Classification result (binary)"
+          jq . testdata/e2e/${{ matrix.use-case }}/destroy-result-binary.json
+          echo "::endgroup::"
+          if [ "$ACTUAL_EXIT" != "$EXPECTED_EXIT" ]; then
+            echo "::error::Destroy phase (binary): expected exit code $EXPECTED_EXIT, got $ACTUAL_EXIT"
             exit 1
           fi
 

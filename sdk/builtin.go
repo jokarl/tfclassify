@@ -30,6 +30,11 @@ func (s *BuiltinPluginSet) AnalyzerNames() []string {
 	return names
 }
 
+// GetAnalyzers returns all analyzers in this plugin set.
+func (s *BuiltinPluginSet) GetAnalyzers() []Analyzer {
+	return s.Analyzers
+}
+
 // GetAnalyzer returns an analyzer by name, or nil if not found.
 func (s *BuiltinPluginSet) GetAnalyzer(name string) Analyzer {
 	for _, a := range s.Analyzers {
