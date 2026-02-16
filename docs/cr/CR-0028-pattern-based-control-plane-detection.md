@@ -15,7 +15,7 @@ target-version: next
 
 ## Change Summary
 
-Replace the opinionated control-plane scoring model (7 tiers from 0-95, scope multipliers, `score_threshold`) with the same pattern-based approach used for data-plane detection in CR-0027. Users configure which control-plane action patterns are risky via an `actions` field in classification-scoped config, instead of relying on built-in scores and thresholds. Additionally, introduce a `scopes` filter on role assignment scope level and a `flag_unknown_roles` safety net for roles whose permissions cannot be resolved.
+Replace the opinionated control-plane scoring model (7 tiers from 0-95, scope multipliers, `score_threshold`) with the same pattern-based approach used for data-plane detection in CR-0027. Users configure which control-plane action patterns are risky via an `actions` field in classification-scoped config, instead of relying on built-in scores and thresholds. Additionally, introduce a `scopes` filter on role assignment scope level, a `flag_unknown_roles` safety net for roles whose permissions cannot be resolved, and an embedded action registry for proper wildcard expansion in `NotActions` subtraction.
 
 ## Motivation and Background
 
@@ -56,6 +56,19 @@ CR-0027 adds `data_actions` pattern matching. Effective data actions (`DataActio
 ### Unknown Role Handling
 
 Roles not found in the built-in database, not cross-referenced from plan custom roles, and not in the `PrivilegedRoles` config fallback are assigned a fixed severity (`UnknownRoleSeverity`, default 50). This silently masks the fact that the role's actual permissions are unknown.
+
+### Wildcard Expansion Limitation
+
+`computeEffectiveActions` has a critical limitation: when a role's `Actions` contains `["*"]`, it returns `["*"]` as-is instead of expanding to concrete actions. `NotActions` patterns cannot properly subtract from the wildcard.
+
+```
+# Contributor role:
+# Actions: ["*"]
+# NotActions: ["Microsoft.Authorization/*"]
+# computeEffectiveActions returns: ["*"] (unchanged — special case at scoring.go:211)
+```
+
+The literal `*` survives subtraction. When pattern-matching against `actions = ["Microsoft.Authorization/*"]`, the literal `*` matches everything — causing a false positive where Contributor appears to have authorization access despite `NotActions` explicitly excluding it. The same limitation applies to provider-level wildcards (e.g., `Microsoft.Storage/storageAccounts/*` cannot be subtracted from).
 
 ## Proposed Change
 
@@ -196,7 +209,7 @@ Decisions no longer carry a severity score. The classification name is the outpu
 
 ### NotActions Subtraction
 
-Applies identically to both planes, using existing `computeEffectiveActions`:
+Applies identically to both planes, using `computeEffectiveActions` enhanced with the action registry for wildcard expansion (see [Action Registry](#action-registry)):
 
 ```
 # Config: actions = ["Microsoft.Authorization/*"]
@@ -204,14 +217,20 @@ Applies identically to both planes, using existing `computeEffectiveActions`:
 # Contributor role:
 # Actions: ["*"]
 # NotActions: ["Microsoft.Authorization/*"]
-# Effective: ["*"] (wildcard kept as-is, but auth is excluded)
-# Does NOT match "Microsoft.Authorization/*" — Contributor is safe
+# Step 1: Expand ["*"] → [all ~17K concrete actions] via action registry
+# Step 2: Subtract NotActions → removes all Microsoft.Authorization/* actions
+# Step 3: Effective set contains ~16.8K actions, none under Microsoft.Authorization/
+# Step 4: Match against config patterns → NO match → Contributor is safe ✓
 
 # User Access Administrator role:
 # Actions: ["Microsoft.Authorization/*", "Microsoft.Support/*", ...]
 # NotActions: []
-# Effective includes Microsoft.Authorization/* -> MATCHES -> flagged
+# Step 1: Expand → [Microsoft.Authorization/roleAssignments/write, .../read, ...]
+# Step 2: No NotActions → unchanged
+# Step 3: Match against config patterns → Microsoft.Authorization/* MATCHES → flagged ✓
 ```
+
+Without the action registry, the literal `*` in Contributor's Actions would match `Microsoft.Authorization/*`, producing a false positive.
 
 ## Items Removed
 
@@ -234,12 +253,126 @@ Applies identically to both planes, using existing `computeEffectiveActions`:
 |------|----------|--------|
 | `actionMatchesPattern` | `scoring.go` | Core matching logic, reused by both planes |
 | `matchesAny` | `scoring.go` | Used by pattern matching |
-| `computeEffectiveActions` | `scoring.go` | Used by both planes for NotActions subtraction |
+| `computeEffectiveActions` | `scoring.go` | Enhanced: uses action registry to expand wildcards before NotActions subtraction |
 | `ParseScopeLevel` | `scoring.go` | Used by `scopes` filter |
 | `RoleDatabase` and built-in roles | `roles.go` | Permission source for built-in role resolution |
 | Custom role cross-referencing | `privilege.go` | Permission source for plan-defined custom roles |
 | `exclude` config field | Unchanged | Role name exclusion |
 | `roles` config field | Unchanged | Role name inclusion filter |
+
+## Action Registry
+
+Pattern-based detection requires proper wildcard expansion in `computeEffectiveActions`. An embedded catalog of all Azure RBAC operations makes this possible.
+
+### Data Source
+
+[Microsoft Docs on GitHub](https://github.com/MicrosoftDocs/azure-docs/tree/main/articles/role-based-access-control/permissions) — 18 markdown files organized by Azure service category (compute, storage, networking, security, etc.). Each file contains structured tables listing control-plane and data-plane actions for all resource providers in that category.
+
+- **Public**: No authentication required. Raw content accessible via `raw.githubusercontent.com`.
+- **Authoritative**: Maintained by Microsoft, same source as the [Azure permissions reference](https://learn.microsoft.com/en-us/azure/role-based-access-control/resource-provider-operations).
+- **Structured**: Consistent markdown table format — `| Action | Description |` for control-plane, `> | **DataAction** | **Description** |` for data-plane. Parseable with regex.
+
+This mirrors the role database's data source (AzAdvertizer CSV — also public, no auth).
+
+### Data Structure
+
+Provider-keyed maps for O(1) namespace lookup:
+
+```json
+{
+  "actions": {
+    "microsoft.storage": [
+      "Microsoft.Storage/storageAccounts/delete",
+      "Microsoft.Storage/storageAccounts/read",
+      "Microsoft.Storage/storageAccounts/write"
+    ],
+    "microsoft.authorization": [
+      "Microsoft.Authorization/roleAssignments/delete",
+      "Microsoft.Authorization/roleAssignments/read",
+      "Microsoft.Authorization/roleAssignments/write"
+    ]
+  },
+  "dataActions": {
+    "microsoft.storage": [
+      "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read",
+      "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write"
+    ],
+    "microsoft.keyvault": [
+      "Microsoft.KeyVault/vaults/secrets/readMetadata/action",
+      "Microsoft.KeyVault/vaults/secrets/getSecret/action"
+    ]
+  }
+}
+```
+
+Map keys are lowercase provider namespaces. Values preserve original casing from Microsoft Docs. Actions within each provider are sorted alphabetically.
+
+**Lookup complexity:**
+
+| Pattern | Strategy | Complexity |
+|---------|----------|------------|
+| `*` | Return cached flat slice (all actions) | O(1) |
+| `Microsoft.Storage/*` | Map lookup by provider key | O(1) |
+| `*/read` | Linear scan of flat slice, filter by suffix | O(N) |
+| Exact match | Return as-is (no expansion needed) | O(1) |
+
+With ~17K control-plane and ~3.7K data-plane actions, even O(N) scans complete in microseconds.
+
+### Go Type
+
+```go
+type ActionRegistry struct {
+    actions        map[string][]string // lowercase provider → sorted action names
+    dataActions    map[string][]string // lowercase provider → sorted data action names
+    allActions     []string            // cached flat sorted slice (control-plane)
+    allDataActions []string            // cached flat sorted slice (data-plane)
+}
+```
+
+Loaded from `//go:embed actiondata/actions.json` via `sync.Once` singleton, mirroring the `RoleDatabase` pattern in `roles.go`.
+
+Key methods:
+- `ExpandPattern(pattern, dataPlane) []string` — expand a single wildcard to concrete actions
+- `ExpandActions(patterns, dataPlane) []string` — expand and deduplicate a list of patterns
+
+### Impact on computeEffectiveActions
+
+The enhanced function expands wildcards before subtraction:
+
+```
+# Before (broken):
+# Actions: ["*"] → returns ["*"] as-is
+# NotActions: ["Microsoft.Authorization/*"]
+# Result: ["*"] — NotActions not applied
+
+# After (with registry):
+# Actions: ["*"] → expanded to [all ~17K concrete actions]
+# NotActions: ["Microsoft.Authorization/*"] → subtracts all auth actions
+# Result: [~16.8K concrete actions, none under Microsoft.Authorization/]
+```
+
+### Generation Tool
+
+`tools/md2actions/main.go` — fetches 18 category markdown files from GitHub raw content, parses tables, groups by lowercase provider namespace, deduplicates, sorts, outputs JSON to stdout.
+
+```bash
+go run tools/md2actions/main.go > plugins/azurerm/actiondata/actions.json
+```
+
+### Maintenance
+
+A scheduled GitHub Actions workflow refreshes the action data alongside existing role data:
+
+| Aspect | Role Database | Action Registry |
+|--------|--------------|-----------------|
+| Data source | AzAdvertizer CSV | Microsoft Docs GitHub markdown |
+| Tool | `tools/csv2roles/main.go` | `tools/md2actions/main.go` |
+| Embedded data | `plugins/azurerm/roledata/roles.json` | `plugins/azurerm/actiondata/actions.json` |
+| Makefile target | `make generate-roles` | `make generate-actions` |
+| Auth required | No | No |
+| Refresh frequency | Weekly (Monday 00:00 UTC) | Weekly (alongside role refresh) |
+
+The workflow creates a PR if the generated data differs from the committed version.
 
 ## Requirements
 
@@ -258,11 +391,19 @@ Applies identically to both planes, using existing `computeEffectiveActions`:
 11. Privilege escalation decisions **MUST NOT** carry a numeric severity score
 12. Custom role cross-referencing from `azurerm_role_definition` plan resources **MUST** be retained
 
+13. The plugin **MUST** embed an action registry containing all Azure RBAC control-plane and data-plane operations
+14. `computeEffectiveActions` **MUST** use the action registry to expand wildcard patterns (e.g., `*`, `Microsoft.Storage/*`) to concrete actions before `NotActions` subtraction
+15. The action registry **MUST** be generated from [Microsoft Docs GitHub](https://github.com/MicrosoftDocs/azure-docs/tree/main/articles/role-based-access-control/permissions) (public, no authentication required)
+16. A `make generate-actions` target **MUST** regenerate the action registry data
+17. A scheduled maintenance workflow **MUST** refresh the action registry alongside the existing role database refresh
+
 ### Non-Functional Requirements
 
 1. Pattern matching **MUST** reuse existing `actionMatchesPattern`, `matchesAny`, and `computeEffectiveActions` functions
 2. The `scopes` filter **MUST** reuse existing `ParseScopeLevel`
 3. The change is intentionally breaking — no backward compatibility with `score_threshold` is required
+4. The action registry **MUST** use provider-keyed maps for O(1) namespace lookup
+5. The action registry data file size **SHOULD** be comparable to the role database (~500 KB–2 MB)
 
 ## Affected Components
 
@@ -278,6 +419,12 @@ Applies identically to both planes, using existing `computeEffectiveActions`:
 | `testdata/e2e/role-escalation-threshold/` | Rewrite: replace `score_threshold` with `actions` patterns. |
 | `testdata/e2e/role-assignment-privileged/` | Update config to use `actions` patterns instead of relying on default scoring. |
 | `testdata/e2e/custom-role-cross-reference/` | **New.** E2e scenario with `azurerm_role_definition` in plan, pattern-matched via cross-referencing. |
+| `plugins/azurerm/actions.go` | **New.** `ActionRegistry` type with `//go:embed`, `ExpandPattern`, `ExpandActions`. Singleton via `sync.Once`. |
+| `plugins/azurerm/actions_test.go` | **New.** Tests for action registry: embedded data sanity, wildcard expansion, provider lookup, suffix matching, deduplication. |
+| `plugins/azurerm/actiondata/actions.json` | **New.** Embedded action registry data (~1–2 MB), generated from Microsoft Docs markdown. |
+| `tools/md2actions/main.go` | **New.** Generation tool: fetches Microsoft Docs markdown from GitHub, parses tables, outputs provider-keyed JSON. |
+| `Makefile` | Add `generate-actions` target. |
+| `.github/workflows/refresh-role-data.yml` | Extend to also run `make generate-actions` alongside `make generate-roles`. |
 
 ## Acceptance Criteria
 
@@ -404,6 +551,46 @@ Then a clear error message indicates the configuration must be updated
   And the error references the new actions/data_actions syntax
 ```
 
+### AC-13: Wildcard expansion via action registry
+
+```gherkin
+Given a role with Actions: ["*"] and NotActions: ["Microsoft.Authorization/*"]
+When computeEffectiveActions processes the role using the action registry
+Then the wildcard "*" is expanded to all concrete control-plane actions
+  And all Microsoft.Authorization/* actions are subtracted
+  And the effective set contains no Microsoft.Authorization/ actions
+```
+
+### AC-14: Provider wildcard expansion
+
+```gherkin
+Given a role with Actions: ["Microsoft.Storage/*"] and NotActions: ["Microsoft.Storage/storageAccounts/delete"]
+When computeEffectiveActions processes the role using the action registry
+Then "Microsoft.Storage/*" is expanded to all concrete Microsoft.Storage actions
+  And "Microsoft.Storage/storageAccounts/delete" is subtracted from the expanded set
+  And the effective set contains Microsoft.Storage/storageAccounts/read but not Microsoft.Storage/storageAccounts/delete
+```
+
+### AC-15: Action registry embedded data is valid
+
+```gherkin
+Given the embedded action registry data
+When the plugin initializes
+Then the registry contains at least 15,000 control-plane actions
+  And the registry contains at least 3,000 data-plane actions
+  And the registry contains at least 200 providers
+```
+
+### AC-16: Action registry refresh generates valid data
+
+```gherkin
+Given the md2actions generation tool
+When run against the Microsoft Docs GitHub markdown
+Then the output is valid JSON matching the provider-keyed schema
+  And the output distinguishes control-plane actions from data-plane actions
+  And make generate-actions produces the same output as a fresh run
+```
+
 ## Test Strategy
 
 ### Unit Tests to Rewrite
@@ -432,6 +619,12 @@ Then a clear error message indicates the configuration must be updated
 | `config/loader_test.go` | `TestLoadPrivilegeEscalation_Scopes` | Parse `scopes` attribute from HCL |
 | `config/loader_test.go` | `TestLoadPrivilegeEscalation_FlagUnknownRoles` | Parse `flag_unknown_roles` attribute from HCL |
 | `config/loader_test.go` | `TestLoadPrivilegeEscalation_ScoreThresholdRejected` | `score_threshold` produces validation error |
+| `actions_test.go` | `TestActionRegistry_EmbeddedData` | Sanity check: minimum action/provider counts from embedded data |
+| `actions_test.go` | `TestActionRegistry_ExpandPattern_GlobalWildcard` | `*` returns all actions |
+| `actions_test.go` | `TestActionRegistry_ExpandPattern_ProviderWildcard` | `Microsoft.Storage/*` returns only storage actions |
+| `actions_test.go` | `TestActionRegistry_ExpandPattern_SuffixWildcard` | `*/read` returns all read actions |
+| `actions_test.go` | `TestActionRegistry_ExpandPattern_CaseInsensitive` | `MICROSOFT.STORAGE/*` matches lowercase provider key |
+| `actions_test.go` | `TestActionRegistry_ExpandActions_Dedup` | Multiple overlapping patterns produce deduplicated results |
 
 ### E2E Tests to Update
 
@@ -447,6 +640,15 @@ Then a clear error message indicates the configuration must be updated
 | `custom-role-cross-reference` | Plan includes `azurerm_role_definition` with specific actions. Role assignment uses the custom role. Config matches via `actions` patterns. Validates end-to-end custom role resolution and pattern matching. |
 
 ## Implementation Approach
+
+### Phase 0: Action Registry
+
+1. Create `tools/md2actions/main.go` — fetch and parse Microsoft Docs markdown
+2. Run tool to generate `plugins/azurerm/actiondata/actions.json`
+3. Create `plugins/azurerm/actions.go` — `ActionRegistry` type with `//go:embed`, `ExpandPattern`, `ExpandActions`
+4. Create `plugins/azurerm/actions_test.go` — sanity checks, expansion tests
+5. Add `generate-actions` target to Makefile
+6. Extend `.github/workflows/refresh-role-data.yml` to also refresh action data
 
 ### Phase 1: Config Changes
 
@@ -500,6 +702,7 @@ Then a clear error message indicates the configuration must be updated
 
 * CR-0024: Classification-scoped config infrastructure (implemented)
 * CR-0027: Data-plane pattern-based detection (must be implemented first — establishes `data_actions` and the pattern matching flow in the analyzer)
+* [Microsoft Docs azure-docs](https://github.com/MicrosoftDocs/azure-docs/tree/main/articles/role-based-access-control/permissions): Public data source for action registry (external, no auth)
 
 ## Related Items
 
