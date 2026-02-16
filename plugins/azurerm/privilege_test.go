@@ -2126,6 +2126,123 @@ func TestCustomRoleCrossReference_UnknownComputedID(t *testing.T) {
 	}
 }
 
+func TestCustomRoleCrossReference_UnresolvedWithMatchingCustomRole(t *testing.T) {
+	config := DefaultConfig()
+	analyzer := NewPrivilegeEscalationAnalyzer(config)
+
+	// Simulates a create plan where BOTH role_definition_id and role_definition_name
+	// are absent from After (they're in after_unknown, not in the After map).
+	// This is the real behavior seen in CI: Terraform omits unknown computed fields.
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			{
+				Address: "azurerm_role_definition.auth_writer",
+				Type:    "azurerm_role_definition",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					// name is also unknown because it uses random_id
+					"permissions": []interface{}{
+						map[string]interface{}{
+							"actions":          []interface{}{"Microsoft.Authorization/roleAssignments/write", "Microsoft.Authorization/roleAssignments/delete"},
+							"not_actions":      []interface{}{},
+							"data_actions":     []interface{}{},
+							"not_data_actions": []interface{}{},
+						},
+					},
+				},
+			},
+			{
+				Address: "azurerm_role_assignment.custom",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					// Only scope is known; role_definition_id and role_definition_name
+					// are NOT in After (they're in after_unknown)
+					"scope": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-test",
+				},
+			},
+		},
+	}
+
+	analyzerConfig := &PluginAnalyzerConfig{
+		PrivilegeEscalation: &PrivilegeEscalationAnalyzerConfig{
+			Actions: []string{"Microsoft.Authorization/*"},
+		},
+	}
+	configJSON, _ := json.Marshal(analyzerConfig)
+
+	err := analyzer.AnalyzeWithClassification(runner, "critical", configJSON)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Should detect the custom role definition in the plan and infer the match
+	if len(runner.decisions) != 1 {
+		t.Fatalf("expected 1 decision (inferred custom role match), got %d", len(runner.decisions))
+	}
+
+	decision := runner.decisions[0]
+	if decision.Classification != "critical" {
+		t.Errorf("expected classification 'critical', got %q", decision.Classification)
+	}
+	if decision.Metadata["trigger"] != "unresolved-custom-role" {
+		t.Errorf("expected trigger unresolved-custom-role, got %v", decision.Metadata["trigger"])
+	}
+	if decision.Metadata["role_source"] != "plan-custom-role-inferred" {
+		t.Errorf("expected role_source plan-custom-role-inferred, got %v", decision.Metadata["role_source"])
+	}
+}
+
+func TestCustomRoleCrossReference_UnresolvedNoMatchingCustomRole(t *testing.T) {
+	config := DefaultConfig()
+	analyzer := NewPrivilegeEscalationAnalyzer(config)
+
+	// Custom role with innocuous permissions that don't match the pattern
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			{
+				Address: "azurerm_role_definition.reader",
+				Type:    "azurerm_role_definition",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"name": "Custom Reader",
+					"permissions": []interface{}{
+						map[string]interface{}{
+							"actions":     []interface{}{"Microsoft.Resources/subscriptions/read"},
+							"not_actions": []interface{}{},
+						},
+					},
+				},
+			},
+			{
+				Address: "azurerm_role_assignment.custom",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"scope": "/subscriptions/00000000-0000-0000-0000-000000000000",
+				},
+			},
+		},
+	}
+
+	analyzerConfig := &PluginAnalyzerConfig{
+		PrivilegeEscalation: &PrivilegeEscalationAnalyzerConfig{
+			Actions: []string{"Microsoft.Authorization/*"},
+		},
+	}
+	configJSON, _ := json.Marshal(analyzerConfig)
+
+	err := analyzer.AnalyzeWithClassification(runner, "critical", configJSON)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Custom role doesn't match Authorization patterns, so no decision
+	if len(runner.decisions) != 0 {
+		t.Errorf("expected 0 decisions (custom role is read-only), got %d", len(runner.decisions))
+	}
+}
+
 // === CR-0028 AC-9: No severity score on decisions ===
 
 func TestPrivilege_NoSeverityOnDecisions(t *testing.T) {

@@ -232,6 +232,32 @@ func (a *PrivilegeEscalationAnalyzer) analyzeWithConfig(runner sdk.Runner, class
 			continue
 		}
 
+		// Handle unresolvable role with custom role definitions in the plan.
+		// When both the role assignment and role definition are being created,
+		// the role_definition_id is unknown at plan time (computed reference).
+		// In this case, check if any custom role definition in the plan matches
+		// the configured action patterns and emit a decision if so.
+		if afterRole.source == roleSourceUnknown && afterRole.name == "" && customRoles != nil {
+			if matchedDef := a.matchAnyCustomRole(customRoles, actionPatterns, dataActionPatterns, useControlPlane, useDataPlane); matchedDef != nil {
+				decision := &sdk.Decision{
+					Classification: classification,
+					Reason:         fmt.Sprintf("role assignment references unresolvable role; custom role %q in plan matches configured patterns", matchedDef.Name),
+					Metadata: map[string]interface{}{
+						"analyzer":    "privilege-escalation",
+						"trigger":     "unresolved-custom-role",
+						"role_name":   matchedDef.Name,
+						"role_source": "plan-custom-role-inferred",
+						"scope":       scope,
+						"scope_level": ParseScopeLevel(scope).String(),
+					},
+				}
+				if err := runner.EmitDecision(a, change, decision); err != nil {
+					return fmt.Errorf("failed to emit decision: %w", err)
+				}
+			}
+			continue
+		}
+
 		// Pattern-based detection
 		controlPlaneTriggered := false
 		var controlPlaneMatchedActions []string
@@ -298,6 +324,35 @@ func (a *PrivilegeEscalationAnalyzer) analyzeWithConfig(runner sdk.Runner, class
 		}
 	}
 
+	return nil
+}
+
+// matchAnyCustomRole checks if any custom role definition in the lookup matches
+// the configured action patterns. Returns the first matching role definition, or nil.
+// This is used when a role assignment references an unresolvable role (computed ID)
+// and custom role definitions exist in the plan.
+func (a *PrivilegeEscalationAnalyzer) matchAnyCustomRole(
+	customRoles *customRoleLookup,
+	actionPatterns, dataActionPatterns []string,
+	useControlPlane, useDataPlane bool,
+) *RoleDefinition {
+	if customRoles == nil {
+		return nil
+	}
+	for _, role := range customRoles.byName {
+		if useControlPlane {
+			matched, _ := a.matchControlPlanePatterns(role, actionPatterns)
+			if len(matched) > 0 {
+				return role
+			}
+		}
+		if useDataPlane {
+			matched, _ := a.matchDataPlanePatterns(role, dataActionPatterns)
+			if len(matched) > 0 {
+				return role
+			}
+		}
+	}
 	return nil
 }
 
@@ -523,14 +578,16 @@ func (a *PrivilegeEscalationAnalyzer) buildCustomRoleLookup(runner sdk.Runner) *
 			continue
 		}
 
-		name := stringField(state, "name")
-		if name == "" {
-			continue
-		}
-
 		perms := a.parsePermissionsFromPlan(state)
 		if len(perms) == 0 {
 			continue
+		}
+
+		name := stringField(state, "name")
+		if name == "" {
+			// Use resource address as a fallback name when the actual name
+			// is unknown at plan time (e.g., it uses random_id).
+			name = change.Address
 		}
 
 		role := &RoleDefinition{
