@@ -644,11 +644,11 @@ Then the output is valid JSON matching the provider-keyed schema
 ### Phase 0: Action Registry
 
 1. Create `tools/md2actions/main.go` — fetch and parse Microsoft Docs markdown
-2. Run tool to generate `plugins/azurerm/actiondata/actions.json`
+2. Run `make generate-actions` to seed `plugins/azurerm/actiondata/actions.json` and **commit the generated file** to the repository. This is version-controlled embedded data (like `roledata/roles.json`), not generated at build time. The `//go:embed` directive requires the file to exist at compile time.
 3. Create `plugins/azurerm/actions.go` — `ActionRegistry` type with `//go:embed`, `ExpandPattern`, `ExpandActions`
 4. Create `plugins/azurerm/actions_test.go` — sanity checks, expansion tests
 5. Add `generate-actions` target to Makefile
-6. Extend `.github/workflows/refresh-role-data.yml` to also refresh action data
+6. Extend `.github/workflows/refresh-role-data.yml` to also refresh action data. The workflow only keeps the data current — the initial seed is part of this phase.
 
 ### Phase 1: Config Changes
 
