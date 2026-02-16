@@ -66,9 +66,6 @@ jobs:
   e2e:
     needs: [build, test, vet, vuln]
     runs-on: ubuntu-latest
-    concurrency:
-      group: e2e-azure
-      cancel-in-progress: true
     permissions:
       id-token: write
       contents: read
