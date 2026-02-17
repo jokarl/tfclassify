@@ -5,35 +5,35 @@ plugin "azurerm" {
 }
 
 classification "critical" {
-  description = "Requires security review - high privilege escalation"
+  description = "Critical - data plane storage access detected"
 
   rule {
     resource = ["*_role_*", "*_security_group", "*_security_rule"]
     actions  = ["delete"]
   }
 
-  # CR-0028: Pattern-based control-plane detection
-  # Owner has Microsoft.Authorization/* actions (triggers critical)
-  # Contributor has NotActions: ["Microsoft.Authorization/*"] so does NOT match
+  # CR-0027: Trigger critical for data-plane access patterns
+  # Storage Blob Data Owner has dataActions: ["Microsoft.Storage/.../blobs/*"]
+  # Use "Microsoft.Storage/*" to match any storage data-plane action.
+  # Only data-plane pattern matching triggers critical here.
   azurerm {
     privilege_escalation {
-      actions = ["Microsoft.Authorization/*"]
+      data_actions = ["Microsoft.Storage/*"]
     }
   }
 }
 
 classification "standard" {
-  description = "Standard change - moderate privilege escalation"
+  description = "Standard change"
 
   rule {
     resource = ["*"]
   }
 
-  # Catch all privilege escalations with any write action
-  # Contributor has many write actions (triggers here)
+  # Catch remaining role assignments with any control-plane write actions
   azurerm {
     privilege_escalation {
-      actions = ["*/write", "*/delete", "*/action"]
+      actions = ["*/write", "*/delete", "*/action", "*/read"]
     }
   }
 }

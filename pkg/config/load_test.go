@@ -227,8 +227,10 @@ func TestLoad_ClassificationScopedPluginConfig(t *testing.T) {
 	if azurermCfg.PrivilegeEscalation == nil {
 		t.Fatal("expected PrivilegeEscalation config")
 	}
-	if azurermCfg.PrivilegeEscalation.ScoreThreshold != 80 {
-		t.Errorf("expected ScoreThreshold 80, got %d", azurermCfg.PrivilegeEscalation.ScoreThreshold)
+	if len(azurermCfg.PrivilegeEscalation.Actions) != 1 {
+		t.Errorf("expected 1 Actions pattern, got %d", len(azurermCfg.PrivilegeEscalation.Actions))
+	} else if azurermCfg.PrivilegeEscalation.Actions[0] != "Microsoft.Authorization/*" {
+		t.Errorf("expected Actions[0] 'Microsoft.Authorization/*', got %q", azurermCfg.PrivilegeEscalation.Actions[0])
 	}
 	if len(azurermCfg.PrivilegeEscalation.Exclude) != 2 {
 		t.Errorf("expected 2 Exclude roles, got %d", len(azurermCfg.PrivilegeEscalation.Exclude))
@@ -276,6 +278,78 @@ func TestLoad_ClassificationScopedPluginConfig(t *testing.T) {
 
 	if len(standard.PluginAnalyzerConfigs) != 0 {
 		t.Errorf("expected no plugin configs for 'standard', got %d", len(standard.PluginAnalyzerConfigs))
+	}
+}
+
+func TestLoad_PatternBasedDetection(t *testing.T) {
+	cfg, err := Load("testdata/pattern_based_detection.hcl")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(cfg.Classifications) != 2 {
+		t.Fatalf("expected 2 classifications, got %d", len(cfg.Classifications))
+	}
+
+	// Test critical classification has pattern-based detection config
+	critical := cfg.Classifications[0]
+	if critical.Name != "critical" {
+		t.Errorf("expected first classification 'critical', got %q", critical.Name)
+	}
+
+	if critical.PluginAnalyzerConfigs == nil {
+		t.Fatal("expected PluginAnalyzerConfigs to be set for 'critical'")
+	}
+
+	azurermCfg, ok := critical.PluginAnalyzerConfigs["azurerm"]
+	if !ok {
+		t.Fatal("expected 'azurerm' plugin config in 'critical' classification")
+	}
+
+	// Test privilege_escalation config with pattern-based detection
+	if azurermCfg.PrivilegeEscalation == nil {
+		t.Fatal("expected PrivilegeEscalation config")
+	}
+
+	// Test CR-0028: actions field (control-plane patterns)
+	if len(azurermCfg.PrivilegeEscalation.Actions) != 2 {
+		t.Errorf("expected 2 Actions patterns, got %d", len(azurermCfg.PrivilegeEscalation.Actions))
+	}
+	if azurermCfg.PrivilegeEscalation.Actions[0] != "*" {
+		t.Errorf("expected first Actions pattern '*', got %q", azurermCfg.PrivilegeEscalation.Actions[0])
+	}
+	if azurermCfg.PrivilegeEscalation.Actions[1] != "Microsoft.Authorization/*" {
+		t.Errorf("expected second Actions pattern 'Microsoft.Authorization/*', got %q", azurermCfg.PrivilegeEscalation.Actions[1])
+	}
+
+	// Test CR-0027: data_actions field (data-plane patterns)
+	if len(azurermCfg.PrivilegeEscalation.DataActions) != 2 {
+		t.Errorf("expected 2 DataActions patterns, got %d", len(azurermCfg.PrivilegeEscalation.DataActions))
+	}
+	if azurermCfg.PrivilegeEscalation.DataActions[0] != "*/read" {
+		t.Errorf("expected first DataActions pattern '*/read', got %q", azurermCfg.PrivilegeEscalation.DataActions[0])
+	}
+	if azurermCfg.PrivilegeEscalation.DataActions[1] != "*/write" {
+		t.Errorf("expected second DataActions pattern '*/write', got %q", azurermCfg.PrivilegeEscalation.DataActions[1])
+	}
+
+	// Test CR-0028: scopes field
+	if len(azurermCfg.PrivilegeEscalation.Scopes) != 2 {
+		t.Errorf("expected 2 Scopes, got %d", len(azurermCfg.PrivilegeEscalation.Scopes))
+	}
+	if azurermCfg.PrivilegeEscalation.Scopes[0] != "subscription" {
+		t.Errorf("expected first Scope 'subscription', got %q", azurermCfg.PrivilegeEscalation.Scopes[0])
+	}
+	if azurermCfg.PrivilegeEscalation.Scopes[1] != "management_group" {
+		t.Errorf("expected second Scope 'management_group', got %q", azurermCfg.PrivilegeEscalation.Scopes[1])
+	}
+
+	// Test CR-0028: flag_unknown_roles field
+	if azurermCfg.PrivilegeEscalation.FlagUnknownRoles == nil {
+		t.Fatal("expected FlagUnknownRoles to be set")
+	}
+	if *azurermCfg.PrivilegeEscalation.FlagUnknownRoles != false {
+		t.Errorf("expected FlagUnknownRoles to be false, got %v", *azurermCfg.PrivilegeEscalation.FlagUnknownRoles)
 	}
 }
 
@@ -348,5 +422,42 @@ defaults {
 	}
 	if !strings.Contains(err.Error(), "azurerm") || !strings.Contains(err.Error(), "not enabled") {
 		t.Errorf("expected error about disabled plugin reference, got: %v", err)
+	}
+}
+
+func TestLoad_ScoreThresholdRejected(t *testing.T) {
+	configContent := `
+plugin "azurerm" {
+  enabled = true
+  source  = "github.com/example/plugin"
+  version = "0.1.0"
+}
+
+classification "critical" {
+  description = "Critical"
+  rule {
+    resource = ["*"]
+  }
+
+  azurerm {
+    privilege_escalation {
+      score_threshold = 80
+    }
+  }
+}
+
+precedence = ["critical"]
+
+defaults {
+  unclassified = "critical"
+  no_changes   = "critical"
+}
+`
+	_, err := Parse([]byte(configContent), "test.hcl")
+	if err == nil {
+		t.Fatal("expected error for score_threshold (removed in CR-0028)")
+	}
+	if !strings.Contains(err.Error(), "score_threshold") || !strings.Contains(err.Error(), "no longer supported") {
+		t.Errorf("expected 'score_threshold is no longer supported' error, got: %v", err)
 	}
 }

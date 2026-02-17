@@ -62,16 +62,37 @@ type PluginAnalyzerConfig struct {
 
 // PrivilegeEscalationConfig holds configuration for the privilege_escalation analyzer.
 type PrivilegeEscalationConfig struct {
-	// ScoreThreshold is the minimum score required to trigger this classification.
-	// Default: 0 (any score triggers)
-	ScoreThreshold int `hcl:"score_threshold,optional" json:"score_threshold,omitempty"`
-
 	// Roles limits triggering to specific role names (case-insensitive).
 	// Empty means any role can trigger.
 	Roles []string `hcl:"roles,optional" json:"roles,omitempty"`
 
 	// Exclude is a list of role names to skip (case-insensitive).
 	Exclude []string `hcl:"exclude,optional" json:"exclude,omitempty"`
+
+	// Actions is a list of Azure RBAC control-plane action patterns to match.
+	// When configured, roles with effective actions matching ANY pattern trigger.
+	// Uses Azure RBAC pattern matching: "*", "Microsoft.Authorization/*", "*/write".
+	// If omitted or empty, control-plane actions are not evaluated.
+	// CR-0028: Pattern-Based Control-Plane Detection
+	Actions []string `hcl:"actions,optional" json:"actions,omitempty"`
+
+	// DataActions is a list of Azure RBAC data-plane action patterns to match.
+	// When configured, roles with effective data actions matching ANY pattern trigger.
+	// Uses Azure RBAC pattern matching: "*", "Microsoft.Storage/*", "*/read".
+	// If omitted or empty, data-plane actions are not evaluated.
+	// CR-0027: Data-Plane Action Detection
+	DataActions []string `hcl:"data_actions,optional" json:"data_actions,omitempty"`
+
+	// Scopes limits triggering to specific ARM scope levels.
+	// Values: "management_group", "subscription", "resource_group", "resource".
+	// If omitted or empty, matches any scope level.
+	// CR-0028: Pattern-Based Control-Plane Detection
+	Scopes []string `hcl:"scopes,optional" json:"scopes,omitempty"`
+
+	// FlagUnknownRoles controls whether roles whose permissions cannot be resolved
+	// emit a decision with diagnostic metadata. Default: true.
+	// CR-0028: Pattern-Based Control-Plane Detection
+	FlagUnknownRoles *bool `hcl:"flag_unknown_roles,optional" json:"flag_unknown_roles,omitempty"`
 }
 
 // NetworkExposureConfig holds configuration for the network_exposure analyzer.

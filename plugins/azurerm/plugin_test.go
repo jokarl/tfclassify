@@ -58,22 +58,6 @@ func (r *mockRunner) EmitDecision(analyzer sdk.Analyzer, change *sdk.ResourceCha
 func TestDefaultConfig(t *testing.T) {
 	config := DefaultConfig()
 
-	// Check privileged roles
-	if len(config.PrivilegedRoles) != 3 {
-		t.Errorf("expected 3 default privileged roles, got %d", len(config.PrivilegedRoles))
-	}
-
-	expectedRoles := map[string]bool{
-		"Owner":                     true,
-		"User Access Administrator": true,
-		"Contributor":               true,
-	}
-	for _, role := range config.PrivilegedRoles {
-		if !expectedRoles[role] {
-			t.Errorf("unexpected privileged role: %s", role)
-		}
-	}
-
 	// Check permissive sources
 	if len(config.PermissiveSources) != 3 {
 		t.Errorf("expected 3 default permissive sources, got %d", len(config.PermissiveSources))
@@ -126,7 +110,6 @@ func TestNewAzurermPluginSet(t *testing.T) {
 
 func TestNewAzurermPluginSetWithConfig(t *testing.T) {
 	config := &PluginConfig{
-		PrivilegedRoles:  []string{"Custom"},
 		PrivilegeEnabled: false,
 		NetworkEnabled:   true,
 		KeyVaultEnabled:  true,

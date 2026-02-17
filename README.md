@@ -23,6 +23,7 @@ Classify Terraform plan changes based on organization-defined rules. tfclassify 
   - [Layer 2: Builtin Analyzers](#layer-2-builtin-analyzers)
   - [Layer 3: Deep Inspection Plugins](#layer-3-deep-inspection-plugins)
 - [Examples](#examples)
+- [E2E Test Scenarios](#e2e-test-scenarios)
 - [Project Structure](#project-structure)
 - [Development](#development)
 - [Architecture Decisions](#architecture-decisions)
@@ -216,7 +217,7 @@ Supports `GITHUB_TOKEN` environment variable for authenticated requests.
 }
 ```
 
-**GitHub** — sets GitHub Actions output variables (`classification`, `exit_code`, `no_changes`, `resource_count`) in both legacy `::set-output` and `GITHUB_OUTPUT` file formats.
+**GitHub** — sets GitHub Actions output variables (`classification`, `exit_code`, `no_changes`, `resource_count`) in `GITHUB_OUTPUT` file format.
 
 ## Configuration
 
@@ -315,12 +316,23 @@ plugin "azurerm" {
   enabled = true
   source  = "github.com/jokarl/tfclassify"   # GitHub repo for download
   version = "0.1.0"                            # Semantic version
+}
 
-  config {
-    # Plugin-specific options (opaque to core, forwarded via gRPC)
-    privilege_enabled = true
-    network_enabled   = true
-    keyvault_enabled  = true
+# Plugin analyzer configuration lives inside classification blocks.
+# Each plugin can define per-analyzer sub-blocks:
+classification "critical" {
+  description = "Requires security team approval"
+
+  rule {
+    resource = ["*_role_*"]
+    actions  = ["delete"]
+  }
+
+  azurerm {
+    privilege_escalation {
+      actions = ["Microsoft.Authorization/*"]   # Control-plane patterns
+    }
+    keyvault_access {}                          # Detect destructive permissions
   }
 }
 ```
@@ -358,17 +370,17 @@ Config-driven pattern matching. Glob patterns on resource types and actions, eva
 
 Cross-provider heuristics that run in-process after core rules. These detect Terraform-level concepts regardless of provider:
 
-| Analyzer | Detects | Severity |
-|----------|---------|----------|
-| `deletion` | Standalone resource deletions (not replacements) | 80 |
-| `replace` | Resource replacements (destroy + recreate) | 75 |
-| `sensitive` | Changes to Terraform-marked sensitive attributes | 70 |
+| Analyzer | Detects |
+|----------|---------|
+| `deletion` | Standalone resource deletions (not part of a replacement) |
+| `replace` | Resource replacements (destroy + recreate) |
+| `sensitive` | Changes to Terraform-marked sensitive attributes |
 
 Builtin analyzers are always enabled and require no configuration.
 
 ### Layer 3: Deep Inspection Plugins
 
-Provider-specific analysis via external plugins. Plugins run as separate processes communicating over gRPC ([hashicorp/go-plugin](https://github.com/hashicorp/go-plugin)). They inspect actual resource attribute values — role permissions, network CIDRs, access grants — to produce graduated severity scores.
+Provider-specific analysis via external plugins. Plugins run as separate processes communicating over gRPC ([hashicorp/go-plugin](https://github.com/hashicorp/go-plugin)). They inspect actual resource attribute values — role permissions, network CIDRs, access grants — using pattern-based detection configured per-classification.
 
 **Available plugins:**
 
@@ -405,6 +417,60 @@ tfclassify \
   -c docs/examples/basic-classification/.tfclassify.hcl \
   -v
 ```
+
+## E2E Test Scenarios
+
+The [`testdata/e2e/`](testdata/e2e/) directory contains end-to-end test scenarios that run against real Azure infrastructure via GitHub Actions CI. Each scenario has a `main.tf` (Terraform config), `.tfclassify.hcl` (classification rules), and `expected.json` (expected exit codes for create and destroy phases).
+
+These scenarios demonstrate real-world classification behavior across all three layers — core rules, builtin analyzers, and deep inspection plugins.
+
+### Core Rule Scenarios
+
+| Scenario | Config | What It Tests |
+|----------|--------|---------------|
+| [route-table](testdata/e2e/route-table/) | Glob rules only, no plugins | Baseline: route table + route classified as `standard` by `resource = ["*"]` catch-all. No plugin involvement. |
+| [role-assignment-reader](testdata/e2e/role-assignment-reader/) | Glob rules only, no plugins | Reader role assignment classified as `standard` on create (catch-all), `critical` on destroy (matches `*_role_*` + `delete`). |
+
+### Deep Inspection: Privilege Escalation
+
+| Scenario | Config | What It Tests |
+|----------|--------|---------------|
+| [role-assignment-privileged](testdata/e2e/role-assignment-privileged/) | `actions = ["Microsoft.Authorization/*"]` on critical | Owner role at RG scope. Owner's effective actions include `Microsoft.Authorization/*`, matching the critical pattern. |
+| [role-escalation-threshold](testdata/e2e/role-escalation-threshold/) | `actions = ["Microsoft.Authorization/*"]` on critical, `actions = ["*/write", "*/delete", "*/action"]` on standard | **Graduated patterns.** Owner (has `Microsoft.Authorization/*`) triggers `critical`. Contributor (has write/delete but `NotActions: Microsoft.Authorization/*`) falls to `standard`. |
+| [role-exclusion](testdata/e2e/role-exclusion/) | `exclude = ["AcrPush"]` on both critical and standard | AcrPush role is excluded from privilege escalation detection in all classifications. Falls through to core rule `standard` on create, `critical` on destroy (glob `*_role_*` + `delete`). |
+| [custom-role-cross-reference](testdata/e2e/custom-role-cross-reference/) | `actions = ["Microsoft.Authorization/*"]` on critical | Custom role with `Microsoft.Authorization/roleAssignments/write`. Plugin cross-references the role definition from the plan to resolve effective actions, matching the critical pattern. |
+
+### Deep Inspection: Network Exposure
+
+| Scenario | Config | What It Tests |
+|----------|--------|---------------|
+| [nsg-open-inbound](testdata/e2e/nsg-open-inbound/) | Glob rules only (no plugin block) | NSG rule allowing `*` inbound from `*`. Classified as `standard` on create (no network exposure plugin configured), `critical` on destroy (glob `*_security_rule` + `delete`). |
+
+### Deep Inspection: Key Vault
+
+| Scenario | Config | What It Tests |
+|----------|--------|---------------|
+| [keyvault-destructive](testdata/e2e/keyvault-destructive/) | `keyvault_access {}` on critical | Key vault access policy granting `Delete` and `Purge` secret permissions. Plugin detects destructive permissions and emits `critical`. Demonstrates attribute-level deep inspection of permission arrays. |
+
+### Deep Inspection: Data-Plane and Control-Plane Patterns
+
+| Scenario | Config | What It Tests |
+|----------|--------|---------------|
+| [data-plane-detection](testdata/e2e/data-plane-detection/) | `data_actions = ["Microsoft.Storage/*"]` on critical | **CR-0027.** Storage Blob Data Owner triggers `critical` via data-plane pattern matching (`Microsoft.Storage/*/blobs/*` matches `Microsoft.Storage/*`). Reader (no data actions) falls through to `standard` via control-plane `*/read` pattern. |
+| [control-plane-patterns](testdata/e2e/control-plane-patterns/) | `actions = ["Microsoft.Authorization/*", "*"]` on critical, `actions = ["*/read"]` on standard | **CR-0028.** User Access Administrator (has `Microsoft.Authorization/*`) triggers `critical`. Reader (only `*/read`) triggers `standard`. Demonstrates pattern-based control-plane detection. |
+
+### How E2E Tests Run
+
+Each scenario is executed by the reusable [e2e.yml](.github/workflows/e2e.yml) workflow:
+
+1. `terraform plan -out=create.tfplan` against real Azure infrastructure
+2. `tfclassify` classifies the create plan and compares exit code to `expected.json`
+3. `terraform apply` to create the resources
+4. `terraform plan -destroy -out=destroy.tfplan`
+5. `tfclassify` classifies the destroy plan and compares exit code
+6. `terraform destroy` to clean up
+
+CI ([ci.yml](.github/workflows/ci.yml)) runs all scenarios on PRs and pushes to main, building from source with both JSON and binary plan formats. The nightly [verify.yml](.github/workflows/verify.yml) runs against published releases.
 
 ## Project Structure
 
@@ -443,13 +509,15 @@ tfclassify/
 ## Development
 
 ```bash
-make build          # Build CLI → bin/tfclassify
-make build-all      # Build CLI + azurerm plugin
-make test           # Run all tests across workspace (go test ./...)
-make vet            # Static analysis (go vet ./...)
-make lint           # golangci-lint run ./...
-make generate-roles # Refresh Azure role database from AzAdvertizer CSV
-make clean          # Remove build artifacts
+make build                    # Build CLI → bin/tfclassify
+make build-all                # Build CLI + azurerm plugin
+make test                     # Run all tests across workspace (go test ./...)
+make vet                      # Static analysis (go vet ./...)
+make lint                     # golangci-lint run ./...
+make generate-roles           # Refresh Azure role database from AzAdvertizer CSV
+make generate-actions         # Refresh Azure action registry from Microsoft Docs + role database
+make generate-actions-offline # Refresh Azure action registry from role database only (no network)
+make clean                    # Remove build artifacts
 ```
 
 Run a single test:

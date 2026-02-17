@@ -19,9 +19,17 @@ type PluginAnalyzerConfig struct {
 
 // PrivilegeEscalationAnalyzerConfig holds per-classification configuration for the privilege analyzer.
 type PrivilegeEscalationAnalyzerConfig struct {
-	ScoreThreshold int      `json:"score_threshold,omitempty"`
-	Roles          []string `json:"roles,omitempty"`
-	Exclude        []string `json:"exclude,omitempty"`
+	Roles   []string `json:"roles,omitempty"`
+	Exclude []string `json:"exclude,omitempty"`
+	// Actions is a list of Azure RBAC control-plane action patterns to match (CR-0028).
+	Actions []string `json:"actions,omitempty"`
+	// DataActions is a list of Azure RBAC data-plane action patterns to match (CR-0027).
+	DataActions []string `json:"data_actions,omitempty"`
+	// Scopes limits triggering to specific ARM scope levels (CR-0028).
+	Scopes []string `json:"scopes,omitempty"`
+	// FlagUnknownRoles controls whether unresolvable roles emit decisions (CR-0028).
+	// Default: true (nil means true).
+	FlagUnknownRoles *bool `json:"flag_unknown_roles,omitempty"`
 }
 
 // NetworkExposureAnalyzerConfig holds per-classification configuration for the network analyzer.
@@ -38,22 +46,22 @@ type KeyVaultAccessAnalyzerConfig struct {
 type roleSource string
 
 const (
-	roleSourceBuiltin        roleSource = "builtin"
-	roleSourcePlanCustom     roleSource = "plan-custom-role"
-	roleSourceConfigFallback roleSource = "config-fallback"
-	roleSourceUnknown        roleSource = "unknown"
+	roleSourceBuiltin    roleSource = "builtin"
+	roleSourcePlanCustom roleSource = "plan-custom-role"
+	roleSourceUnknown    roleSource = "unknown"
 )
 
-// resolvedRole contains the resolved role information and score.
+// resolvedRole contains the resolved role information.
 type resolvedRole struct {
-	name   string
-	score  PermissionScore
-	source roleSource
+	name               string
+	source             roleSource
+	definition         *RoleDefinition // The full role definition (for pattern matching)
+	resolutionAttempts []string        // Why resolution failed (for unknown roles)
 }
 
 // PrivilegeEscalationAnalyzer detects privilege escalation in Azure role assignments.
-// It uses permission-based scoring, scope weighting, and custom role cross-referencing
-// to compute graduated severity based on the actual risk of role changes.
+// It uses pattern-based detection for both control-plane and data-plane actions,
+// with scope filtering and unknown role handling.
 type PrivilegeEscalationAnalyzer struct {
 	sdk.DefaultAnalyzer
 	config *PluginConfig
@@ -79,7 +87,7 @@ func (a *PrivilegeEscalationAnalyzer) ResourcePatterns() []string {
 	return []string{"azurerm_role_assignment"}
 }
 
-// Analyze inspects role assignments for privilege escalation using permission-based scoring.
+// Analyze inspects role assignments for privilege escalation.
 func (a *PrivilegeEscalationAnalyzer) Analyze(runner sdk.Runner) error {
 	return a.analyzeWithConfig(runner, "", nil)
 }
@@ -87,7 +95,6 @@ func (a *PrivilegeEscalationAnalyzer) Analyze(runner sdk.Runner) error {
 // AnalyzeWithClassification implements sdk.ClassificationAwareAnalyzer.
 // It receives classification context and per-analyzer configuration.
 func (a *PrivilegeEscalationAnalyzer) AnalyzeWithClassification(runner sdk.Runner, classification string, analyzerConfigJSON []byte) error {
-	// Parse the analyzer config
 	var pluginConfig PluginAnalyzerConfig
 	if len(analyzerConfigJSON) > 0 {
 		if err := json.Unmarshal(analyzerConfigJSON, &pluginConfig); err != nil {
@@ -95,6 +102,42 @@ func (a *PrivilegeEscalationAnalyzer) AnalyzeWithClassification(runner sdk.Runne
 		}
 	}
 	return a.analyzeWithConfig(runner, classification, pluginConfig.PrivilegeEscalation)
+}
+
+// scopeConfigName maps ScopeLevel values to the config names used in the scopes field.
+var scopeConfigName = map[ScopeLevel]string{
+	ScopeLevelManagementGroup: "management_group",
+	ScopeLevelSubscription:    "subscription",
+	ScopeLevelResourceGroup:   "resource_group",
+	ScopeLevelResource:        "resource",
+}
+
+// matchesScopeFilter checks if the scope matches the configured scopes filter.
+// Returns true if scopes is empty/nil (match any) or if the scope level is in the filter.
+func matchesScopeFilter(scope string, configuredScopes []string) bool {
+	if len(configuredScopes) == 0 {
+		return true
+	}
+	level := ParseScopeLevel(scope)
+	configName, ok := scopeConfigName[level]
+	if !ok {
+		return false
+	}
+	for _, s := range configuredScopes {
+		if strings.EqualFold(s, configName) {
+			return true
+		}
+	}
+	return false
+}
+
+// flagUnknownRolesEnabled returns whether unknown roles should be flagged.
+// Default is true when the pointer is nil.
+func flagUnknownRolesEnabled(cfg *PrivilegeEscalationAnalyzerConfig) bool {
+	if cfg == nil || cfg.FlagUnknownRoles == nil {
+		return true
+	}
+	return *cfg.FlagUnknownRoles
 }
 
 // analyzeWithConfig is the core analysis logic with optional classification-scoped config.
@@ -107,14 +150,11 @@ func (a *PrivilegeEscalationAnalyzer) analyzeWithConfig(runner sdk.Runner, class
 	// Build custom role lookup from plan (if enabled)
 	customRoles := a.buildCustomRoleLookup(runner)
 
-	// Get role database (use default if not configured)
+	// Get role database
 	db := a.config.RoleDatabase
 	if db == nil {
 		db = DefaultRoleDatabase()
 	}
-
-	// Build privileged roles set for fallback
-	privilegedSet := toSet(a.config.PrivilegedRoles)
 
 	// Build exclude set from classification config
 	var excludeSet map[string]bool
@@ -125,7 +165,7 @@ func (a *PrivilegeEscalationAnalyzer) analyzeWithConfig(runner sdk.Runner, class
 		}
 	}
 
-	// Build roles filter from classification config (limit to specific roles)
+	// Build roles filter from classification config
 	var rolesFilter map[string]bool
 	if analyzerCfg != nil && len(analyzerCfg.Roles) > 0 {
 		rolesFilter = make(map[string]bool)
@@ -134,11 +174,18 @@ func (a *PrivilegeEscalationAnalyzer) analyzeWithConfig(runner sdk.Runner, class
 		}
 	}
 
-	// Get score threshold
-	scoreThreshold := 0
+	// Get config options
+	var actionPatterns []string
+	var dataActionPatterns []string
+	var scopeFilter []string
 	if analyzerCfg != nil {
-		scoreThreshold = analyzerCfg.ScoreThreshold
+		actionPatterns = analyzerCfg.Actions
+		dataActionPatterns = analyzerCfg.DataActions
+		scopeFilter = analyzerCfg.Scopes
 	}
+
+	useControlPlane := len(actionPatterns) > 0
+	useDataPlane := len(dataActionPatterns) > 0
 
 	for _, change := range changes {
 		scope := stringField(change.After, "scope")
@@ -146,80 +193,246 @@ func (a *PrivilegeEscalationAnalyzer) analyzeWithConfig(runner sdk.Runner, class
 			scope = stringField(change.Before, "scope")
 		}
 
-		beforeRole := a.resolveRole(change.Before, db, customRoles, privilegedSet)
-		afterRole := a.resolveRole(change.After, db, customRoles, privilegedSet)
-
-		// Apply scope weighting to scores
-		beforeScoreWeighted := ApplyScopeMultiplier(beforeRole.score.Total, scope)
-		afterScoreWeighted := ApplyScopeMultiplier(afterRole.score.Total, scope)
-
-		// Only detect escalation (not de-escalation - CR-0024 removes de-escalation detection)
-		if afterScoreWeighted > beforeScoreWeighted {
-			// Check if role is in exclude list
-			if excludeSet != nil && excludeSet[strings.ToLower(afterRole.name)] {
-				continue
-			}
-
-			// Check if we have a roles filter and the role isn't in it
-			if rolesFilter != nil && !rolesFilter[strings.ToLower(afterRole.name)] {
-				continue
-			}
-
-			// Check score threshold
-			if afterScoreWeighted < scoreThreshold {
-				continue
-			}
-
-			// Escalation: after is more privileged than before
-			reason := fmt.Sprintf("role escalated from %q to %q", beforeRole.name, afterRole.name)
-			if beforeRole.name == "" {
-				reason = fmt.Sprintf("privileged role %q assigned", afterRole.name)
-			}
-
-			decision := &sdk.Decision{
-				Classification: classification, // Set classification from context
-				Reason:         reason,
-				Severity:       afterScoreWeighted,
-				Metadata: map[string]interface{}{
-					"analyzer":        "privilege-escalation",
-					"before_role":     beforeRole.name,
-					"after_role":      afterRole.name,
-					"direction":       "escalation",
-					"before_score":    beforeScoreWeighted,
-					"after_score":     afterScoreWeighted,
-					"scope":           scope,
-					"scope_level":     ParseScopeLevel(scope).String(),
-					"score_factors":   afterRole.score.Factors,
-					"role_source":     string(afterRole.source),
-					"score_threshold": scoreThreshold,
-				},
-			}
-
-			if err := runner.EmitDecision(a, change, decision); err != nil {
-				return fmt.Errorf("failed to emit decision: %w", err)
-			}
+		// Check scope filter before resolving role (optimization)
+		if !matchesScopeFilter(scope, scopeFilter) {
+			continue
 		}
-		// De-escalation is no longer detected (removed per CR-0024)
+
+		afterRole := a.resolveRole(change.After, db, customRoles)
+
+		// Check exclude list
+		if excludeSet != nil && excludeSet[strings.ToLower(afterRole.name)] {
+			continue
+		}
+
+		// Check roles filter
+		if rolesFilter != nil && !rolesFilter[strings.ToLower(afterRole.name)] {
+			continue
+		}
+
+		// Handle unknown roles
+		if afterRole.source == roleSourceUnknown && afterRole.name != "" {
+			if flagUnknownRolesEnabled(analyzerCfg) {
+				decision := &sdk.Decision{
+					Classification: classification,
+					Reason:         fmt.Sprintf("unknown role %q flagged (role permissions could not be resolved)", afterRole.name),
+					Metadata: map[string]interface{}{
+						"analyzer":            "privilege-escalation",
+						"trigger":             "unknown-role",
+						"role_name":           afterRole.name,
+						"resolution_attempts": afterRole.resolutionAttempts,
+						"scope":               scope,
+						"scope_level":         ParseScopeLevel(scope).String(),
+					},
+				}
+				if err := runner.EmitDecision(a, change, decision); err != nil {
+					return fmt.Errorf("failed to emit decision: %w", err)
+				}
+			}
+			continue
+		}
+
+		// Handle unresolvable role with custom role definitions in the plan.
+		// When both the role assignment and role definition are being created,
+		// the role_definition_id is unknown at plan time (computed reference).
+		// In this case, check if any custom role definition in the plan matches
+		// the configured action patterns and emit a decision if so.
+		if afterRole.source == roleSourceUnknown && afterRole.name == "" && customRoles != nil {
+			if matchedDef := a.matchAnyCustomRole(customRoles, actionPatterns, dataActionPatterns, useControlPlane, useDataPlane); matchedDef != nil {
+				decision := &sdk.Decision{
+					Classification: classification,
+					Reason:         fmt.Sprintf("role assignment references unresolvable role; custom role %q in plan matches configured patterns", matchedDef.Name),
+					Metadata: map[string]interface{}{
+						"analyzer":    "privilege-escalation",
+						"trigger":     "unresolved-custom-role",
+						"role_name":   matchedDef.Name,
+						"role_source": "plan-custom-role-inferred",
+						"scope":       scope,
+						"scope_level": ParseScopeLevel(scope).String(),
+					},
+				}
+				if err := runner.EmitDecision(a, change, decision); err != nil {
+					return fmt.Errorf("failed to emit decision: %w", err)
+				}
+			}
+			continue
+		}
+
+		// Pattern-based detection
+		controlPlaneTriggered := false
+		var controlPlaneMatchedActions []string
+		var controlPlaneMatchedPatterns []string
+
+		if useControlPlane {
+			controlPlaneMatchedActions, controlPlaneMatchedPatterns = a.matchControlPlanePatterns(afterRole.definition, actionPatterns)
+			controlPlaneTriggered = len(controlPlaneMatchedActions) > 0
+		}
+
+		dataPlaneTriggered := false
+		var dataPlaneMatchedActions []string
+		var dataPlaneMatchedPatterns []string
+
+		if useDataPlane {
+			dataPlaneMatchedActions, dataPlaneMatchedPatterns = a.matchDataPlanePatterns(afterRole.definition, dataActionPatterns)
+			dataPlaneTriggered = len(dataPlaneMatchedActions) > 0
+		}
+
+		if !controlPlaneTriggered && !dataPlaneTriggered {
+			continue
+		}
+
+		// Build decision
+		var trigger string
+		var reason string
+		metadata := map[string]interface{}{
+			"analyzer":    "privilege-escalation",
+			"after_role":  afterRole.name,
+			"scope":       scope,
+			"scope_level": ParseScopeLevel(scope).String(),
+			"role_source": string(afterRole.source),
+		}
+
+		if controlPlaneTriggered && dataPlaneTriggered {
+			trigger = "both"
+			reason = fmt.Sprintf("role %q grants control-plane and data-plane access matching configured patterns", afterRole.name)
+			metadata["matched_actions"] = controlPlaneMatchedActions
+			metadata["matched_patterns"] = controlPlaneMatchedPatterns
+			metadata["matched_data_actions"] = dataPlaneMatchedActions
+			metadata["matched_data_patterns"] = dataPlaneMatchedPatterns
+		} else if dataPlaneTriggered {
+			trigger = "data-plane"
+			reason = fmt.Sprintf("role %q grants data-plane access matching configured patterns", afterRole.name)
+			metadata["matched_data_actions"] = dataPlaneMatchedActions
+			metadata["matched_patterns"] = dataPlaneMatchedPatterns
+		} else {
+			trigger = "control-plane"
+			reason = fmt.Sprintf("role %q grants control-plane access matching configured patterns", afterRole.name)
+			metadata["matched_actions"] = controlPlaneMatchedActions
+			metadata["matched_patterns"] = controlPlaneMatchedPatterns
+		}
+
+		metadata["trigger"] = trigger
+
+		decision := &sdk.Decision{
+			Classification: classification,
+			Reason:         reason,
+			Metadata:       metadata,
+		}
+
+		if err := runner.EmitDecision(a, change, decision); err != nil {
+			return fmt.Errorf("failed to emit decision: %w", err)
+		}
 	}
 
 	return nil
 }
 
-// resolveRole resolves a role from the resource state using the four-level fallback chain:
+// matchAnyCustomRole checks if any custom role definition in the lookup matches
+// the configured action patterns. Returns the first matching role definition, or nil.
+// This is used when a role assignment references an unresolvable role (computed ID)
+// and custom role definitions exist in the plan.
+func (a *PrivilegeEscalationAnalyzer) matchAnyCustomRole(
+	customRoles *customRoleLookup,
+	actionPatterns, dataActionPatterns []string,
+	useControlPlane, useDataPlane bool,
+) *RoleDefinition {
+	if customRoles == nil {
+		return nil
+	}
+	for _, role := range customRoles.byName {
+		if useControlPlane {
+			matched, _ := a.matchControlPlanePatterns(role, actionPatterns)
+			if len(matched) > 0 {
+				return role
+			}
+		}
+		if useDataPlane {
+			matched, _ := a.matchDataPlanePatterns(role, dataActionPatterns)
+			if len(matched) > 0 {
+				return role
+			}
+		}
+	}
+	return nil
+}
+
+// matchControlPlanePatterns matches effective control-plane actions against patterns.
+func (a *PrivilegeEscalationAnalyzer) matchControlPlanePatterns(role *RoleDefinition, patterns []string) (matchedActions, matchedPatterns []string) {
+	if role == nil || len(patterns) == 0 {
+		return nil, nil
+	}
+
+	matchedActionsSet := make(map[string]bool)
+	matchedPatternsSet := make(map[string]bool)
+
+	for _, perm := range role.Permissions {
+		effectiveActions := computeEffectiveActionsWithRegistry(perm.Actions, perm.NotActions, false, nil)
+
+		for _, action := range effectiveActions {
+			for _, pattern := range patterns {
+				if actionMatchesPattern(action, pattern) {
+					matchedActionsSet[action] = true
+					matchedPatternsSet[pattern] = true
+				}
+			}
+		}
+	}
+
+	for action := range matchedActionsSet {
+		matchedActions = append(matchedActions, action)
+	}
+	for pattern := range matchedPatternsSet {
+		matchedPatterns = append(matchedPatterns, pattern)
+	}
+
+	return matchedActions, matchedPatterns
+}
+
+// matchDataPlanePatterns matches effective data-plane actions against patterns.
+func (a *PrivilegeEscalationAnalyzer) matchDataPlanePatterns(role *RoleDefinition, patterns []string) (matchedActions, matchedPatterns []string) {
+	if role == nil || len(patterns) == 0 {
+		return nil, nil
+	}
+
+	matchedActionsSet := make(map[string]bool)
+	matchedPatternsSet := make(map[string]bool)
+
+	for _, perm := range role.Permissions {
+		effectiveDataActions := computeEffectiveActionsWithRegistry(perm.DataActions, perm.NotDataActions, true, nil)
+
+		for _, action := range effectiveDataActions {
+			for _, pattern := range patterns {
+				if actionMatchesPattern(action, pattern) {
+					matchedActionsSet[action] = true
+					matchedPatternsSet[pattern] = true
+				}
+			}
+		}
+	}
+
+	for action := range matchedActionsSet {
+		matchedActions = append(matchedActions, action)
+	}
+	for pattern := range matchedPatternsSet {
+		matchedPatterns = append(matchedPatterns, pattern)
+	}
+
+	return matchedActions, matchedPatterns
+}
+
+// resolveRole resolves a role from the resource state.
+// Resolution order:
 // 1. Built-in role database (by name or ID)
-// 2. Custom role from plan (azurerm_role_definition)
-// 3. Config fallback (PrivilegedRoles list)
-// 4. Unknown role
+// 2. Custom role from plan (azurerm_role_definition) by name or ID
+// 3. Unknown role (with resolution attempt details)
 func (a *PrivilegeEscalationAnalyzer) resolveRole(
 	state map[string]interface{},
 	db *RoleDatabase,
-	customRoles map[string]*RoleDefinition,
-	privilegedSet map[string]bool,
+	customRoles *customRoleLookup,
 ) resolvedRole {
 	if state == nil {
 		return resolvedRole{
 			name:   "",
-			score:  PermissionScore{Total: 0, Factors: []string{"no role state"}},
 			source: roleSourceUnknown,
 		}
 	}
@@ -227,92 +440,135 @@ func (a *PrivilegeEscalationAnalyzer) resolveRole(
 	roleName := stringField(state, "role_definition_name")
 	roleID := stringField(state, "role_definition_id")
 
-	// Try to resolve by name first from built-in database
-	if roleName != "" {
-		if role, found := db.LookupByName(roleName); found {
-			return resolvedRole{
-				name:   roleName,
-				score:  ScorePermissions(role),
-				source: roleSourceBuiltin,
-			}
+	// Check if role_definition_id is present but unknown (computed reference in plan).
+	// Terraform puts the key with a null value for unknown computed attributes.
+	hasUnknownID := roleID == "" && hasField(state, "role_definition_id")
+
+	if roleName == "" && roleID == "" && !hasUnknownID {
+		return resolvedRole{
+			name:   "",
+			source: roleSourceUnknown,
 		}
 	}
 
-	// Try to resolve by ID from built-in database
+	var attempts []string
+
+	// Try built-in database by name
+	if roleName != "" {
+		if role, found := db.LookupByName(roleName); found {
+			return resolvedRole{
+				name:       roleName,
+				source:     roleSourceBuiltin,
+				definition: role,
+			}
+		}
+		attempts = append(attempts, "not found in built-in role database")
+	}
+
+	// Try built-in database by ID
 	if roleID != "" {
 		if role, found := db.LookupByID(roleID); found {
 			name := role.Name
 			if roleName != "" {
-				name = roleName // Prefer the name from the assignment
+				name = roleName
 			}
 			return resolvedRole{
-				name:   name,
-				score:  ScorePermissions(role),
-				source: roleSourceBuiltin,
+				name:       name,
+				source:     roleSourceBuiltin,
+				definition: role,
 			}
+		}
+		if roleName == "" {
+			attempts = append(attempts, "not found in built-in role database (by ID)")
 		}
 	}
 
-	// Try custom roles from plan
+	// Try custom roles from plan (by name)
 	if roleName != "" && customRoles != nil {
-		if role, found := customRoles[strings.ToLower(roleName)]; found {
+		if role, found := customRoles.lookupByName(roleName); found {
 			return resolvedRole{
-				name:   roleName,
-				score:  ScorePermissions(role),
-				source: roleSourcePlanCustom,
+				name:       roleName,
+				source:     roleSourcePlanCustom,
+				definition: role,
 			}
 		}
+		attempts = append(attempts, "no matching azurerm_role_definition by name in plan")
 	}
 
-	// Config fallback: check if in PrivilegedRoles list
-	if roleName != "" && privilegedSet[roleName] {
-		return resolvedRole{
-			name: roleName,
-			score: PermissionScore{
-				Total:   a.config.UnknownPrivilegedSeverity,
-				Factors: []string{"configured as privileged role"},
-			},
-			source: roleSourceConfigFallback,
+	// Try custom roles from plan (by ID)
+	if roleID != "" && customRoles != nil {
+		if role, found := customRoles.lookupByID(roleID); found {
+			return resolvedRole{
+				name:       role.Name,
+				source:     roleSourcePlanCustom,
+				definition: role,
+			}
 		}
+		attempts = append(attempts, "no matching azurerm_role_definition by ID in plan")
 	}
 
-	// Unknown role
-	if roleName == "" && roleID == "" {
-		return resolvedRole{
-			name:   "",
-			score:  PermissionScore{Total: 0, Factors: []string{"no role specified"}},
-			source: roleSourceUnknown,
-		}
+	if customRoles == nil {
+		attempts = append(attempts, "custom role cross-referencing disabled")
+	}
+
+	if hasUnknownID {
+		attempts = append(attempts, "role_definition_id is unknown (computed reference in plan)")
 	}
 
 	name := roleName
 	if name == "" {
 		name = roleID
 	}
+	if name == "" && hasUnknownID {
+		name = "(unknown computed role)"
+	}
 	return resolvedRole{
-		name: name,
-		score: PermissionScore{
-			Total:   a.config.UnknownRoleSeverity,
-			Factors: []string{"unknown role"},
-		},
-		source: roleSourceUnknown,
+		name:               name,
+		source:             roleSourceUnknown,
+		resolutionAttempts: attempts,
 	}
 }
 
+// customRoleLookup holds custom role definitions indexed by name and by resource ID.
+type customRoleLookup struct {
+	byName map[string]*RoleDefinition // lowercase name → definition
+	byID   map[string]*RoleDefinition // lowercase role_definition_resource_id → definition
+}
+
+// lookupByName finds a custom role by name.
+func (c *customRoleLookup) lookupByName(name string) (*RoleDefinition, bool) {
+	if c == nil {
+		return nil, false
+	}
+	role, ok := c.byName[strings.ToLower(name)]
+	return role, ok
+}
+
+// lookupByID finds a custom role by its role_definition_resource_id.
+func (c *customRoleLookup) lookupByID(id string) (*RoleDefinition, bool) {
+	if c == nil {
+		return nil, false
+	}
+	role, ok := c.byID[strings.ToLower(id)]
+	return role, ok
+}
+
 // buildCustomRoleLookup queries the runner for azurerm_role_definition resources
-// and builds a lookup map by role name.
-func (a *PrivilegeEscalationAnalyzer) buildCustomRoleLookup(runner sdk.Runner) map[string]*RoleDefinition {
+// and builds a lookup indexed by role name and role_definition_resource_id.
+func (a *PrivilegeEscalationAnalyzer) buildCustomRoleLookup(runner sdk.Runner) *customRoleLookup {
 	if !a.config.CrossReferenceCustomRoles {
 		return nil
 	}
 
 	changes, err := runner.GetResourceChanges([]string{"azurerm_role_definition"})
 	if err != nil {
-		// Log and continue - don't fail analysis due to cross-reference failure
 		return nil
 	}
 
-	result := make(map[string]*RoleDefinition)
+	result := &customRoleLookup{
+		byName: make(map[string]*RoleDefinition),
+		byID:   make(map[string]*RoleDefinition),
+	}
 	for _, change := range changes {
 		state := change.After
 		if state == nil {
@@ -322,23 +578,29 @@ func (a *PrivilegeEscalationAnalyzer) buildCustomRoleLookup(runner sdk.Runner) m
 			continue
 		}
 
-		name := stringField(state, "name")
-		if name == "" {
-			continue
-		}
-
-		// Parse permissions from plan JSON
-		// Terraform uses snake_case: actions, not_actions, data_actions, not_data_actions
 		perms := a.parsePermissionsFromPlan(state)
 		if len(perms) == 0 {
 			continue
+		}
+
+		name := stringField(state, "name")
+		if name == "" {
+			// Use resource address as a fallback name when the actual name
+			// is unknown at plan time (e.g., it uses random_id).
+			name = change.Address
 		}
 
 		role := &RoleDefinition{
 			Name:        name,
 			Permissions: perms,
 		}
-		result[strings.ToLower(name)] = role
+		result.byName[strings.ToLower(name)] = role
+
+		// Also index by role_definition_resource_id for ID-based lookups
+		resourceID := stringField(state, "role_definition_resource_id")
+		if resourceID != "" {
+			result.byID[strings.ToLower(resourceID)] = role
+		}
 	}
 
 	return result
@@ -346,7 +608,6 @@ func (a *PrivilegeEscalationAnalyzer) buildCustomRoleLookup(runner sdk.Runner) m
 
 // parsePermissionsFromPlan extracts permissions from a Terraform plan state.
 func (a *PrivilegeEscalationAnalyzer) parsePermissionsFromPlan(state map[string]interface{}) []Permission {
-	// The permissions field in Terraform is typically a list of permission blocks
 	permsRaw, ok := state["permissions"]
 	if !ok {
 		return nil

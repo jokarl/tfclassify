@@ -14,7 +14,7 @@ classification "critical" {
 
   azurerm {
     privilege_escalation {
-      score_threshold = 80
+      actions = ["Microsoft.Authorization/*"]
       exclude = ["AcrPush", "AcrPull"]
     }
 

@@ -152,12 +152,7 @@ func parsePrivilegeEscalationConfig(block *hclsyntax.Block, config *PrivilegeEsc
 	for name, attr := range block.Body.Attributes {
 		switch name {
 		case "score_threshold":
-			val, diags := attr.Expr.Value(nil)
-			if diags.HasErrors() {
-				return fmt.Errorf("privilege_escalation.score_threshold: %v", diags.Error())
-			}
-			num, _ := val.AsBigFloat().Int64()
-			config.ScoreThreshold = int(num)
+			return fmt.Errorf("privilege_escalation: score_threshold is no longer supported; use actions/data_actions for pattern-based detection (see CR-0028)")
 		case "roles":
 			val, diags := attr.Expr.Value(nil)
 			if diags.HasErrors() {
@@ -170,6 +165,31 @@ func parsePrivilegeEscalationConfig(block *hclsyntax.Block, config *PrivilegeEsc
 				return fmt.Errorf("privilege_escalation.exclude: %v", diags.Error())
 			}
 			config.Exclude = toStringSlice(val)
+		case "actions":
+			val, diags := attr.Expr.Value(nil)
+			if diags.HasErrors() {
+				return fmt.Errorf("privilege_escalation.actions: %v", diags.Error())
+			}
+			config.Actions = toStringSlice(val)
+		case "data_actions":
+			val, diags := attr.Expr.Value(nil)
+			if diags.HasErrors() {
+				return fmt.Errorf("privilege_escalation.data_actions: %v", diags.Error())
+			}
+			config.DataActions = toStringSlice(val)
+		case "scopes":
+			val, diags := attr.Expr.Value(nil)
+			if diags.HasErrors() {
+				return fmt.Errorf("privilege_escalation.scopes: %v", diags.Error())
+			}
+			config.Scopes = toStringSlice(val)
+		case "flag_unknown_roles":
+			val, diags := attr.Expr.Value(nil)
+			if diags.HasErrors() {
+				return fmt.Errorf("privilege_escalation.flag_unknown_roles: %v", diags.Error())
+			}
+			b := val.True()
+			config.FlagUnknownRoles = &b
 		default:
 			return fmt.Errorf("privilege_escalation: unknown attribute %q", name)
 		}

@@ -80,6 +80,25 @@ Discovery order (`pkg/plugin/discovery.go`): config `plugin_dir` → `TFCLASSIFY
 
 Version negotiation: host checks `SDKVersionConstraints` against plugin's reported SDK version, and plugin can specify `HostVersionConstraint` (semver). Both checked during handshake.
 
+## E2E Tests
+
+E2E test scenarios live in `testdata/e2e/`. Each scenario has `main.tf`, `.tfclassify.hcl`, and `expected.json`. These run against real Azure infrastructure in CI.
+
+**E2e tests must be kept in sync with code changes.** When modifying plugin analyzers, config parsing, or classification logic, check whether existing e2e scenarios need updating and whether new scenarios are needed. The CI matrix in `.github/workflows/ci.yml` must include all scenarios.
+
+**Verify e2e on your branch** by triggering the CI workflow:
+```bash
+gh workflow run ci.yml --ref $(git branch --show-current)
+```
+
+Monitor the run:
+```bash
+gh run list --workflow=ci.yml --branch=$(git branch --show-current) --limit=1
+gh run watch                    # watch the latest run
+```
+
+E2e tests build from source and test both JSON and binary plan formats. Each scenario runs create and destroy phases, comparing exit codes against `expected.json`.
+
 ## Governance
 
 ADRs in `docs/adr/`, CRs in `docs/cr/`. Use the `/governance` skill to create new ones. Checkpoint commits follow `checkpoint(CR-xxxx): {summary}` format. CRs use Gherkin acceptance criteria and RFC 2119 keywords.

@@ -16,6 +16,11 @@ on:
         type: string
         default: json
         description: Plan formats to test — "json", "binary", or "both"
+      plan-only:
+        required: false
+        type: boolean
+        default: false
+        description: Only run plan + classify (skip apply/destroy). Use when the scenario requires permissions the CI service principal lacks.
       open-issue-on-failure:
         required: false
         type: boolean
@@ -91,7 +96,7 @@ jobs:
 
       - name: Create plan
         run: |
-          terraform -chdir=testdata/e2e/${{ inputs.use-case }} plan -out=create.tfplan
+          terraform -chdir=testdata/e2e/${{ inputs.use-case }} plan -var-file=../e2e.tfvars -out=create.tfplan
           terraform -chdir=testdata/e2e/${{ inputs.use-case }} show -json create.tfplan \
             > testdata/e2e/${{ inputs.use-case }}/create.json
           echo "::group::Create plan JSON"
@@ -142,11 +147,13 @@ jobs:
 
       - name: Apply
         id: apply
+        if: ${{ !inputs.plan-only }}
         run: terraform -chdir=testdata/e2e/${{ inputs.use-case }} apply -auto-approve create.tfplan
 
       - name: Destroy plan
+        if: ${{ !inputs.plan-only }}
         run: |
-          terraform -chdir=testdata/e2e/${{ inputs.use-case }} plan -destroy -out=destroy.tfplan
+          terraform -chdir=testdata/e2e/${{ inputs.use-case }} plan -destroy -var-file=../e2e.tfvars -out=destroy.tfplan
           terraform -chdir=testdata/e2e/${{ inputs.use-case }} show -json destroy.tfplan \
             > testdata/e2e/${{ inputs.use-case }}/destroy.json
           echo "::group::Destroy plan JSON"
@@ -155,7 +162,7 @@ jobs:
 
       - name: Classify destroy plan (JSON)
         id: classify-destroy-json
-        if: inputs.plan-formats == 'json' || inputs.plan-formats == 'both'
+        if: ${{ !inputs.plan-only && (inputs.plan-formats == 'json' || inputs.plan-formats == 'both') }}
         run: |
           EXPECTED_EXIT=$(jq -r '.destroy.exit_code' testdata/e2e/${{ inputs.use-case }}/expected.json)
           set +e
@@ -177,7 +184,7 @@ jobs:
 
       - name: Classify destroy plan (binary)
         id: classify-destroy-binary
-        if: inputs.plan-formats == 'binary' || inputs.plan-formats == 'both'
+        if: ${{ !inputs.plan-only && (inputs.plan-formats == 'binary' || inputs.plan-formats == 'both') }}
         run: |
           EXPECTED_EXIT=$(jq -r '.destroy.exit_code' testdata/e2e/${{ inputs.use-case }}/expected.json)
           set +e
@@ -198,7 +205,7 @@ jobs:
       - name: Cleanup
         if: always() && steps.apply.outcome != 'skipped'
         continue-on-error: true
-        run: terraform -chdir=testdata/e2e/${{ inputs.use-case }} destroy -auto-approve
+        run: terraform -chdir=testdata/e2e/${{ inputs.use-case }} destroy -auto-approve -var-file=../e2e.tfvars
 
       - name: Open issue on failure
         if: failure() && inputs.open-issue-on-failure

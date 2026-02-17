@@ -11,6 +11,14 @@ classification "critical" {
     resource = ["*_role_*", "*_security_group", "*_security_rule"]
     actions  = ["delete"]
   }
+
+  # CR-0028: Pattern-based control-plane detection
+  # Owner role has Actions: ["*"] which includes Microsoft.Authorization/*
+  azurerm {
+    privilege_escalation {
+      actions = ["Microsoft.Authorization/*"]
+    }
+  }
 }
 
 classification "standard" {

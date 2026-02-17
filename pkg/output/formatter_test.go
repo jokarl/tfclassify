@@ -142,18 +142,18 @@ func TestFormatGitHub(t *testing.T) {
 
 	output := buf.String()
 
-	// Check for ::set-output syntax
-	if !strings.Contains(output, "::set-output name=classification::critical") {
-		t.Errorf("expected GitHub Actions set-output for classification, got:\n%s", output)
-	}
-
-	if !strings.Contains(output, "::set-output name=exit_code::2") {
-		t.Errorf("expected GitHub Actions set-output for exit_code, got:\n%s", output)
-	}
-
 	// Check for GITHUB_OUTPUT file format
 	if !strings.Contains(output, "classification=critical") {
 		t.Errorf("expected GITHUB_OUTPUT format for classification, got:\n%s", output)
+	}
+
+	if !strings.Contains(output, "exit_code=2") {
+		t.Errorf("expected GITHUB_OUTPUT format for exit_code, got:\n%s", output)
+	}
+
+	// Legacy ::set-output should not be present
+	if strings.Contains(output, "::set-output") {
+		t.Errorf("unexpected legacy ::set-output syntax in output:\n%s", output)
 	}
 }
 
@@ -286,11 +286,6 @@ func TestFormatGitHub_WithDescription(t *testing.T) {
 	}
 
 	output := buf.String()
-
-	// Check for ::set-output syntax with classification_description
-	if !strings.Contains(output, "::set-output name=classification_description::Security approval required") {
-		t.Errorf("expected GitHub Actions set-output for classification_description, got:\n%s", output)
-	}
 
 	// Check for GITHUB_OUTPUT file format
 	if !strings.Contains(output, "classification_description=Security approval required") {

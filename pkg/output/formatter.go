@@ -151,16 +151,7 @@ func (f *Formatter) formatText(result *classify.Result) error {
 func (f *Formatter) formatGitHub(result *classify.Result) error {
 	var sb strings.Builder
 
-	// Set output variables using GitHub Actions syntax
-	sb.WriteString(fmt.Sprintf("::set-output name=classification::%s\n", result.Overall))
-	sb.WriteString(fmt.Sprintf("::set-output name=exit_code::%d\n", result.OverallExitCode))
-	sb.WriteString(fmt.Sprintf("::set-output name=no_changes::%t\n", result.NoChanges))
-	sb.WriteString(fmt.Sprintf("::set-output name=resource_count::%d\n", len(result.ResourceDecisions)))
-	if result.OverallDescription != "" {
-		sb.WriteString(fmt.Sprintf("::set-output name=classification_description::%s\n", result.OverallDescription))
-	}
-
-	// Also set GITHUB_OUTPUT environment file format (newer approach)
+	// Set output variables using GITHUB_OUTPUT file format
 	sb.WriteString(fmt.Sprintf("classification=%s\n", result.Overall))
 	sb.WriteString(fmt.Sprintf("exit_code=%d\n", result.OverallExitCode))
 	sb.WriteString(fmt.Sprintf("no_changes=%t\n", result.NoChanges))
