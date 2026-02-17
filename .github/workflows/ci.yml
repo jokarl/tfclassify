@@ -85,8 +85,17 @@ jobs:
           - data-plane-detection
           - control-plane-patterns
           - custom-role-cross-reference
+        include:
+          # custom-role-cross-reference creates an azurerm_role_definition, which
+          # requires Microsoft.Authorization/roleDefinitions/write — a permission
+          # the CI service principal does not have. Plan-only mode is sufficient
+          # because the test validates that tfclassify cross-references the custom
+          # role definition from the plan; apply/destroy adds no classification coverage.
+          - use-case: custom-role-cross-reference
+            plan-only: true
     uses: ./.github/workflows/e2e.yml
     with:
       use-case: ${{ matrix.use-case }}
       binary-source: build
       plan-formats: both
+      plan-only: ${{ matrix.plan-only || false }}

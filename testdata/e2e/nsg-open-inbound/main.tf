@@ -13,7 +13,6 @@ terraform {
 
 provider "azurerm" {
   features {}
-  subscription_id                 = "0a271008-02cf-4a50-9bb3-afc7c4aed74c"
   resource_provider_registrations = "none"
 }
 
@@ -21,8 +20,10 @@ resource "random_id" "suffix" {
   byte_length = 4
 }
 
+variable "resource_group_name" {}
+
 data "azurerm_resource_group" "lab" {
-  name = "rg-lab-johan.karlsson"
+  name = var.resource_group_name
 }
 
 resource "azurerm_network_security_group" "test" {
