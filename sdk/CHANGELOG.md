@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/jokarl/tfclassify/compare/tfclassify-plugin-sdk-v0.1.0...tfclassify-plugin-sdk-v0.2.0) (2026-02-17)
+
+
+### Features
+
+* classification-scoped plugin config and --detailed-exitcode flag ([#14](https://github.com/jokarl/tfclassify/issues/14)) ([128646b](https://github.com/jokarl/tfclassify/commit/128646b8d33bb64cf585bc3d9460bee98a96d924))
+
 ## [0.1.0](https://github.com/jokarl/tfclassify/compare/tfclassify-plugin-sdk-v0.0.1...tfclassify-plugin-sdk-v0.1.0) (2026-02-14)
 
 
