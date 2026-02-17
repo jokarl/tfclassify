@@ -217,7 +217,7 @@ Supports `GITHUB_TOKEN` environment variable for authenticated requests.
 }
 ```
 
-**GitHub** — sets GitHub Actions output variables (`classification`, `exit_code`, `no_changes`, `resource_count`) in both legacy `::set-output` and `GITHUB_OUTPUT` file formats.
+**GitHub** — sets GitHub Actions output variables (`classification`, `exit_code`, `no_changes`, `resource_count`) in `GITHUB_OUTPUT` file format.
 
 ## Configuration
 
@@ -316,12 +316,23 @@ plugin "azurerm" {
   enabled = true
   source  = "github.com/jokarl/tfclassify"   # GitHub repo for download
   version = "0.1.0"                            # Semantic version
+}
 
-  config {
-    # Plugin-specific options (opaque to core, forwarded via gRPC)
-    privilege_enabled = true
-    network_enabled   = true
-    keyvault_enabled  = true
+# Plugin analyzer configuration lives inside classification blocks.
+# Each plugin can define per-analyzer sub-blocks:
+classification "critical" {
+  description = "Requires security team approval"
+
+  rule {
+    resource = ["*_role_*"]
+    actions  = ["delete"]
+  }
+
+  azurerm {
+    privilege_escalation {
+      actions = ["Microsoft.Authorization/*"]   # Control-plane patterns
+    }
+    keyvault_access {}                          # Detect destructive permissions
   }
 }
 ```
@@ -359,17 +370,17 @@ Config-driven pattern matching. Glob patterns on resource types and actions, eva
 
 Cross-provider heuristics that run in-process after core rules. These detect Terraform-level concepts regardless of provider:
 
-| Analyzer | Detects | Severity |
-|----------|---------|----------|
-| `deletion` | Standalone resource deletions (not replacements) | 80 |
-| `replace` | Resource replacements (destroy + recreate) | 75 |
-| `sensitive` | Changes to Terraform-marked sensitive attributes | 70 |
+| Analyzer | Detects |
+|----------|---------|
+| `deletion` | Standalone resource deletions (not part of a replacement) |
+| `replace` | Resource replacements (destroy + recreate) |
+| `sensitive` | Changes to Terraform-marked sensitive attributes |
 
 Builtin analyzers are always enabled and require no configuration.
 
 ### Layer 3: Deep Inspection Plugins
 
-Provider-specific analysis via external plugins. Plugins run as separate processes communicating over gRPC ([hashicorp/go-plugin](https://github.com/hashicorp/go-plugin)). They inspect actual resource attribute values — role permissions, network CIDRs, access grants — to produce graduated severity scores.
+Provider-specific analysis via external plugins. Plugins run as separate processes communicating over gRPC ([hashicorp/go-plugin](https://github.com/hashicorp/go-plugin)). They inspect actual resource attribute values — role permissions, network CIDRs, access grants — using pattern-based detection configured per-classification.
 
 **Available plugins:**
 
@@ -424,9 +435,10 @@ These scenarios demonstrate real-world classification behavior across all three 
 
 | Scenario | Config | What It Tests |
 |----------|--------|---------------|
-| [role-assignment-privileged](testdata/e2e/role-assignment-privileged/) | Plugin enabled, default config | Owner role assignment at RG scope. Plugin scores permissions (tier 1, score 95 * 0.8 = 76) and emits escalation decision. No `score_threshold` configured so any score triggers. |
-| [role-escalation-threshold](testdata/e2e/role-escalation-threshold/) | `score_threshold = 70` on critical, default on standard | **Graduated thresholds.** Owner (76 at RG) triggers `critical` (>= 70). Contributor (56 at RG) skips critical, falls through to `standard` (any score). Demonstrates per-classification threshold gating. |
+| [role-assignment-privileged](testdata/e2e/role-assignment-privileged/) | `actions = ["Microsoft.Authorization/*"]` on critical | Owner role at RG scope. Owner's effective actions include `Microsoft.Authorization/*`, matching the critical pattern. |
+| [role-escalation-threshold](testdata/e2e/role-escalation-threshold/) | `actions = ["Microsoft.Authorization/*"]` on critical, `actions = ["*/write", "*/delete", "*/action"]` on standard | **Graduated patterns.** Owner (has `Microsoft.Authorization/*`) triggers `critical`. Contributor (has write/delete but `NotActions: Microsoft.Authorization/*`) falls to `standard`. |
 | [role-exclusion](testdata/e2e/role-exclusion/) | `exclude = ["AcrPush"]` on both critical and standard | AcrPush role is excluded from privilege escalation detection in all classifications. Falls through to core rule `standard` on create, `critical` on destroy (glob `*_role_*` + `delete`). |
+| [custom-role-cross-reference](testdata/e2e/custom-role-cross-reference/) | `actions = ["Microsoft.Authorization/*"]` on critical | Custom role with `Microsoft.Authorization/roleAssignments/write`. Plugin cross-references the role definition from the plan to resolve effective actions, matching the critical pattern. |
 
 ### Deep Inspection: Network Exposure
 
@@ -444,8 +456,8 @@ These scenarios demonstrate real-world classification behavior across all three 
 
 | Scenario | Config | What It Tests |
 |----------|--------|---------------|
-| [data-plane-detection](testdata/e2e/data-plane-detection/) | `data_actions = ["Microsoft.Storage/*"]`, `score_threshold = 100` on critical | **CR-0027.** Storage Blob Data Owner triggers `critical` via data-plane pattern matching. Reader (no data actions) falls through to `standard`. Control-plane threshold set to 100 to isolate data-plane triggering. |
-| [control-plane-patterns](testdata/e2e/control-plane-patterns/) | `actions = ["Microsoft.Authorization/*", "*"]` on critical, `actions = ["*/read"]` on standard | **CR-0028.** User Access Administrator (has `Microsoft.Authorization/*`) triggers `critical`. Reader (only `*/read`) triggers `standard`. Demonstrates pattern-based control-plane detection replacing score thresholds. |
+| [data-plane-detection](testdata/e2e/data-plane-detection/) | `data_actions = ["Microsoft.Storage/*"]` on critical | **CR-0027.** Storage Blob Data Owner triggers `critical` via data-plane pattern matching (`Microsoft.Storage/*/blobs/*` matches `Microsoft.Storage/*`). Reader (no data actions) falls through to `standard` via control-plane `*/read` pattern. |
+| [control-plane-patterns](testdata/e2e/control-plane-patterns/) | `actions = ["Microsoft.Authorization/*", "*"]` on critical, `actions = ["*/read"]` on standard | **CR-0028.** User Access Administrator (has `Microsoft.Authorization/*`) triggers `critical`. Reader (only `*/read`) triggers `standard`. Demonstrates pattern-based control-plane detection. |
 
 ### How E2E Tests Run
 
@@ -497,13 +509,15 @@ tfclassify/
 ## Development
 
 ```bash
-make build          # Build CLI → bin/tfclassify
-make build-all      # Build CLI + azurerm plugin
-make test           # Run all tests across workspace (go test ./...)
-make vet            # Static analysis (go vet ./...)
-make lint           # golangci-lint run ./...
-make generate-roles # Refresh Azure role database from AzAdvertizer CSV
-make clean          # Remove build artifacts
+make build                    # Build CLI → bin/tfclassify
+make build-all                # Build CLI + azurerm plugin
+make test                     # Run all tests across workspace (go test ./...)
+make vet                      # Static analysis (go vet ./...)
+make lint                     # golangci-lint run ./...
+make generate-roles           # Refresh Azure role database from AzAdvertizer CSV
+make generate-actions         # Refresh Azure action registry from Microsoft Docs + role database
+make generate-actions-offline # Refresh Azure action registry from role database only (no network)
+make clean                    # Remove build artifacts
 ```
 
 Run a single test:

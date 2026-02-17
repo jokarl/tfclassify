@@ -6,10 +6,6 @@ plugin "azurerm" {
   enabled = true
   source  = "github.com/jokarl/tfclassify-plugin-azurerm"
   version = "0.1.0"
-
-  config {
-    privileged_roles = ["Owner", "User Access Administrator"]
-  }
 }
 
 classification "critical" {
@@ -23,6 +19,12 @@ classification "critical" {
   rule {
     resource = ["*_key_vault*"]
     actions  = ["delete"]
+  }
+
+  azurerm {
+    privilege_escalation {
+      actions = ["Microsoft.Authorization/*"]
+    }
   }
 }
 

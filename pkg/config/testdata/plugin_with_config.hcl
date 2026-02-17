@@ -1,3 +1,7 @@
+# This fixture tests opaque config body passthrough — the top-level config {}
+# block is forwarded to the plugin as raw HCL. The field names here are
+# intentionally arbitrary (not real azurerm config) to verify that the host
+# preserves the body without interpreting it.
 plugin "azurerm" {
   enabled = true
   source  = "github.com/jokarl/tfclassify-plugin-azurerm"

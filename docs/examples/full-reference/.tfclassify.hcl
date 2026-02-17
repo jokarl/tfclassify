@@ -111,6 +111,20 @@ classification "critical" {
 
       # Exclude these roles even if they match patterns above.
       exclude = ["AcrPush", "AcrPull"]
+
+      # Filter which roles to analyze by display name.
+      # When set, only role assignments whose resolved display name matches one of
+      # these entries are analyzed. Omit to analyze all roles.
+      # roles = ["Owner", "User Access Administrator"]
+
+      # Scope-level filtering — only trigger for assignments at these ARM scope levels.
+      # Valid values: "management_group", "subscription", "resource_group", "resource".
+      # Omit to trigger at all scope levels.
+      # scopes = ["management_group", "subscription"]
+
+      # Whether to flag roles whose permissions cannot be resolved (not in the
+      # built-in database and not a custom role in the plan). Default: true.
+      # flag_unknown_roles = true
     }
 
     # Network exposure detection
@@ -119,7 +133,11 @@ classification "critical" {
     }
 
     # Key vault destructive permission detection
-    keyvault_access {}  # Empty block = use defaults
+    keyvault_access {
+      # Override the default list of permissions considered destructive.
+      # Default: ["delete", "purge"] (matched case-insensitively).
+      # destructive_permissions = ["delete", "purge", "recover"]
+    }
   }
 }
 
