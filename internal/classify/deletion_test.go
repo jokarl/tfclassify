@@ -32,11 +32,11 @@ func TestDeletionAnalyzer_StandaloneDelete(t *testing.T) {
 	if decisions[0].Address != "azurerm_resource_group.example" {
 		t.Errorf("expected address 'azurerm_resource_group.example', got %q", decisions[0].Address)
 	}
-	if !strings.Contains(decisions[0].MatchedRule, "builtin: deletion") {
-		t.Errorf("expected MatchedRule to contain 'builtin: deletion', got %q", decisions[0].MatchedRule)
+	if !strings.Contains(decisions[0].MatchedRules[0], "builtin: deletion") {
+		t.Errorf("expected MatchedRule to contain 'builtin: deletion', got %q", decisions[0].MatchedRules[0])
 	}
-	if !strings.Contains(decisions[0].MatchedRule, "is being deleted") {
-		t.Errorf("expected MatchedRule to mention deletion, got %q", decisions[0].MatchedRule)
+	if !strings.Contains(decisions[0].MatchedRules[0], "is being deleted") {
+		t.Errorf("expected MatchedRule to mention deletion, got %q", decisions[0].MatchedRules[0])
 	}
 }
 

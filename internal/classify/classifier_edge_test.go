@@ -39,7 +39,7 @@ func TestAddPluginDecisions_UnknownResource(t *testing.T) {
 			ResourceType:   "aws_s3_bucket",
 			Actions:        []string{"create"},
 			Classification: "critical",
-			MatchedRule:    "plugin: ghost resource",
+			MatchedRules:   []string{"plugin: ghost resource"},
 		},
 	}
 
@@ -99,7 +99,7 @@ func TestAddPluginDecisions_LowerPrecedenceIgnored(t *testing.T) {
 			ResourceType:   "azurerm_role_assignment",
 			Actions:        []string{"create"},
 			Classification: "standard",
-			MatchedRule:    "plugin: downgrade attempt",
+			MatchedRules:   []string{"plugin: downgrade attempt"},
 		},
 	}
 
@@ -155,7 +155,7 @@ func TestAddPluginDecisions_UpgradeAllowed(t *testing.T) {
 			ResourceType:   "azurerm_virtual_network",
 			Actions:        []string{"update"},
 			Classification: "critical",
-			MatchedRule:    "plugin: network exposure detected",
+			MatchedRules:   []string{"plugin: network exposure detected"},
 		},
 	}
 
@@ -420,8 +420,8 @@ func TestClassify_CustomRuleDescription(t *testing.T) {
 
 	result := classifier.Classify(changes)
 
-	if result.ResourceDecisions[0].MatchedRule != "Role assignments require special review" {
-		t.Errorf("expected custom rule description, got %q", result.ResourceDecisions[0].MatchedRule)
+	if len(result.ResourceDecisions[0].MatchedRules) == 0 || result.ResourceDecisions[0].MatchedRules[0] != "Role assignments require special review" {
+		t.Errorf("expected custom rule description, got %v", result.ResourceDecisions[0].MatchedRules)
 	}
 }
 

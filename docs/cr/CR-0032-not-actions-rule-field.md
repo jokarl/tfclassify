@@ -2,7 +2,7 @@
 name: cr-0032-not-actions-rule-field
 description: Add not_actions field to classification rules, the inverse of the existing actions field.
 id: "CR-0032"
-status: "accepted"
+status: "implemented"
 date: 2026-02-18
 requestor: jokarl
 stakeholders:

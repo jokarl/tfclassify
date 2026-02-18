@@ -24,7 +24,7 @@ func (a *DeletionAnalyzer) Analyze(changes []plan.ResourceChange) []ResourceDeci
 				Address:      change.Address,
 				ResourceType: change.Type,
 				Actions:      change.Actions,
-				MatchedRule:  fmt.Sprintf("builtin: deletion - Resource %s is being deleted", change.Address),
+				MatchedRules: []string{fmt.Sprintf("builtin: deletion - Resource %s is being deleted", change.Address)},
 			})
 		}
 	}

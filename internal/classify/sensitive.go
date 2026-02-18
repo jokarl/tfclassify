@@ -30,7 +30,7 @@ func (a *SensitiveAnalyzer) Analyze(changes []plan.ResourceChange) []ResourceDec
 				Address:      change.Address,
 				ResourceType: change.Type,
 				Actions:      change.Actions,
-				MatchedRule:  reason,
+				MatchedRules: []string{reason},
 			})
 		}
 	}

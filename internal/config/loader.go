@@ -103,6 +103,16 @@ func parseClassificationPluginBlocks(cfg *Config, body hcl.Body, filename string
 				continue
 			}
 
+			// Parse blast_radius blocks
+			if subBlock.Type == "blast_radius" {
+				brConfig := &BlastRadiusConfig{}
+				if err := parseBlastRadiusConfig(subBlock, brConfig); err != nil {
+					return fmt.Errorf("classification %q: %w", classification.Name, err)
+				}
+				classification.BlastRadius = brConfig
+				continue
+			}
+
 			// This is a plugin-named block (e.g., "azurerm")
 			pluginName := subBlock.Type
 
@@ -227,6 +237,34 @@ func parseKeyVaultAccessConfig(block *hclsyntax.Block, config *KeyVaultAccessCon
 			config.DestructivePermissions = toStringSlice(val)
 		default:
 			return fmt.Errorf("keyvault_access: unknown attribute %q", name)
+		}
+	}
+	return nil
+}
+
+// parseBlastRadiusConfig parses attributes from a blast_radius block.
+func parseBlastRadiusConfig(block *hclsyntax.Block, config *BlastRadiusConfig) error {
+	for name, attr := range block.Body.Attributes {
+		val, diags := attr.Expr.Value(nil)
+		if diags.HasErrors() {
+			return fmt.Errorf("blast_radius.%s: %v", name, diags.Error())
+		}
+
+		switch name {
+		case "max_deletions":
+			n, _ := val.AsBigFloat().Int64()
+			v := int(n)
+			config.MaxDeletions = &v
+		case "max_replacements":
+			n, _ := val.AsBigFloat().Int64()
+			v := int(n)
+			config.MaxReplacements = &v
+		case "max_changes":
+			n, _ := val.AsBigFloat().Int64()
+			v := int(n)
+			config.MaxChanges = &v
+		default:
+			return fmt.Errorf("blast_radius: unknown attribute %q", name)
 		}
 	}
 	return nil

@@ -29,11 +29,11 @@ func TestReplaceAnalyzer_DetectsReplace(t *testing.T) {
 	if len(decisions) != 1 {
 		t.Fatalf("expected 1 decision, got %d", len(decisions))
 	}
-	if !strings.Contains(decisions[0].MatchedRule, "builtin: replace") {
-		t.Errorf("expected MatchedRule to contain 'builtin: replace', got %q", decisions[0].MatchedRule)
+	if !strings.Contains(decisions[0].MatchedRules[0], "builtin: replace") {
+		t.Errorf("expected MatchedRule to contain 'builtin: replace', got %q", decisions[0].MatchedRules[0])
 	}
-	if !strings.Contains(decisions[0].MatchedRule, "will be replaced") {
-		t.Errorf("expected MatchedRule to mention replacement, got %q", decisions[0].MatchedRule)
+	if !strings.Contains(decisions[0].MatchedRules[0], "will be replaced") {
+		t.Errorf("expected MatchedRule to mention replacement, got %q", decisions[0].MatchedRules[0])
 	}
 }
 

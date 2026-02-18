@@ -67,7 +67,7 @@ tfclassify classifies Terraform plan changes into organizational categories (cri
 
 **Layer 1 — Core Engine** (`internal/classify/`): Config-driven pattern matching. Glob patterns on resource types + actions, evaluated against precedence order from `.tfclassify.hcl`. This is the fast path — no plugins involved.
 
-**Layer 2 — Builtin Analyzers** (`internal/classify/deletion.go`, `replace.go`, `sensitive.go`): Cross-provider heuristics that run in-process. Implement `classify.BuiltinAnalyzer` interface. Detect deletions, destroy-and-recreate, and sensitive attribute changes.
+**Layer 2 — Builtin Analyzers** (`internal/classify/deletion.go`, `replace.go`, `sensitive.go`, `blast_radius.go`): Cross-provider heuristics that run in-process. Implement `classify.BuiltinAnalyzer` interface. Detect deletions, destroy-and-recreate, sensitive attribute changes, and plan-wide blast radius thresholds.
 
 **Layer 3 — External Plugins** (`sdk/` + `internal/plugin/`): Provider-specific deep inspection via gRPC (hashicorp/go-plugin). Plugins run as separate processes, communicate bidirectionally — host calls `PluginService.Analyze()`, plugin calls back `RunnerService.GetResourceChanges()` and `RunnerService.EmitDecision()`. The broker ID in `AnalyzeRequest` enables the plugin to dial back to the host's Runner server.
 
@@ -100,7 +100,7 @@ Defined in `proto/tfclassify.proto`, generated code in `sdk/pb/`. Two services:
 
 ## Configuration
 
-HCL format (`.tfclassify.hcl`), parsed by `internal/config/` using `hashicorp/hcl/v2`. Key blocks: `classification` (rules with resource glob + actions), `plugin` (source, version, enabled, config), `precedence` list, `defaults`.
+HCL format (`.tfclassify.hcl`), parsed by `internal/config/` using `hashicorp/hcl/v2`. Key blocks: `classification` (rules with resource/not_resource glob + actions/not_actions, blast_radius thresholds), `plugin` (source, version, enabled, config), `precedence` list, `defaults`, `evidence` (artifact output with optional Ed25519 signing).
 
 ## Plugin System
 
@@ -110,10 +110,11 @@ Version negotiation: host checks `SDKVersionConstraints` against plugin's report
 
 ## CLI Subcommands
 
-- `tfclassify --plan <file>` — Classify a Terraform plan (root command)
+- `tfclassify --plan <file>` — Classify a Terraform plan (root command). Accepts `--evidence-file <path>` to write a signed evidence artifact alongside normal output.
 - `tfclassify init` — Install plugins declared in configuration
 - `tfclassify validate` — Check `.tfclassify.hcl` for errors without a plan. Exits 0 if valid (warnings to stderr), exits 1 on errors. Accepts `--config` / `-c` flag.
 - `tfclassify explain --plan <file>` — Trace classification decisions for each resource through the full pipeline (core rules, builtin analyzers, plugins). Accepts `--resource` / `-r` (repeatable) to filter, `--output` / `-o` for json/text, `--config` / `-c`.
+- `tfclassify verify --evidence-file <file> --public-key <file>` — Verify the Ed25519 signature of an evidence artifact. Exits 0 if valid, 1 if invalid.
 
 ## E2E Tests
 

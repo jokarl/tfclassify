@@ -19,7 +19,7 @@ type ResourceDecision struct {
 	Actions                   []string // actions being performed
 	Classification            string   // the classification assigned
 	ClassificationDescription string   // description of the classification level
-	MatchedRule               string   // description of which rule matched
+	MatchedRules              []string // descriptions of which rules matched
 }
 
 // ExplainResult contains full trace data for explain output.

@@ -351,7 +351,7 @@ func TestClassify_WithPluginDecisions(t *testing.T) {
 			ResourceType:   "azurerm_virtual_network",
 			Actions:        []string{"update"},
 			Classification: "critical",
-			MatchedRule:    "plugin: sensitive change detected",
+			MatchedRules:   []string{"plugin: sensitive change detected"},
 		},
 	}
 
@@ -397,7 +397,7 @@ func TestClassify_PluginDecisionsWithEmptyClassification(t *testing.T) {
 			ResourceType:   "azurerm_virtual_network",
 			Actions:        []string{"update"},
 			Classification: "", // Empty - should be ignored
-			MatchedRule:    "plugin: some detection",
+			MatchedRules:   []string{"plugin: some detection"},
 		},
 	}
 
@@ -633,7 +633,7 @@ func TestExplainClassify_PluginDecisionTrace(t *testing.T) {
 		{
 			Address:        "azurerm_role_assignment.example",
 			Classification: "critical",
-			MatchedRule:    "azurerm/privilege-escalation",
+			MatchedRules:   []string{"azurerm/privilege-escalation"},
 		},
 	}
 
@@ -692,7 +692,7 @@ func TestClassify_PluginDecisionsWithUnknownClassification(t *testing.T) {
 			ResourceType:   "azurerm_virtual_network",
 			Actions:        []string{"update"},
 			Classification: "unknown_classification", // Not in precedence list
-			MatchedRule:    "plugin: some detection",
+			MatchedRules:   []string{"plugin: some detection"},
 		},
 	}
 

@@ -20,7 +20,7 @@ func TestFormatJSON(t *testing.T) {
 				ResourceType:   "azurerm_role_assignment",
 				Actions:        []string{"delete"},
 				Classification: "critical",
-				MatchedRule:    "critical rule 1 (resource: *_role_*)",
+				MatchedRules:   []string{"critical rule 1 (resource: *_role_*)"},
 			},
 		},
 	}
@@ -71,7 +71,7 @@ func TestFormatText(t *testing.T) {
 				ResourceType:   "azurerm_virtual_network",
 				Actions:        []string{"update"},
 				Classification: "standard",
-				MatchedRule:    "standard rule 1 (resource: *)",
+				MatchedRules:   []string{"standard rule 1 (resource: *)"},
 			},
 		},
 	}
@@ -167,7 +167,7 @@ func TestFormatText_Verbose(t *testing.T) {
 				ResourceType:   "azurerm_virtual_network",
 				Actions:        []string{"update"},
 				Classification: "standard",
-				MatchedRule:    "standard rule 1 (resource: *)",
+				MatchedRules:   []string{"standard rule 1 (resource: *)"},
 			},
 		},
 	}
@@ -200,7 +200,7 @@ func TestFormatJSON_WithDescriptions(t *testing.T) {
 				Actions:                   []string{"delete"},
 				Classification:            "critical",
 				ClassificationDescription: "IAM role change requiring security approval",
-				MatchedRule:               "critical rule 1 (resource: *_role_*)",
+				MatchedRules:              []string{"critical rule 1 (resource: *_role_*)"},
 			},
 		},
 	}
@@ -333,7 +333,7 @@ func TestFormatText_VerboseWithDescriptions(t *testing.T) {
 				Actions:                   []string{"delete"},
 				Classification:            "critical",
 				ClassificationDescription: "IAM changes require security approval",
-				MatchedRule:               "critical rule 1 (resource: *_role_*)",
+				MatchedRules:              []string{"critical rule 1 (resource: *_role_*)"},
 			},
 		},
 	}

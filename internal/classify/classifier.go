@@ -91,7 +91,7 @@ func (c *Classifier) classifyResource(change plan.ResourceChange) ResourceDecisi
 			if rule.matchesResource(change.Type) && rule.matchesActions(change.Actions) {
 				decision.Classification = classificationName
 				decision.ClassificationDescription = rule.classificationDescription
-				decision.MatchedRule = rule.ruleDescription
+				decision.MatchedRules = []string{rule.ruleDescription}
 				return decision
 			}
 		}
@@ -100,7 +100,7 @@ func (c *Classifier) classifyResource(change plan.ResourceChange) ResourceDecisi
 	// No rule matched, use default
 	decision.Classification = c.config.Defaults.Unclassified
 	decision.ClassificationDescription = c.descriptionMap[decision.Classification]
-	decision.MatchedRule = "default (no rule matched)"
+	decision.MatchedRules = []string{"default (no rule matched)"}
 	return decision
 }
 
@@ -245,12 +245,17 @@ func (c *Classifier) AddExplainBuiltinAnalyzers(result *ExplainResult, changes [
 				classification = c.config.Defaults.Unclassified
 			}
 
+			reason := ""
+			if len(decision.MatchedRules) > 0 {
+				reason = decision.MatchedRules[0]
+			}
+
 			entry := TraceEntry{
 				Classification: classification,
 				Source:         "builtin: " + analyzer.Name(),
 				Rule:           analyzer.Name(),
 				Result:         TraceMatch,
-				Reason:         decision.MatchedRule,
+				Reason:         reason,
 			}
 
 			if exp, ok := explanationMap[decision.Address]; ok {
@@ -279,10 +284,15 @@ func (c *Classifier) AddExplainPluginDecisions(result *ExplainResult, pluginDeci
 			continue
 		}
 
+		pluginRule := ""
+		if len(decision.MatchedRules) > 0 {
+			pluginRule = decision.MatchedRules[0]
+		}
+
 		entry := TraceEntry{
 			Classification: classification,
-			Source:         "plugin: " + decision.MatchedRule,
-			Rule:           decision.MatchedRule,
+			Source:         "plugin: " + pluginRule,
+			Rule:           pluginRule,
 			Result:         TraceMatch,
 		}
 
@@ -382,12 +392,14 @@ func (c *Classifier) AddPluginDecisions(result *Result, pluginDecisions []Resour
 		existingPrecedence, existingKnown := c.precedenceMap[existing.Classification]
 		pluginPrecedence := c.precedenceMap[pluginDecision.Classification]
 
-		// Only replace if plugin classification has higher precedence
-		// (lower index = higher precedence)
 		if !existingKnown || pluginPrecedence < existingPrecedence {
+			// Higher precedence: replace classification and rules entirely
 			existing.Classification = pluginDecision.Classification
 			existing.ClassificationDescription = c.descriptionMap[pluginDecision.Classification]
-			existing.MatchedRule = pluginDecision.MatchedRule
+			existing.MatchedRules = pluginDecision.MatchedRules
+		} else if pluginPrecedence == existingPrecedence {
+			// Same classification level: append rules for multi-reason visibility
+			existing.MatchedRules = append(existing.MatchedRules, pluginDecision.MatchedRules...)
 		}
 	}
 
