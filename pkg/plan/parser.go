@@ -175,10 +175,10 @@ func extractResourceChanges(plan *tfjson.Plan) []ResourceChange {
 			Type:         rc.Type,
 			ProviderName: rc.ProviderName,
 			Mode:         string(rc.Mode),
-			Actions:      actionsToStrings(rc.Change.Actions),
 		}
 
 		if rc.Change != nil {
+			change.Actions = actionsToStrings(rc.Change.Actions)
 			change.Before = convertToMap(rc.Change.Before)
 			change.After = convertToMap(rc.Change.After)
 			change.BeforeSensitive = rc.Change.BeforeSensitive

@@ -35,6 +35,14 @@ tfclassify-plugin-*
 /csv2roles
 .tfclassify/plugins/
 
+# Terraform artifacts
+.terraform/
+.terraform.lock.hcl
+*.tfplan
+*.tfstate
+*.tfstate.backup
+crash.log
+
 # Environment files
 .env
 .env.local

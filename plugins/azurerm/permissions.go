@@ -89,7 +89,7 @@ func computeEffectiveActionsWithRegistry(actions, notActions []string, dataPlane
 		return expanded
 	}
 
-	var effective []string
+	effective := make([]string, 0, len(expanded))
 	for _, action := range expanded {
 		if !matchesAny(action, notActions) {
 			effective = append(effective, action)

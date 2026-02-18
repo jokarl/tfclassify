@@ -23,22 +23,20 @@ func Discover(explicitPath string) (string, error) {
 		return explicitPath, nil
 	}
 
-	searchPaths := getSearchPaths()
-	searchedPaths := make([]string, 0, len(searchPaths))
+	paths := getSearchPaths()
 
-	for _, p := range searchPaths {
-		searchedPaths = append(searchedPaths, p)
+	for _, p := range paths {
 		if _, err := os.Stat(p); err == nil {
 			return p, nil
 		}
 	}
 
-	return "", fmt.Errorf("no configuration file found; searched paths: %v", searchedPaths)
+	return "", fmt.Errorf("no configuration file found; searched paths: %v", paths)
 }
 
 // getSearchPaths returns the ordered list of paths to search for config files.
 func getSearchPaths() []string {
-	paths := []string{}
+	paths := make([]string, 0, 2)
 
 	// Current working directory
 	cwd, err := os.Getwd()

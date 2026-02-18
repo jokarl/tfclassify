@@ -4,6 +4,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/gohcl"
@@ -236,7 +237,7 @@ func toStringSlice(val cty.Value) []string {
 	if val.IsNull() || !val.CanIterateElements() {
 		return nil
 	}
-	var result []string
+	result := make([]string, 0, val.LengthInt())
 	for it := val.ElementIterator(); it.Next(); {
 		_, v := it.Element()
 		if v.Type() == cty.String {
@@ -248,20 +249,20 @@ func toStringSlice(val cty.Value) []string {
 
 // formatDiagnostics converts HCL diagnostics into a readable error.
 func formatDiagnostics(diags hcl.Diagnostics, filename string) error {
-	var errMsg string
+	var sb strings.Builder
 	for _, diag := range diags {
 		if diag.Severity == hcl.DiagError {
 			if diag.Subject != nil {
-				errMsg += fmt.Sprintf("%s:%d:%d: %s: %s\n",
+				fmt.Fprintf(&sb, "%s:%d:%d: %s: %s\n",
 					filename,
 					diag.Subject.Start.Line,
 					diag.Subject.Start.Column,
 					diag.Summary,
 					diag.Detail)
 			} else {
-				errMsg += fmt.Sprintf("%s: %s: %s\n", filename, diag.Summary, diag.Detail)
+				fmt.Fprintf(&sb, "%s: %s: %s\n", filename, diag.Summary, diag.Detail)
 			}
 		}
 	}
-	return fmt.Errorf("configuration error:\n%s", errMsg)
+	return fmt.Errorf("configuration error:\n%s", sb.String())
 }
