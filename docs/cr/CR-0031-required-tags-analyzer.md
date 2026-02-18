@@ -2,7 +2,7 @@
 name: cr-0031-required-tags-analyzer
 description: Add a required tags analyzer to the azurerm plugin that detects resources missing mandatory tag keys on creates and updates.
 id: "CR-0031"
-status: "proposed"
+status: "rejected"
 date: 2026-02-18
 requestor: jokarl
 stakeholders:
