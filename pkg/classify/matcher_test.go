@@ -88,7 +88,7 @@ func TestMatchesResource_NotResource(t *testing.T) {
 
 func TestMatchesActions_Match(t *testing.T) {
 	rule := compiledRule{
-		actions: []string{"delete"},
+		actions: map[string]struct{}{"delete": {}},
 	}
 
 	if !rule.matchesActions([]string{"delete"}) {
@@ -98,7 +98,7 @@ func TestMatchesActions_Match(t *testing.T) {
 
 func TestMatchesActions_NoMatch(t *testing.T) {
 	rule := compiledRule{
-		actions: []string{"delete"},
+		actions: map[string]struct{}{"delete": {}},
 	}
 
 	if rule.matchesActions([]string{"update"}) {
@@ -122,7 +122,7 @@ func TestMatchesActions_NoActionsInRule(t *testing.T) {
 
 func TestMatchesActions_MultipleActions(t *testing.T) {
 	rule := compiledRule{
-		actions: []string{"delete", "create"},
+		actions: map[string]struct{}{"delete": {}, "create": {}},
 	}
 
 	// Match if any of the change actions match any of the rule actions

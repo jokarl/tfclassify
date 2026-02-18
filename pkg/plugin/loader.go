@@ -259,7 +259,7 @@ func (r *Runner) GetResourceChanges(patterns []string) ([]*sdk.ResourceChange, e
 	defer r.mu.Unlock()
 
 	// Compile patterns
-	var globs []glob.Glob
+	globs := make([]glob.Glob, 0, len(patterns))
 	for _, pattern := range patterns {
 		g, err := glob.Compile(pattern)
 		if err != nil {
@@ -268,7 +268,7 @@ func (r *Runner) GetResourceChanges(patterns []string) ([]*sdk.ResourceChange, e
 		globs = append(globs, g)
 	}
 
-	result := make([]*sdk.ResourceChange, 0)
+	result := make([]*sdk.ResourceChange, 0, len(r.host.changes))
 	for _, change := range r.host.changes {
 		if len(globs) == 0 || matchesAny(change.Type, globs) {
 			result = append(result, toSDKResourceChange(&change))

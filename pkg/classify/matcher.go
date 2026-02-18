@@ -14,7 +14,7 @@ type compiledRule struct {
 	classificationDescription string
 	resourceGlobs             []glob.Glob
 	notResourceGlobs          []glob.Glob
-	actions                   []string
+	actions                   map[string]struct{} // pre-computed set for O(1) lookup
 	ruleDescription           string
 }
 
@@ -32,10 +32,19 @@ func compileRules(cfg *config.Config) (map[string][]compiledRule, error) {
 				ruleDesc = formatRuleDescription(classification.Name, i+1, rule)
 			}
 
+			// Pre-compute action set for O(1) lookups during classification
+			var actionSet map[string]struct{}
+			if len(rule.Actions) > 0 {
+				actionSet = make(map[string]struct{}, len(rule.Actions))
+				for _, a := range rule.Actions {
+					actionSet[a] = struct{}{}
+				}
+			}
+
 			compiled := compiledRule{
 				classification:            classification.Name,
 				classificationDescription: classification.Description,
-				actions:                   rule.Actions,
+				actions:                   actionSet,
 				ruleDescription:           ruleDesc,
 			}
 
@@ -98,11 +107,9 @@ func (r *compiledRule) matchesActions(changeActions []string) bool {
 		return true
 	}
 
-	for _, ruleAction := range r.actions {
-		for _, changeAction := range changeActions {
-			if ruleAction == changeAction {
-				return true
-			}
+	for _, changeAction := range changeActions {
+		if _, ok := r.actions[changeAction]; ok {
+			return true
 		}
 	}
 

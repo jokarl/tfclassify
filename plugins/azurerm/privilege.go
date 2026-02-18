@@ -358,38 +358,16 @@ func (a *PrivilegeEscalationAnalyzer) matchAnyCustomRole(
 
 // matchControlPlanePatterns matches effective control-plane actions against patterns.
 func (a *PrivilegeEscalationAnalyzer) matchControlPlanePatterns(role *RoleDefinition, patterns []string) (matchedActions, matchedPatterns []string) {
-	if role == nil || len(patterns) == 0 {
-		return nil, nil
-	}
-
-	matchedActionsSet := make(map[string]bool)
-	matchedPatternsSet := make(map[string]bool)
-
-	for _, perm := range role.Permissions {
-		effectiveActions := computeEffectiveActionsWithRegistry(perm.Actions, perm.NotActions, false, nil)
-
-		for _, action := range effectiveActions {
-			for _, pattern := range patterns {
-				if actionMatchesPattern(action, pattern) {
-					matchedActionsSet[action] = true
-					matchedPatternsSet[pattern] = true
-				}
-			}
-		}
-	}
-
-	for action := range matchedActionsSet {
-		matchedActions = append(matchedActions, action)
-	}
-	for pattern := range matchedPatternsSet {
-		matchedPatterns = append(matchedPatterns, pattern)
-	}
-
-	return matchedActions, matchedPatterns
+	return a.matchActionPatterns(role, patterns, false)
 }
 
 // matchDataPlanePatterns matches effective data-plane actions against patterns.
 func (a *PrivilegeEscalationAnalyzer) matchDataPlanePatterns(role *RoleDefinition, patterns []string) (matchedActions, matchedPatterns []string) {
+	return a.matchActionPatterns(role, patterns, true)
+}
+
+// matchActionPatterns matches effective actions against patterns for the given plane.
+func (a *PrivilegeEscalationAnalyzer) matchActionPatterns(role *RoleDefinition, patterns []string, dataPlane bool) (matchedActions, matchedPatterns []string) {
 	if role == nil || len(patterns) == 0 {
 		return nil, nil
 	}
@@ -398,9 +376,15 @@ func (a *PrivilegeEscalationAnalyzer) matchDataPlanePatterns(role *RoleDefinitio
 	matchedPatternsSet := make(map[string]bool)
 
 	for _, perm := range role.Permissions {
-		effectiveDataActions := computeEffectiveActionsWithRegistry(perm.DataActions, perm.NotDataActions, true, nil)
+		actions := perm.Actions
+		notActions := perm.NotActions
+		if dataPlane {
+			actions = perm.DataActions
+			notActions = perm.NotDataActions
+		}
+		effective := computeEffectiveActionsWithRegistry(actions, notActions, dataPlane, nil)
 
-		for _, action := range effectiveDataActions {
+		for _, action := range effective {
 			for _, pattern := range patterns {
 				if actionMatchesPattern(action, pattern) {
 					matchedActionsSet[action] = true

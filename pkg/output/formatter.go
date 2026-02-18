@@ -97,17 +97,17 @@ func (f *Formatter) formatText(result *classify.Result) error {
 	var sb strings.Builder
 
 	// Overall classification
-	sb.WriteString(fmt.Sprintf("Classification: %s\n", result.Overall))
+	fmt.Fprintf(&sb, "Classification: %s\n", result.Overall)
 	if f.verbose && result.OverallDescription != "" {
-		sb.WriteString(fmt.Sprintf("  %s\n", result.OverallDescription))
+		fmt.Fprintf(&sb, "  %s\n", result.OverallDescription)
 	}
-	sb.WriteString(fmt.Sprintf("Exit code: %d\n", result.OverallExitCode))
+	fmt.Fprintf(&sb, "Exit code: %d\n", result.OverallExitCode)
 
 	if result.NoChanges {
 		sb.WriteString("No resource changes in plan.\n")
 	} else {
-		sb.WriteString(fmt.Sprintf("Resources: %d\n", len(result.ResourceDecisions)))
-		sb.WriteString("\n")
+		fmt.Fprintf(&sb, "Resources: %d\n", len(result.ResourceDecisions))
+		sb.WriteByte('\n')
 
 		if f.verbose {
 			// Group by classification
@@ -123,28 +123,28 @@ func (f *Formatter) formatText(result *classify.Result) error {
 
 			for _, classification := range classificationOrder {
 				decisions := byClassification[classification]
-				sb.WriteString(fmt.Sprintf("[%s] (%d resources)\n", classification, len(decisions)))
+				fmt.Fprintf(&sb, "[%s] (%d resources)\n", classification, len(decisions))
 				// Show classification description if available (from first decision)
 				if len(decisions) > 0 && decisions[0].ClassificationDescription != "" {
-					sb.WriteString(fmt.Sprintf("  %s\n", decisions[0].ClassificationDescription))
+					fmt.Fprintf(&sb, "  %s\n", decisions[0].ClassificationDescription)
 				}
 				for _, decision := range decisions {
-					sb.WriteString(fmt.Sprintf("  - %s (%s) %v\n",
-						decision.Address, decision.ResourceType, decision.Actions))
-					sb.WriteString(fmt.Sprintf("    Rule: %s\n", decision.MatchedRule))
+					fmt.Fprintf(&sb, "  - %s (%s) %v\n",
+						decision.Address, decision.ResourceType, decision.Actions)
+					fmt.Fprintf(&sb, "    Rule: %s\n", decision.MatchedRule)
 				}
-				sb.WriteString("\n")
+				sb.WriteByte('\n')
 			}
 		} else {
 			// Compact output
 			for _, decision := range result.ResourceDecisions {
-				sb.WriteString(fmt.Sprintf("  [%s] %s\n",
-					decision.Classification, decision.Address))
+				fmt.Fprintf(&sb, "  [%s] %s\n",
+					decision.Classification, decision.Address)
 			}
 		}
 	}
 
-	_, err := f.writer.Write([]byte(sb.String()))
+	_, err := io.WriteString(f.writer, sb.String())
 	return err
 }
 
@@ -152,14 +152,14 @@ func (f *Formatter) formatGitHub(result *classify.Result) error {
 	var sb strings.Builder
 
 	// Set output variables using GITHUB_OUTPUT file format
-	sb.WriteString(fmt.Sprintf("classification=%s\n", result.Overall))
-	sb.WriteString(fmt.Sprintf("exit_code=%d\n", result.OverallExitCode))
-	sb.WriteString(fmt.Sprintf("no_changes=%t\n", result.NoChanges))
-	sb.WriteString(fmt.Sprintf("resource_count=%d\n", len(result.ResourceDecisions)))
+	fmt.Fprintf(&sb, "classification=%s\n", result.Overall)
+	fmt.Fprintf(&sb, "exit_code=%d\n", result.OverallExitCode)
+	fmt.Fprintf(&sb, "no_changes=%t\n", result.NoChanges)
+	fmt.Fprintf(&sb, "resource_count=%d\n", len(result.ResourceDecisions))
 	if result.OverallDescription != "" {
-		sb.WriteString(fmt.Sprintf("classification_description=%s\n", result.OverallDescription))
+		fmt.Fprintf(&sb, "classification_description=%s\n", result.OverallDescription)
 	}
 
-	_, err := f.writer.Write([]byte(sb.String()))
+	_, err := io.WriteString(f.writer, sb.String())
 	return err
 }

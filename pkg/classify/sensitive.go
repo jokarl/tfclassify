@@ -2,6 +2,7 @@ package classify
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/jokarl/tfclassify/pkg/plan"
@@ -40,32 +41,28 @@ func (a *SensitiveAnalyzer) Analyze(changes []plan.ResourceChange) []ResourceDec
 // findSensitiveChanges walks the sensitive markers and returns attribute names
 // that have sensitive values that changed.
 func findSensitiveChanges(change plan.ResourceChange) []string {
-	var sensitiveAttrs []string
-
 	beforeSens := asBoolMap(change.BeforeSensitive)
 	afterSens := asBoolMap(change.AfterSensitive)
 
+	// Use a set to avoid duplicates efficiently
+	seen := make(map[string]struct{})
+	var sensitiveAttrs []string
+
 	// Find all sensitive attributes from before
-	for attr := range beforeSens {
-		if beforeSens[attr] == true {
+	for attr, val := range beforeSens {
+		if val == true {
 			if hasAttributeChanged(attr, change.Before, change.After) {
+				seen[attr] = struct{}{}
 				sensitiveAttrs = append(sensitiveAttrs, attr)
 			}
 		}
 	}
 
 	// Find sensitive attributes that are newly sensitive in after
-	for attr := range afterSens {
-		if afterSens[attr] == true && beforeSens[attr] != true {
-			if hasAttributeChanged(attr, change.Before, change.After) {
-				found := false
-				for _, existing := range sensitiveAttrs {
-					if existing == attr {
-						found = true
-						break
-					}
-				}
-				if !found {
+	for attr, val := range afterSens {
+		if val == true && beforeSens[attr] != true {
+			if _, exists := seen[attr]; !exists {
+				if hasAttributeChanged(attr, change.Before, change.After) {
 					sensitiveAttrs = append(sensitiveAttrs, attr)
 				}
 			}
@@ -105,6 +102,6 @@ func hasAttributeChanged(attr string, before, after map[string]interface{}) bool
 		return true
 	}
 
-	// Attribute changed (simple comparison, not deep)
-	return fmt.Sprintf("%v", beforeVal) != fmt.Sprintf("%v", afterVal)
+	// Attribute changed
+	return !reflect.DeepEqual(beforeVal, afterVal)
 }

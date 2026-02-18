@@ -8,11 +8,17 @@ import (
 
 // Validate checks that the configuration is valid.
 func Validate(cfg *Config) error {
-	if err := validatePrecedence(cfg); err != nil {
+	// Build classification names set once for all validators
+	classificationNames := make(map[string]bool, len(cfg.Classifications))
+	for _, c := range cfg.Classifications {
+		classificationNames[c.Name] = true
+	}
+
+	if err := validatePrecedence(cfg, classificationNames); err != nil {
 		return err
 	}
 
-	if err := validateDefaults(cfg); err != nil {
+	if err := validateDefaults(cfg, classificationNames); err != nil {
 		return err
 	}
 
@@ -32,14 +38,9 @@ func Validate(cfg *Config) error {
 }
 
 // validatePrecedence checks that all precedence entries reference defined classifications.
-func validatePrecedence(cfg *Config) error {
+func validatePrecedence(cfg *Config, classificationNames map[string]bool) error {
 	if len(cfg.Precedence) == 0 {
 		return fmt.Errorf("precedence must not be empty")
-	}
-
-	classificationNames := make(map[string]bool)
-	for _, c := range cfg.Classifications {
-		classificationNames[c.Name] = true
 	}
 
 	for _, name := range cfg.Precedence {
@@ -52,14 +53,9 @@ func validatePrecedence(cfg *Config) error {
 }
 
 // validateDefaults checks that default values reference valid classifications.
-func validateDefaults(cfg *Config) error {
+func validateDefaults(cfg *Config, classificationNames map[string]bool) error {
 	if cfg.Defaults == nil {
 		return fmt.Errorf("defaults block is required")
-	}
-
-	classificationNames := make(map[string]bool)
-	for _, c := range cfg.Classifications {
-		classificationNames[c.Name] = true
 	}
 
 	if cfg.Defaults.Unclassified != "" && !classificationNames[cfg.Defaults.Unclassified] {
