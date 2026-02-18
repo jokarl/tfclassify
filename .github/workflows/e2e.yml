@@ -56,6 +56,12 @@ jobs:
           mkdir -p "$TFCLASSIFY_PLUGIN_DIR"
           go build -o "$TFCLASSIFY_PLUGIN_DIR/tfclassify-plugin-azurerm" ./plugins/azurerm
 
+      - name: Validate config
+        if: inputs.binary-source == 'build'
+        run: |
+          tfclassify validate \
+            -c testdata/e2e/${{ inputs.use-case }}/.tfclassify.hcl
+
       - name: Download release
         if: inputs.binary-source == 'release'
         env:
@@ -125,6 +131,18 @@ jobs:
             exit 1
           fi
 
+      - name: Explain create plan (JSON)
+        if: steps.classify-create-json.outcome == 'success'
+        continue-on-error: true
+        run: |
+          echo "### Explain: create (JSON)" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          tfclassify explain \
+            -p testdata/e2e/${{ inputs.use-case }}/create.json \
+            -c testdata/e2e/${{ inputs.use-case }}/.tfclassify.hcl \
+            >> "$GITHUB_STEP_SUMMARY" 2>&1
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
       - name: Classify create plan (binary)
         id: classify-create-binary
         if: inputs.plan-formats == 'binary' || inputs.plan-formats == 'both'
@@ -144,6 +162,18 @@ jobs:
             echo "::error::Create phase (binary): expected exit code $EXPECTED_EXIT, got $ACTUAL_EXIT"
             exit 1
           fi
+
+      - name: Explain create plan (binary)
+        if: steps.classify-create-binary.outcome == 'success'
+        continue-on-error: true
+        run: |
+          echo "### Explain: create (binary)" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          tfclassify explain \
+            -p testdata/e2e/${{ inputs.use-case }}/create.tfplan \
+            -c testdata/e2e/${{ inputs.use-case }}/.tfclassify.hcl \
+            >> "$GITHUB_STEP_SUMMARY" 2>&1
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
 
       - name: Apply
         id: apply
@@ -182,6 +212,18 @@ jobs:
             exit 1
           fi
 
+      - name: Explain destroy plan (JSON)
+        if: steps.classify-destroy-json.outcome == 'success'
+        continue-on-error: true
+        run: |
+          echo "### Explain: destroy (JSON)" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          tfclassify explain \
+            -p testdata/e2e/${{ inputs.use-case }}/destroy.json \
+            -c testdata/e2e/${{ inputs.use-case }}/.tfclassify.hcl \
+            >> "$GITHUB_STEP_SUMMARY" 2>&1
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
       - name: Classify destroy plan (binary)
         id: classify-destroy-binary
         if: ${{ !inputs.plan-only && (inputs.plan-formats == 'binary' || inputs.plan-formats == 'both') }}
@@ -201,6 +243,18 @@ jobs:
             echo "::error::Destroy phase (binary): expected exit code $EXPECTED_EXIT, got $ACTUAL_EXIT"
             exit 1
           fi
+
+      - name: Explain destroy plan (binary)
+        if: steps.classify-destroy-binary.outcome == 'success'
+        continue-on-error: true
+        run: |
+          echo "### Explain: destroy (binary)" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          tfclassify explain \
+            -p testdata/e2e/${{ inputs.use-case }}/destroy.tfplan \
+            -c testdata/e2e/${{ inputs.use-case }}/.tfclassify.hcl \
+            >> "$GITHUB_STEP_SUMMARY" 2>&1
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
 
       - name: Cleanup
         if: always() && steps.apply.outcome != 'skipped'

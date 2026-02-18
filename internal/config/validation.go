@@ -4,6 +4,10 @@ package config
 import (
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
+
+	"github.com/gobwas/glob"
 )
 
 // Validate checks that the configuration is valid.
@@ -166,4 +170,214 @@ func allPatternsKnown(patterns []string, known map[string]bool) bool {
 		}
 	}
 	return true
+}
+
+// ValidateGlobPatterns checks that all glob patterns in resource and not_resource
+// fields compile successfully. Returns an error on the first malformed pattern.
+func ValidateGlobPatterns(cfg *Config) error {
+	for _, classification := range cfg.Classifications {
+		for i, rule := range classification.Rules {
+			for _, pattern := range rule.Resource {
+				if _, err := glob.Compile(pattern); err != nil {
+					return fmt.Errorf("classification %q rule %d: invalid resource pattern %q: %w",
+						classification.Name, i+1, pattern, err)
+				}
+			}
+			for _, pattern := range rule.NotResource {
+				if _, err := glob.Compile(pattern); err != nil {
+					return fmt.Errorf("classification %q rule %d: invalid not_resource pattern %q: %w",
+						classification.Name, i+1, pattern, err)
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// Warning represents a validation warning with context.
+type Warning struct {
+	Classification string
+	Message        string
+}
+
+func (w Warning) String() string {
+	if w.Classification != "" {
+		return fmt.Sprintf("Warning: classification %q: %s", w.Classification, w.Message)
+	}
+	return fmt.Sprintf("Warning: %s", w.Message)
+}
+
+// ValidateWarnings runs warning-level checks on a valid configuration.
+// It returns warnings for: unreachable rules (catch-all shadows), empty
+// classifications, and missing plugin binaries.
+func ValidateWarnings(cfg *Config) []Warning {
+	var warnings []Warning
+	warnings = append(warnings, warnUnreachableRules(cfg)...)
+	warnings = append(warnings, warnEmptyClassifications(cfg)...)
+	warnings = append(warnings, warnMissingPluginBinaries(cfg)...)
+	warnings = append(warnings, warnRedundantNotResource(cfg)...)
+	return warnings
+}
+
+// warnUnreachableRules detects when a higher-precedence classification has a
+// resource=["*"] rule with no action constraint, making all lower-precedence
+// classification rules unreachable.
+func warnUnreachableRules(cfg *Config) []Warning {
+	var warnings []Warning
+
+	// Build classification lookup
+	classificationByName := make(map[string]*ClassificationConfig)
+	for i := range cfg.Classifications {
+		classificationByName[cfg.Classifications[i].Name] = &cfg.Classifications[i]
+	}
+
+	// Walk precedence list; if we find a catch-all (resource=["*"], no actions),
+	// everything after it is unreachable.
+	catchAllFound := ""
+	for _, name := range cfg.Precedence {
+		c, ok := classificationByName[name]
+		if !ok {
+			continue
+		}
+
+		if catchAllFound != "" {
+			// This classification is shadowed
+			if len(c.Rules) > 0 {
+				warnings = append(warnings, Warning{
+					Classification: name,
+					Message: fmt.Sprintf("rules are unreachable because classification %q has a catch-all rule (resource=[\"*\"] with no action constraint) at higher precedence",
+						catchAllFound),
+				})
+			}
+			continue
+		}
+
+		// Check if this classification has a catch-all rule
+		for _, rule := range c.Rules {
+			if isCatchAllRule(rule) {
+				catchAllFound = name
+				break
+			}
+		}
+	}
+
+	return warnings
+}
+
+// isCatchAllRule returns true if the rule matches all resources with no action constraint.
+func isCatchAllRule(rule RuleConfig) bool {
+	if len(rule.Actions) > 0 {
+		return false
+	}
+	for _, pattern := range rule.Resource {
+		if pattern == "*" {
+			return true
+		}
+	}
+	return false
+}
+
+// warnEmptyClassifications warns when a classification has no rules and no plugin
+// analyzer blocks, meaning it can never match anything.
+func warnEmptyClassifications(cfg *Config) []Warning {
+	var warnings []Warning
+	for _, c := range cfg.Classifications {
+		if len(c.Rules) == 0 && !hasPluginAnalyzers(c) {
+			warnings = append(warnings, Warning{
+				Classification: c.Name,
+				Message:        "has no rules and no plugin analyzer blocks; it will never match any resource",
+			})
+		}
+	}
+	return warnings
+}
+
+// hasPluginAnalyzers returns true if the classification has any plugin analyzer config.
+func hasPluginAnalyzers(c ClassificationConfig) bool {
+	for _, pac := range c.PluginAnalyzerConfigs {
+		if pac != nil && (pac.PrivilegeEscalation != nil || pac.NetworkExposure != nil || pac.KeyVaultAccess != nil) {
+			return true
+		}
+	}
+	return false
+}
+
+// pluginSearchPaths returns the ordered list of directories to search for plugin binaries.
+func pluginSearchPaths() []string {
+	var paths []string
+	if envDir := os.Getenv("TFCLASSIFY_PLUGIN_DIR"); envDir != "" {
+		paths = append(paths, envDir)
+	}
+	if cwd, err := os.Getwd(); err == nil {
+		paths = append(paths, filepath.Join(cwd, ".tfclassify", "plugins"))
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		paths = append(paths, filepath.Join(home, ".tfclassify", "plugins"))
+	}
+	return paths
+}
+
+// warnMissingPluginBinaries checks that enabled plugins have their binary
+// available in the plugin search path.
+func warnMissingPluginBinaries(cfg *Config) []Warning {
+	var warnings []Warning
+	paths := pluginSearchPaths()
+
+	for _, p := range cfg.Plugins {
+		if !p.Enabled || p.Source == "" {
+			continue
+		}
+
+		binaryName := "tfclassify-plugin-" + p.Name
+		found := false
+		for _, dir := range paths {
+			candidate := filepath.Join(dir, binaryName)
+			if _, err := os.Stat(candidate); err == nil {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			warnings = append(warnings, Warning{
+				Message: fmt.Sprintf("plugin %q is enabled but binary %q was not found in any search path; run \"tfclassify init\" to install it",
+					p.Name, binaryName),
+			})
+		}
+	}
+
+	return warnings
+}
+
+// warnRedundantNotResource checks for not_resource rules that are fully covered
+// by higher-precedence resource patterns.
+func warnRedundantNotResource(cfg *Config) []Warning {
+	var warnings []Warning
+
+	classificationByName := make(map[string]*ClassificationConfig)
+	for i := range cfg.Classifications {
+		classificationByName[cfg.Classifications[i].Name] = &cfg.Classifications[i]
+	}
+
+	higherPatterns := make(map[string]bool)
+	for _, classificationName := range cfg.Precedence {
+		classification, ok := classificationByName[classificationName]
+		if !ok {
+			continue
+		}
+		for ruleIdx, rule := range classification.Rules {
+			if len(rule.NotResource) > 0 && allPatternsKnown(rule.NotResource, higherPatterns) {
+				warnings = append(warnings, Warning{
+					Classification: classificationName,
+					Message: fmt.Sprintf("rule %d uses not_resource with patterns already covered by higher-precedence rules; consider using resource = [\"*\"] instead",
+						ruleIdx+1),
+				})
+			}
+			for _, pattern := range rule.Resource {
+				higherPatterns[pattern] = true
+			}
+		}
+	}
+
+	return warnings
 }

@@ -414,6 +414,255 @@ func TestClassify_PluginDecisionsWithEmptyClassification(t *testing.T) {
 	}
 }
 
+func TestExplainClassify_AllRulesEvaluated(t *testing.T) {
+	cfg := newTestConfig()
+	classifier, err := New(cfg)
+	if err != nil {
+		t.Fatalf("failed to create classifier: %v", err)
+	}
+
+	changes := []plan.ResourceChange{
+		{
+			Address: "azurerm_role_assignment.example",
+			Type:    "azurerm_role_assignment",
+			Actions: []string{"delete"},
+		},
+	}
+
+	result := classifier.ExplainClassify(changes)
+
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
+	}
+
+	// Should have trace entries for all 3 rules (critical, standard, auto)
+	res := result.Resources[0]
+	if len(res.Trace) != 3 {
+		t.Fatalf("expected 3 trace entries (one per rule), got %d", len(res.Trace))
+	}
+
+	// Verify all classifications appear
+	classifications := make(map[string]bool)
+	for _, entry := range res.Trace {
+		classifications[entry.Classification] = true
+	}
+	for _, name := range []string{"critical", "standard", "auto"} {
+		if !classifications[name] {
+			t.Errorf("expected trace entry for classification %q", name)
+		}
+	}
+}
+
+func TestExplainClassify_SkipReasons(t *testing.T) {
+	cfg := newTestConfig()
+	classifier, err := New(cfg)
+	if err != nil {
+		t.Fatalf("failed to create classifier: %v", err)
+	}
+
+	changes := []plan.ResourceChange{
+		{
+			Address: "azurerm_virtual_network.main",
+			Type:    "azurerm_virtual_network",
+			Actions: []string{"create"},
+		},
+	}
+
+	result := classifier.ExplainClassify(changes)
+	res := result.Resources[0]
+
+	// Critical rule should skip with resource mismatch (vnet doesn't match *_role_*)
+	if res.Trace[0].Result != TraceSkip {
+		t.Errorf("expected critical rule to skip, got %s", res.Trace[0].Result)
+	}
+	if res.Trace[0].Reason != "resource mismatch" {
+		t.Errorf("expected 'resource mismatch' reason, got %q", res.Trace[0].Reason)
+	}
+
+	// Auto rule should skip with action mismatch
+	autoEntry := res.Trace[2]
+	if autoEntry.Result != TraceSkip {
+		t.Errorf("expected auto rule to skip, got %s", autoEntry.Result)
+	}
+	if autoEntry.Reason == "" || autoEntry.Reason == "resource mismatch" {
+		t.Errorf("expected action mismatch reason, got %q", autoEntry.Reason)
+	}
+}
+
+func TestExplainClassify_MatchesClassify(t *testing.T) {
+	cfg := newTestConfig()
+	classifier, err := New(cfg)
+	if err != nil {
+		t.Fatalf("failed to create classifier: %v", err)
+	}
+
+	changes := []plan.ResourceChange{
+		{Address: "azurerm_role_assignment.example", Type: "azurerm_role_assignment", Actions: []string{"delete"}},
+		{Address: "azurerm_virtual_network.main", Type: "azurerm_virtual_network", Actions: []string{"update"}},
+	}
+
+	classifyResult := classifier.Classify(changes)
+	explainResult := classifier.ExplainClassify(changes)
+	classifier.FinalizeExplanation(explainResult)
+
+	for i, decision := range classifyResult.ResourceDecisions {
+		if explainResult.Resources[i].FinalClassification != decision.Classification {
+			t.Errorf("resource %s: explain says %q, classify says %q",
+				decision.Address,
+				explainResult.Resources[i].FinalClassification,
+				decision.Classification)
+		}
+	}
+}
+
+func TestExplainClassify_NoChanges(t *testing.T) {
+	cfg := newTestConfig()
+	classifier, err := New(cfg)
+	if err != nil {
+		t.Fatalf("failed to create classifier: %v", err)
+	}
+
+	result := classifier.ExplainClassify([]plan.ResourceChange{})
+
+	if !result.NoChanges {
+		t.Error("expected NoChanges to be true")
+	}
+	if len(result.Resources) != 0 {
+		t.Errorf("expected 0 resources, got %d", len(result.Resources))
+	}
+}
+
+func TestExplainClassify_DefaultFallback(t *testing.T) {
+	cfg := &config.Config{
+		Classifications: []config.ClassificationConfig{
+			{
+				Name:  "critical",
+				Rules: []config.RuleConfig{{Resource: []string{"critical_*"}}},
+			},
+		},
+		Precedence: []string{"critical"},
+		Defaults: &config.DefaultsConfig{
+			Unclassified: "standard",
+			NoChanges:    "auto",
+		},
+	}
+
+	classifier, err := New(cfg)
+	if err != nil {
+		t.Fatalf("failed to create classifier: %v", err)
+	}
+
+	changes := []plan.ResourceChange{
+		{Address: "azurerm_virtual_network.main", Type: "azurerm_virtual_network", Actions: []string{"update"}},
+	}
+
+	result := classifier.ExplainClassify(changes)
+	classifier.FinalizeExplanation(result)
+	res := result.Resources[0]
+
+	// All rules should skip
+	for _, entry := range res.Trace {
+		if entry.Result != TraceSkip {
+			t.Errorf("expected all entries to skip for unmatched resource, got %s for %s", entry.Result, entry.Rule)
+		}
+	}
+
+	if res.FinalClassification != "standard" {
+		t.Errorf("expected default 'standard', got %q", res.FinalClassification)
+	}
+	if res.FinalSource != "default" {
+		t.Errorf("expected source 'default', got %q", res.FinalSource)
+	}
+	if res.WinnerReason != "no rule matched" {
+		t.Errorf("expected winner reason 'no rule matched', got %q", res.WinnerReason)
+	}
+}
+
+func TestExplainClassify_BuiltinAnalyzerTrace(t *testing.T) {
+	cfg := newTestConfig()
+	classifier, err := New(cfg)
+	if err != nil {
+		t.Fatalf("failed to create classifier: %v", err)
+	}
+
+	changes := []plan.ResourceChange{
+		{Address: "azurerm_resource_group.delete", Type: "azurerm_resource_group", Actions: []string{"delete"}},
+	}
+
+	result := classifier.ExplainClassify(changes)
+	builtinDecisions := classifier.AddExplainBuiltinAnalyzers(result, changes, []BuiltinAnalyzer{
+		&DeletionAnalyzer{},
+	})
+
+	if len(builtinDecisions) != 1 {
+		t.Fatalf("expected 1 builtin decision, got %d", len(builtinDecisions))
+	}
+
+	// Find the deletion trace entry
+	res := result.Resources[0]
+	found := false
+	for _, entry := range res.Trace {
+		if entry.Source == "builtin: deletion" {
+			found = true
+			if entry.Result != TraceMatch {
+				t.Errorf("expected deletion entry to be MATCH, got %s", entry.Result)
+			}
+			break
+		}
+	}
+	if !found {
+		t.Error("expected deletion analyzer trace entry")
+	}
+}
+
+func TestExplainClassify_PluginDecisionTrace(t *testing.T) {
+	cfg := newTestConfig()
+	classifier, err := New(cfg)
+	if err != nil {
+		t.Fatalf("failed to create classifier: %v", err)
+	}
+
+	changes := []plan.ResourceChange{
+		{Address: "azurerm_role_assignment.example", Type: "azurerm_role_assignment", Actions: []string{"create"}},
+	}
+
+	result := classifier.ExplainClassify(changes)
+
+	// Simulate plugin decisions
+	pluginDecisions := []ResourceDecision{
+		{
+			Address:        "azurerm_role_assignment.example",
+			Classification: "critical",
+			MatchedRule:    "azurerm/privilege-escalation",
+		},
+	}
+
+	classifier.AddExplainPluginDecisions(result, pluginDecisions)
+	classifier.FinalizeExplanation(result)
+
+	res := result.Resources[0]
+
+	// Should have plugin entry in trace
+	found := false
+	for _, entry := range res.Trace {
+		if entry.Source == "plugin: azurerm/privilege-escalation" {
+			found = true
+			if entry.Result != TraceMatch {
+				t.Errorf("expected plugin entry to be MATCH, got %s", entry.Result)
+			}
+			break
+		}
+	}
+	if !found {
+		t.Error("expected plugin trace entry")
+	}
+
+	// Final should be critical (from plugin)
+	if res.FinalClassification != "critical" {
+		t.Errorf("expected final 'critical', got %q", res.FinalClassification)
+	}
+}
+
 func TestClassify_PluginDecisionsWithUnknownClassification(t *testing.T) {
 	cfg := newTestConfig()
 	classifier, err := New(cfg)

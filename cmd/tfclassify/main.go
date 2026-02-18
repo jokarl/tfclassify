@@ -18,11 +18,12 @@ import (
 var Version = "dev"
 
 var (
-	planPath       string
-	configPath     string
-	outputFmt      string
-	verbose        bool
+	planPath         string
+	configPath       string
+	outputFmt        string
+	verbose          bool
 	detailedExitCode bool
+	resourceFilters  []string
 )
 
 // builtinAnalyzers returns the default set of builtin analyzers.
@@ -63,6 +64,34 @@ requests (to avoid rate limits).`,
 	RunE: runInit,
 }
 
+var validateCmd = &cobra.Command{
+	Use:   "validate",
+	Short: "Check configuration file for errors",
+	Long: `Validates .tfclassify.hcl for correctness without requiring a Terraform plan.
+
+Checks HCL syntax, classification references, precedence ordering, glob pattern
+syntax, plugin references, and emits warnings for unreachable rules, empty
+classifications, and missing plugin binaries.
+
+Exit codes:
+  0  Configuration is valid (warnings may be printed to stderr)
+  1  Configuration has errors`,
+	RunE: runValidate,
+}
+
+var explainCmd = &cobra.Command{
+	Use:   "explain",
+	Short: "Trace classification decisions for plan resources",
+	Long: `Shows why each resource was classified the way it was by tracing through the
+full classification pipeline: core rules, builtin analyzers, and external plugins.
+
+Produces a per-resource trace showing every rule evaluated, whether it matched
+or was skipped, and how the final classification was determined via precedence.
+
+Use --resource / -r (repeatable) to filter to specific resource addresses.`,
+	RunE: runExplain,
+}
+
 func init() {
 	// Root command flags
 	rootCmd.Flags().StringVarP(&planPath, "plan", "p", "", "Path to Terraform plan file (JSON or binary)")
@@ -76,8 +105,20 @@ func init() {
 	// Init command flags
 	initCmd.Flags().StringVarP(&configPath, "config", "c", "", "Path to configuration file")
 
+	// Validate command flags
+	validateCmd.Flags().StringVarP(&configPath, "config", "c", "", "Path to configuration file")
+
+	// Explain command flags
+	explainCmd.Flags().StringVarP(&planPath, "plan", "p", "", "Path to Terraform plan file (JSON or binary)")
+	explainCmd.Flags().StringVarP(&configPath, "config", "c", "", "Path to configuration file")
+	explainCmd.Flags().StringVarP(&outputFmt, "output", "o", "text", "Output format: json, text")
+	explainCmd.Flags().StringArrayVarP(&resourceFilters, "resource", "r", nil, "Resource address to explain (repeatable)")
+	explainCmd.MarkFlagRequired("plan")
+
 	// Add subcommands
 	rootCmd.AddCommand(initCmd)
+	rootCmd.AddCommand(validateCmd)
+	rootCmd.AddCommand(explainCmd)
 }
 
 func run(cmd *cobra.Command, args []string) error {
@@ -154,6 +195,114 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 	os.Exit(0)
 	return nil
+}
+
+func runValidate(cmd *cobra.Command, args []string) error {
+	// Load configuration (runs all error-level validations)
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+
+	// Validate glob patterns
+	if err := config.ValidateGlobPatterns(cfg); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+
+	// Run warning-level checks
+	warnings := config.ValidateWarnings(cfg)
+	for _, w := range warnings {
+		fmt.Fprintln(os.Stderr, w)
+	}
+
+	fmt.Println("Configuration valid.")
+	return nil
+}
+
+func runExplain(cmd *cobra.Command, args []string) error {
+	// Load configuration
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		return fmt.Errorf("failed to load configuration: %w", err)
+	}
+
+	// Parse plan
+	planResult, err := plan.ParseFile(planPath)
+	if err != nil {
+		return fmt.Errorf("failed to parse plan: %w", err)
+	}
+
+	// Create classifier
+	classifier, err := classify.New(cfg)
+	if err != nil {
+		return fmt.Errorf("failed to create classifier: %w", err)
+	}
+
+	// Run explain classification (evaluates all rules, no short-circuit)
+	result := classifier.ExplainClassify(planResult.Changes)
+
+	// Run builtin analyzers with trace collection
+	builtinDecisions := classifier.AddExplainBuiltinAnalyzers(result, planResult.Changes, builtinAnalyzers())
+
+	// Run external plugins (if any configured)
+	if hasExternalPlugins(cfg) {
+		selfPath, err := os.Executable()
+		if err != nil {
+			return fmt.Errorf("failed to determine executable path: %w", err)
+		}
+
+		host := plugin.NewHost(cfg)
+		defer host.Shutdown()
+
+		if err := host.DiscoverAndStart(selfPath); err != nil {
+			if _, ok := err.(*plugin.PluginNotInstalledError); ok {
+				fmt.Fprintf(os.Stderr, "Warning: %v\nPlugin decisions will not appear in trace.\n", err)
+			} else {
+				fmt.Fprintf(os.Stderr, "Warning: plugin discovery failed: %v\n", err)
+			}
+		} else {
+			pluginDecisions, err := host.RunAnalysis(planResult.Changes)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: plugin analysis failed: %v\n", err)
+			} else if len(pluginDecisions) > 0 {
+				classifier.AddExplainPluginDecisions(result, pluginDecisions)
+			}
+		}
+	}
+
+	// Merge builtin decisions for precedence calculation
+	_ = builtinDecisions
+
+	// Finalize: determine winner for each resource across all trace entries
+	classifier.FinalizeExplanation(result)
+
+	// Apply resource filter
+	if len(resourceFilters) > 0 {
+		filterSet := make(map[string]bool, len(resourceFilters))
+		for _, r := range resourceFilters {
+			filterSet[r] = true
+		}
+
+		filtered := make([]classify.ResourceExplanation, 0)
+		for _, res := range result.Resources {
+			if filterSet[res.Address] {
+				filtered = append(filtered, res)
+			}
+		}
+
+		if len(filtered) == 0 {
+			fmt.Fprintln(os.Stderr, "No matching resources found for the specified --resource filter(s).")
+		}
+
+		result.Resources = filtered
+	}
+
+	// Format and output
+	format := output.Format(outputFmt)
+	formatter := output.NewFormatter(os.Stdout, format, false)
+	return formatter.FormatExplain(result)
 }
 
 func runInit(cmd *cobra.Command, args []string) error {
