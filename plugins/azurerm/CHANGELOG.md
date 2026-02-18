@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/jokarl/tfclassify/compare/tfclassify-plugin-azurerm-v0.2.0...tfclassify-plugin-azurerm-v0.2.1) (2026-02-18)
+
+
+### Performance Improvements
+
+* optimize hot paths and reduce allocations across codebase ([#31](https://github.com/jokarl/tfclassify/issues/31)) ([8ffe569](https://github.com/jokarl/tfclassify/commit/8ffe56999bde1523d2c623946c01a7a902181842))
+
 ## [0.2.0](https://github.com/jokarl/tfclassify/compare/tfclassify-plugin-azurerm-v0.1.0...tfclassify-plugin-azurerm-v0.2.0) (2026-02-17)
 
 
