@@ -738,3 +738,133 @@ func TestCLI_InvalidPlanJSON(t *testing.T) {
 		t.Errorf("expected error about parsing plan, got:\n%s", outputStr)
 	}
 }
+
+func TestCLI_ExplainCmd_TextOutput(t *testing.T) {
+	binary := buildBinary(t)
+
+	tmpDir, err := os.MkdirTemp("", "tfclassify-cli")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	configPath := writeTestConfig(t, tmpDir)
+	planPath := writeTestPlan(t, tmpDir)
+
+	cmd := exec.Command(binary, "explain", "--plan", planPath, "--config", configPath)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("expected exit 0, got error: %v\n%s", err, output)
+	}
+
+	outputStr := string(output)
+	if !strings.Contains(outputStr, "Resource: azurerm_role_assignment.example") {
+		t.Errorf("expected resource address in output, got:\n%s", outputStr)
+	}
+	if !strings.Contains(outputStr, "Evaluation trace:") {
+		t.Errorf("expected trace section in output, got:\n%s", outputStr)
+	}
+	if !strings.Contains(outputStr, "Winner:") {
+		t.Errorf("expected winner section in output, got:\n%s", outputStr)
+	}
+}
+
+func TestCLI_ExplainCmd_JSONOutput(t *testing.T) {
+	binary := buildBinary(t)
+
+	tmpDir, err := os.MkdirTemp("", "tfclassify-cli")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	configPath := writeTestConfig(t, tmpDir)
+	planPath := writeTestPlan(t, tmpDir)
+
+	cmd := exec.Command(binary, "explain", "--plan", planPath, "--config", configPath, "--output", "json")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("expected exit 0, got error: %v\n%s", err, output)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(output, &result); err != nil {
+		t.Fatalf("expected valid JSON output, got error: %v\nOutput:\n%s", err, output)
+	}
+
+	resources, ok := result["resources"].([]any)
+	if !ok {
+		t.Fatalf("expected resources array, got %T", result["resources"])
+	}
+	if len(resources) != 2 {
+		t.Errorf("expected 2 resources, got %d", len(resources))
+	}
+
+	// Check first resource has required fields
+	res := resources[0].(map[string]any)
+	if res["address"] == nil {
+		t.Error("expected address field")
+	}
+	if res["final_classification"] == nil {
+		t.Error("expected final_classification field")
+	}
+	if res["trace"] == nil {
+		t.Error("expected trace field")
+	}
+}
+
+func TestCLI_ExplainCmd_ResourceFilter(t *testing.T) {
+	binary := buildBinary(t)
+
+	tmpDir, err := os.MkdirTemp("", "tfclassify-cli")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	configPath := writeTestConfig(t, tmpDir)
+	planPath := writeTestPlan(t, tmpDir)
+
+	cmd := exec.Command(binary, "explain", "--plan", planPath, "--config", configPath,
+		"-r", "azurerm_role_assignment.example")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("expected exit 0, got error: %v\n%s", err, output)
+	}
+
+	outputStr := string(output)
+	if !strings.Contains(outputStr, "azurerm_role_assignment.example") {
+		t.Error("expected filtered resource in output")
+	}
+	if strings.Contains(outputStr, "azurerm_virtual_network.main") {
+		t.Error("expected unfiltered resource NOT in output")
+	}
+}
+
+func TestCLI_ExplainCmd_ResourceFilter_Repeatable(t *testing.T) {
+	binary := buildBinary(t)
+
+	tmpDir, err := os.MkdirTemp("", "tfclassify-cli")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	configPath := writeTestConfig(t, tmpDir)
+	planPath := writeTestPlan(t, tmpDir)
+
+	cmd := exec.Command(binary, "explain", "--plan", planPath, "--config", configPath,
+		"-r", "azurerm_role_assignment.example", "-r", "azurerm_virtual_network.main")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("expected exit 0, got error: %v\n%s", err, output)
+	}
+
+	outputStr := string(output)
+	if !strings.Contains(outputStr, "azurerm_role_assignment.example") {
+		t.Error("expected first filtered resource in output")
+	}
+	if !strings.Contains(outputStr, "azurerm_virtual_network.main") {
+		t.Error("expected second filtered resource in output")
+	}
+}

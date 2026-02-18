@@ -85,6 +85,7 @@ Version negotiation: host checks `SDKVersionConstraints` against plugin's report
 - `tfclassify --plan <file>` — Classify a Terraform plan (root command)
 - `tfclassify init` — Install plugins declared in configuration
 - `tfclassify validate` — Check `.tfclassify.hcl` for errors without a plan. Exits 0 if valid (warnings to stderr), exits 1 on errors. Accepts `--config` / `-c` flag.
+- `tfclassify explain --plan <file>` — Trace classification decisions for each resource through the full pipeline (core rules, builtin analyzers, plugins). Accepts `--resource` / `-r` (repeatable) to filter, `--output` / `-o` for json/text, `--config` / `-c`.
 
 ## E2E Tests
 
