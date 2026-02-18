@@ -8,7 +8,7 @@ classification "critical" {
   description = "Critical - data plane storage access detected"
 
   rule {
-    resource = ["*_role_*", "*_security_group", "*_security_rule"]
+    resource = ["*_role_*"]
     actions  = ["delete"]
   }
 
