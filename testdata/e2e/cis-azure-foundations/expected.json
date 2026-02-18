@@ -1,0 +1,4 @@
+{
+  "create": { "exit_code": 4, "classification": "CIS-6" },
+  "destroy": { "exit_code": 4, "classification": "CIS-6" }
+}

@@ -87,6 +87,7 @@ jobs:
           - custom-role-cross-reference
           - modules-pluginless
           - modules-plugin
+          - cis-azure-foundations
         include:
           # custom-role-cross-reference creates an azurerm_role_definition, which
           # requires Microsoft.Authorization/roleDefinitions/write — a permission
