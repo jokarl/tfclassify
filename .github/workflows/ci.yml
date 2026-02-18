@@ -85,6 +85,8 @@ jobs:
           - data-plane-detection
           - control-plane-patterns
           - custom-role-cross-reference
+          - modules-pluginless
+          - modules-plugin
         include:
           # custom-role-cross-reference creates an azurerm_role_definition, which
           # requires Microsoft.Authorization/roleDefinitions/write — a permission
