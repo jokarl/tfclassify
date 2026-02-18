@@ -35,6 +35,32 @@ go test ./plugins/azurerm/ -run TestPrivilege
 protoc --go_out=. --go-grpc_out=. proto/tfclassify.proto
 ```
 
+## Product Philosophy
+
+tfclassify classifies **changes**, not final state. This is the core differentiator from Trivy, Checkov, and tflint — those tools evaluate whether a resource IS compliant. tfclassify classifies whether a CHANGE needs elevated approval. "This resource has TLS 1.0" is a compliance finding (their domain). "This PR downgrades TLS from 1.2 to 1.0" is a risky change that needs a different approval workflow (our domain).
+
+### What We Are
+
+A change classification and approval routing engine for Terraform plans. We answer: "Given this set of infrastructure changes, what level of review and approval is required?"
+
+### What We Are NOT
+
+A policy engine, compliance scanner, or static analysis tool. We do not maintain databases of "correct" attribute values, check hundreds of resource properties, or enforce configuration standards. That is what Trivy, Checkov, and tflint do — and they do it well.
+
+### Analyzer Depth Principle
+
+**Either bring semantic depth or don't build it.** The bar for a new analyzer is: "Does this require domain knowledge that Trivy/Checkov cannot replicate?"
+
+The `privilege_escalation` analyzer is the gold standard — it resolves Azure role definitions from a built-in database, computes effective permissions with wildcard expansion and NotActions, separates data-plane from control-plane, cross-references custom role definitions from the plan, and supports graduated thresholds per classification. Users cannot replicate this with a Checkov policy.
+
+A shallow attribute check ("if `default_action == Allow`, flag it") does NOT clear this bar. That is a policy check, and policy tools already do it across hundreds of resource types.
+
+The existing `network_exposure` and `keyvault_access` analyzers are borderline — simpler than privilege_escalation but already shipped and useful. They are **not** the model for future development. Do not extend them to cover additional resource types.
+
+### Classification Naming Convention
+
+Classifications can be named after compliance controls (e.g., `classification "CIS-6"`) and rule descriptions can reference specific control IDs. No dedicated compliance annotation feature is needed — the existing model handles it through naming. See `testdata/e2e/cis-azure-foundations/` for a working example.
+
 ## Architecture
 
 tfclassify classifies Terraform plan changes into organizational categories (critical, review, standard, auto-approved) using a three-layer model:
