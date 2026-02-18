@@ -389,6 +389,20 @@ func TestFormatRuleDescription_Variants(t *testing.T) {
 	if desc != "auto rule 1" {
 		t.Errorf("unexpected bare description: %q", desc)
 	}
+
+	// Single not_actions
+	rule = config.RuleConfig{Resource: []string{"*"}, NotActions: []string{"no-op"}}
+	desc = formatRuleDescription("standard", 1, rule)
+	if desc != "standard rule 1 (resource: *; not_actions: no-op)" {
+		t.Errorf("unexpected not_actions description: %q", desc)
+	}
+
+	// Multiple not_actions
+	rule = config.RuleConfig{Resource: []string{"*"}, NotActions: []string{"read", "no-op"}}
+	desc = formatRuleDescription("standard", 1, rule)
+	if desc != "standard rule 1 (resource: *; not_actions: read, ...)" {
+		t.Errorf("unexpected multiple not_actions description: %q", desc)
+	}
 }
 
 func TestClassify_CustomRuleDescription(t *testing.T) {

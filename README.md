@@ -13,6 +13,7 @@ Classify Terraform plan changes based on organization-defined rules. tfclassify 
   - [Init Command](#init-command)
   - [Validate Command](#validate-command)
   - [Explain Command](#explain-command)
+  - [Verify Command](#verify-command)
   - [Output Formats](#output-formats)
 - [Configuration](#configuration)
   - [Config Discovery](#config-discovery)
@@ -20,7 +21,9 @@ Classify Terraform plan changes based on organization-defined rules. tfclassify 
   - [Rule Fields](#rule-fields)
   - [Precedence](#precedence)
   - [Defaults](#defaults)
+  - [Blast Radius](#blast-radius)
   - [Plugin Declarations](#plugin-declarations)
+  - [Evidence](#evidence)
 - [Plan File Formats](#plan-file-formats)
 - [Three-Layer Classification Model](#three-layer-classification-model)
   - [Layer 1: Core Rules](#layer-1-core-rules)
@@ -167,6 +170,7 @@ tfclassify [flags]
 | `--output` | `-o` | `text` | Output format: `text`, `json`, `github` |
 | `--verbose` | `-v` | `false` | Show per-resource rule match details |
 | `--detailed-exitcode` | `-d` | `false` | Use classification-based exit codes (see below) |
+| `--evidence-file` | | | Write evidence artifact to file (see [Evidence](#evidence)) |
 
 ### Exit Codes
 
@@ -247,6 +251,24 @@ tfclassify explain -p tfplan -r azurerm_role_assignment.admin -o json
 tfclassify explain -p tfplan -r azurerm_role_assignment.admin -r azurerm_key_vault.main
 ```
 
+### Verify Command
+
+```
+tfclassify verify [flags]
+```
+
+Verifies the Ed25519 signature of a tfclassify evidence artifact. Exits 0 if the signature is valid, 1 if invalid.
+
+| Flag | Short | Default | Description |
+|------|-------|---------|-------------|
+| `--evidence-file` | `-e` | (required) | Path to evidence artifact JSON |
+| `--public-key` | `-k` | (required) | Path to Ed25519 PEM public key |
+
+```bash
+# Verify an evidence artifact
+tfclassify verify --evidence-file evidence.json --public-key signing.pub
+```
+
 ### Output Formats
 
 **Text** (default) — human-readable summary. With `-v`, groups resources by classification and shows matched rules.
@@ -266,7 +288,7 @@ tfclassify explain -p tfplan -r azurerm_role_assignment.admin -r azurerm_key_vau
       "actions": ["delete"],
       "classification": "critical",
       "classification_description": "Requires security team approval",
-      "matched_rule": "Deleting IAM or role resources requires security review"
+      "matched_rules": ["Deleting IAM or role resources requires security review"]
     }
   ]
 }
@@ -314,6 +336,7 @@ classification "review" {
 | `resource` | list of globs | Resource type must match at least one pattern. |
 | `not_resource` | list of globs | Resource type must match **none** of the patterns. Cannot combine with `resource` in the same rule. |
 | `actions` | list of strings | Terraform plan action. Omit to match all actions. See **Action Values** below. |
+| `not_actions` | list of strings | Inverse of `actions` — matches all actions EXCEPT those listed. Cannot combine with `actions` in the same rule. Same valid values as `actions`. |
 
 ### Action Values
 
@@ -326,6 +349,17 @@ These values come directly from the Terraform plan JSON format — tfclassify do
 | `delete` | An existing resource will be destroyed. Also appears as part of replacement (see below). |
 | `read` | A data source will be read during apply. Only appears for `data` resources whose values are not yet known at plan time. |
 | `no-op` | Terraform evaluated the resource and found no difference between config and state. The resource appears in the plan but nothing will change. |
+
+`not_actions` is useful when you want to match "everything except" a small set. For example, matching all real changes (excluding no-ops):
+
+```hcl
+rule {
+  resource    = ["*"]
+  not_actions = ["no-op"]
+}
+```
+
+`actions` and `not_actions` are mutually exclusive — specifying both in the same rule is a validation error. Omitting both matches all actions.
 
 **Replacement** is not a single action — it is a composite of `["delete", "create"]` (destroy-then-create) or `["create", "delete"]` (create-before-destroy, when `lifecycle { create_before_destroy = true }` is set). A rule with `actions = ["delete"]` will match replacements because the action list contains `"delete"`.
 
@@ -364,6 +398,30 @@ defaults {
 
 `unclassified` and `no_changes` must reference classification names from the precedence list. `plugin_timeout` accepts Go duration strings (e.g. `"10s"`, `"2m30s"`).
 
+### Blast Radius
+
+The optional `blast_radius` block inside a classification triggers when plan-wide change counts exceed configured thresholds. When any threshold is exceeded, **all** resources in the plan receive a decision at that classification level.
+
+```hcl
+classification "critical" {
+  description = "Requires security team approval"
+
+  blast_radius {
+    max_deletions    = 5    # Standalone deletions (delete without create)
+    max_replacements = 10   # Replacements (delete + create pairs)
+    max_changes      = 50   # All resources with non-no-op actions
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `max_deletions` | int | Trigger when standalone deletions exceed this count |
+| `max_replacements` | int | Trigger when replacements (destroy + recreate) exceed this count |
+| `max_changes` | int | Trigger when total non-no-op changes exceed this count |
+
+All fields are optional. Omitted fields are not evaluated. Values must be positive integers. Multiple classifications can define different thresholds for graduated blast radius detection.
+
 ### Plugin Declarations
 
 ```hcl
@@ -393,6 +451,32 @@ classification "critical" {
 ```
 
 See the [full-reference example](docs/examples/full-reference/.tfclassify.hcl) for an annotated configuration demonstrating every field.
+
+### Evidence
+
+The optional `evidence` block configures evidence artifact output for audit retention. When present, tfclassify produces a self-contained JSON file alongside the normal output, including input hashes, timestamps, classification results, and an optional Ed25519 signature for tamper evidence.
+
+```hcl
+evidence {
+  include_resources = true     # Include per-resource decisions (default: true)
+  include_trace     = false    # Include full explain trace (default: false)
+  signing_key       = "$TFCLASSIFY_SIGNING_KEY"  # Ed25519 PEM private key path
+}
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `include_resources` | bool | `true` | Include per-resource classification decisions in the artifact |
+| `include_trace` | bool | `false` | Include full explain trace (every rule evaluated per resource) |
+| `signing_key` | string | | Path to Ed25519 PEM private key. Supports `$ENV_VAR` expansion. When set, the artifact includes `signature` and `signed_content_hash` fields |
+
+Use `--evidence-file` on the root command to specify the output path. If the `evidence` block is present but `--evidence-file` is omitted, tfclassify writes to the current directory with an auto-generated filename and warns to stderr.
+
+Verify a signed artifact with:
+
+```bash
+tfclassify verify --evidence-file evidence.json --public-key signing.pub
+```
 
 ## Plan File Formats
 
@@ -430,8 +514,9 @@ Cross-provider heuristics that run in-process after core rules. These detect Ter
 | `deletion` | Standalone resource deletions (not part of a replacement) |
 | `replace` | Resource replacements (destroy + recreate) |
 | `sensitive` | Changes to Terraform-marked sensitive attributes |
+| `blast_radius` | Plan-wide change counts exceeding configured thresholds |
 
-Builtin analyzers are always enabled and require no configuration.
+Builtin analyzers are always enabled and require no configuration, except `blast_radius` which requires a `blast_radius {}` block inside a classification (see [Blast Radius](#blast-radius)).
 
 ### Layer 3: Deep Inspection Plugins
 
