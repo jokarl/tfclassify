@@ -8,7 +8,7 @@ classification "critical" {
   description = "Critical - authorization control access via custom role"
 
   rule {
-    resource = ["*_role_*", "*_security_group", "*_security_rule"]
+    resource = ["*_role_*"]
     actions  = ["delete"]
   }
 
