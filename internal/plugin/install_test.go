@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jokarl/tfclassify/pkg/config"
+	"github.com/jokarl/tfclassify/internal/config"
 )
 
 func TestInstallPlugins_BuiltinSkipped(t *testing.T) {

@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/gobwas/glob"
-	"github.com/jokarl/tfclassify/pkg/config"
+	"github.com/jokarl/tfclassify/internal/config"
 )
 
 // compiledRule is a pre-compiled classification rule.

@@ -3,7 +3,7 @@ package classify
 import (
 	"testing"
 
-	"github.com/jokarl/tfclassify/pkg/config"
+	"github.com/jokarl/tfclassify/internal/config"
 )
 
 func TestMatchesResource_SimpleGlob(t *testing.T) {

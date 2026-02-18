@@ -6,10 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jokarl/tfclassify/pkg/classify"
-	"github.com/jokarl/tfclassify/pkg/config"
-	"github.com/jokarl/tfclassify/pkg/output"
-	"github.com/jokarl/tfclassify/pkg/plan"
+	"github.com/jokarl/tfclassify/internal/classify"
+	"github.com/jokarl/tfclassify/internal/config"
+	"github.com/jokarl/tfclassify/internal/output"
+	"github.com/jokarl/tfclassify/internal/plan"
 )
 
 // TestEndToEnd_FullPipeline tests the complete config → parse → classify → output pipeline.

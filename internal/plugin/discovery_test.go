@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/jokarl/tfclassify/pkg/config"
+	"github.com/jokarl/tfclassify/internal/config"
 )
 
 func TestDiscoverPlugins_SourcelessPluginDiscovered(t *testing.T) {

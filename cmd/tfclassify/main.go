@@ -7,11 +7,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/jokarl/tfclassify/pkg/classify"
-	"github.com/jokarl/tfclassify/pkg/config"
-	"github.com/jokarl/tfclassify/pkg/output"
-	"github.com/jokarl/tfclassify/pkg/plan"
-	"github.com/jokarl/tfclassify/pkg/plugin"
+	"github.com/jokarl/tfclassify/internal/classify"
+	"github.com/jokarl/tfclassify/internal/config"
+	"github.com/jokarl/tfclassify/internal/output"
+	"github.com/jokarl/tfclassify/internal/plan"
+	"github.com/jokarl/tfclassify/internal/plugin"
 )
 
 // Version is set at build time.

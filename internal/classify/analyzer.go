@@ -2,7 +2,7 @@
 package classify
 
 import (
-	"github.com/jokarl/tfclassify/pkg/plan"
+	"github.com/jokarl/tfclassify/internal/plan"
 )
 
 // BuiltinAnalyzer inspects plan changes and produces additional classification decisions.

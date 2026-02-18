@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/jokarl/tfclassify/pkg/config"
-	"github.com/jokarl/tfclassify/pkg/plan"
+	"github.com/jokarl/tfclassify/internal/config"
+	"github.com/jokarl/tfclassify/internal/plan"
 	"github.com/jokarl/tfclassify/sdk"
 	"github.com/jokarl/tfclassify/sdk/pb"
 	sdkplugin "github.com/jokarl/tfclassify/sdk/plugin"

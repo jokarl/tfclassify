@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jokarl/tfclassify/pkg/classify"
+	"github.com/jokarl/tfclassify/internal/classify"
 )
 
 func TestFormatJSON(t *testing.T) {

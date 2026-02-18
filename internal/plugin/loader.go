@@ -11,9 +11,9 @@ import (
 
 	"github.com/gobwas/glob"
 	goplugin "github.com/hashicorp/go-plugin"
-	"github.com/jokarl/tfclassify/pkg/classify"
-	"github.com/jokarl/tfclassify/pkg/config"
-	"github.com/jokarl/tfclassify/pkg/plan"
+	"github.com/jokarl/tfclassify/internal/classify"
+	"github.com/jokarl/tfclassify/internal/config"
+	"github.com/jokarl/tfclassify/internal/plan"
 	"github.com/jokarl/tfclassify/sdk"
 	"github.com/jokarl/tfclassify/sdk/pb"
 	sdkplugin "github.com/jokarl/tfclassify/sdk/plugin"
