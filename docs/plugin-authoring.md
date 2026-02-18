@@ -195,6 +195,66 @@ func stringField(m map[string]interface{}, key string) string {
 }
 ```
 
+## Step 4b: ClassificationAwareAnalyzer (Optional)
+
+If your analyzer needs per-classification configuration (e.g., graduated thresholds), implement `ClassificationAwareAnalyzer` instead of the basic `Analyzer`:
+
+```go
+type ClassificationAwareAnalyzer interface {
+    Analyzer
+
+    // AnalyzeWithClassification is called once per classification that has
+    // analyzer config. classification is the name (e.g., "critical"),
+    // analyzerConfig is the JSON-encoded HCL sub-block for this analyzer.
+    AnalyzeWithClassification(runner Runner, classification string, analyzerConfig []byte) error
+}
+```
+
+The host calls `AnalyzeWithClassification` once per classification block that contains configuration for your analyzer. This is how the reference azurerm plugin supports different action patterns for critical vs standard:
+
+```go
+func (a *PrivilegeEscalationAnalyzer) AnalyzeWithClassification(
+    runner sdk.Runner, classification string, analyzerConfig []byte,
+) error {
+    var cfg PrivilegeConfig
+    if err := json.Unmarshal(analyzerConfig, &cfg); err != nil {
+        return fmt.Errorf("invalid config for %s: %w", classification, err)
+    }
+
+    changes, err := runner.GetResourceChanges(a.ResourcePatterns())
+    if err != nil {
+        return err
+    }
+
+    for _, change := range changes {
+        if matchesPatterns(change, cfg.Actions) {
+            runner.EmitDecision(a, change, &sdk.Decision{
+                Classification: classification,
+                Reason:         fmt.Sprintf("matches %s patterns", classification),
+                Severity:       severityFor(classification),
+            })
+        }
+    }
+    return nil
+}
+```
+
+The `analyzerConfig` JSON is derived from the HCL sub-block inside the classification. For example, given:
+
+```hcl
+classification "critical" {
+  azurerm {
+    privilege_escalation {
+      actions = ["Microsoft.Authorization/*"]
+    }
+  }
+}
+```
+
+The analyzer receives `{"actions":["Microsoft.Authorization/*"]}` as `analyzerConfig` with `classification = "critical"`.
+
+If an analyzer does **not** implement `ClassificationAwareAnalyzer`, its basic `Analyze()` method is called once (without classification context). Use the basic interface when your analyzer has no per-classification variation.
+
 ## Step 5: Understanding ResourceChange
 
 The `sdk.ResourceChange` structure contains the Terraform plan data:
@@ -356,23 +416,50 @@ Or distribute via GitHub releases and let users run `tfclassify init`.
 
 ## Step 10: Configuring the Plugin
 
-Users configure your plugin in `.tfclassify.hcl`:
+Users configure your plugin in `.tfclassify.hcl`. Plugin declarations and analyzer configuration are separate:
 
 ```hcl
+# Plugin declaration — enables the plugin and sets the download source.
 plugin "azurerm-roleassignment" {
   enabled = true
   source  = "github.com/yourorg/tfclassify-plugin-azurerm-roleassignment"
   version = "0.1.0"
+}
 
-  config {
-    some_threshold = 50
-    enabled_flags = {
-      privilege = true
-      scope     = false
+# Analyzer configuration lives inside classification blocks.
+# Each classification can configure different thresholds.
+classification "critical" {
+  description = "Requires security review"
+
+  rule {
+    resource = ["*_role_*"]
+    actions  = ["delete"]
+  }
+
+  # Plugin analyzer sub-blocks — named after the plugin.
+  azurerm-roleassignment {
+    privilege-escalation {
+      some_threshold = 90
+    }
+  }
+}
+
+classification "standard" {
+  description = "Standard change"
+
+  rule {
+    resource = ["*"]
+  }
+
+  azurerm-roleassignment {
+    privilege-escalation {
+      some_threshold = 50
     }
   }
 }
 ```
+
+This classification-scoped pattern allows graduated thresholds — stricter for critical, more relaxed for standard. See the [full-reference example](examples/full-reference/.tfclassify.hcl) for a complete annotated configuration.
 
 ## Distribution
 

@@ -10,8 +10,10 @@ make build-all      # Build CLI + azurerm plugin
 make test           # Run all tests across workspace (go test ./...)
 make vet            # Static analysis (go vet ./...)
 make lint           # golangci-lint run ./...
-make generate-roles # Refresh Azure role database from AzAdvertizer CSV
-make clean          # Remove build artifacts
+make generate-roles           # Refresh Azure role database from AzAdvertizer CSV
+make generate-actions         # Refresh Azure action registry from Microsoft Docs + role database
+make generate-actions-offline # Refresh Azure action registry from role database only (no network)
+make clean                    # Remove build artifacts
 ```
 
 Go workspace mode means all commands run across all three modules from the repo root.
@@ -76,7 +78,7 @@ HCL format (`.tfclassify.hcl`), parsed by `internal/config/` using `hashicorp/hc
 
 ## Plugin System
 
-Discovery order (`internal/plugin/discovery.go`): config `plugin_dir` → `TFCLASSIFY_PLUGIN_DIR` env → `.tfclassify/plugins/` → `~/.tfclassify/plugins/`. Binaries named `tfclassify-plugin-{name}`.
+Discovery order (`internal/plugin/discovery.go`): `TFCLASSIFY_PLUGIN_DIR` env → `.tfclassify/plugins/` → `~/.tfclassify/plugins/`. Binaries named `tfclassify-plugin-{name}`.
 
 Version negotiation: host checks `SDKVersionConstraints` against plugin's reported SDK version, and plugin can specify `HostVersionConstraint` (semver). Both checked during handshake.
 

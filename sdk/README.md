@@ -12,6 +12,7 @@ go get github.com/jokarl/tfclassify/sdk
 - [Architecture](#architecture)
 - [Interfaces](#interfaces)
   - [Analyzer](#analyzer)
+  - [ClassificationAwareAnalyzer](#classificationawareanalyzer)
   - [Runner](#runner)
   - [PluginSet](#pluginset)
 - [Types](#types)
@@ -95,6 +96,40 @@ type Analyzer interface {
 ```
 
 Embed `DefaultAnalyzer` to get default implementations for `Enabled()` (returns `true`) and `ResourcePatterns()` (returns `nil`).
+
+### ClassificationAwareAnalyzer
+
+An optional extension of `Analyzer` for analyzers that need per-classification configuration. When implemented, the host calls `AnalyzeWithClassification` once per classification block that contains analyzer config, instead of calling `Analyze` once.
+
+```go
+type ClassificationAwareAnalyzer interface {
+    Analyzer
+
+    // AnalyzeWithClassification inspects resources with classification context.
+    // classification is the name of the classification block (e.g., "critical")
+    // analyzerConfig is JSON-encoded per-analyzer configuration from the
+    // classification block's plugin sub-block.
+    AnalyzeWithClassification(runner Runner, classification string, analyzerConfig []byte) error
+}
+```
+
+**When to use:** Implement this when your analyzer needs graduated thresholds or different detection patterns per classification level. For example, the azurerm plugin's privilege escalation analyzer uses stricter action patterns for `critical` than for `standard`.
+
+**How config flows:** HCL sub-blocks inside `classification {}` blocks are JSON-encoded and passed as `analyzerConfig`. Given:
+
+```hcl
+classification "critical" {
+  azurerm {
+    privilege_escalation {
+      actions = ["Microsoft.Authorization/*"]
+    }
+  }
+}
+```
+
+The analyzer receives `classification = "critical"` and `analyzerConfig = {"actions":["Microsoft.Authorization/*"]}`.
+
+If an analyzer only implements `Analyzer` (not `ClassificationAwareAnalyzer`), its `Analyze()` method is called once without classification context.
 
 ### Runner
 

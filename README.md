@@ -9,6 +9,8 @@ Classify Terraform plan changes based on organization-defined rules. tfclassify 
 - [CLI Reference](#cli-reference)
   - [Root Command](#root-command)
   - [Init Command](#init-command)
+  - [Validate Command](#validate-command)
+  - [Explain Command](#explain-command)
   - [Output Formats](#output-formats)
 - [Configuration](#configuration)
   - [Config Discovery](#config-discovery)
@@ -24,6 +26,7 @@ Classify Terraform plan changes based on organization-defined rules. tfclassify 
   - [Layer 3: Deep Inspection Plugins](#layer-3-deep-inspection-plugins)
 - [Examples](#examples)
 - [E2E Test Scenarios](#e2e-test-scenarios)
+- [CI/CD Integration](#cicd-integration)
 - [Project Structure](#project-structure)
 - [Development](#development)
 - [Architecture Decisions](#architecture-decisions)
@@ -191,6 +194,56 @@ Downloads and installs plugin binaries declared in your configuration from GitHu
 | `--config` | `-c` | auto-discover | Path to `.tfclassify.hcl` config file |
 
 Supports `GITHUB_TOKEN` environment variable for authenticated requests.
+
+### Validate Command
+
+```
+tfclassify validate [flags]
+```
+
+Checks `.tfclassify.hcl` for errors without requiring a Terraform plan. Validates HCL syntax, classification references in precedence/defaults, precedence ordering, glob patterns, and plugin references.
+
+| Flag | Short | Default | Description |
+|------|-------|---------|-------------|
+| `--config` | `-c` | auto-discover | Path to `.tfclassify.hcl` config file |
+
+**Exit codes:**
+- `0` — config is valid (warnings, if any, are printed to stderr)
+- `1` — config has errors
+
+```bash
+# Validate before committing config changes
+tfclassify validate -c .tfclassify.hcl
+
+# Use in CI to catch config drift early (no plan needed)
+tfclassify validate
+```
+
+### Explain Command
+
+```
+tfclassify explain [flags]
+```
+
+Traces classification decisions for each resource through the full pipeline — core rules, builtin analyzers, and plugins. Useful for debugging why a resource received a particular classification.
+
+| Flag | Short | Default | Description |
+|------|-------|---------|-------------|
+| `--plan` | `-p` | (required) | Path to Terraform plan file (JSON or binary) |
+| `--config` | `-c` | auto-discover | Path to `.tfclassify.hcl` config file |
+| `--output` | `-o` | `text` | Output format: `text`, `json` |
+| `--resource` | `-r` | (all) | Filter to specific resource addresses (repeatable) |
+
+```bash
+# Explain all resources
+tfclassify explain -p tfplan
+
+# Explain specific resources with JSON output
+tfclassify explain -p tfplan -r azurerm_role_assignment.admin -o json
+
+# Filter multiple resources
+tfclassify explain -p tfplan -r azurerm_role_assignment.admin -r azurerm_key_vault.main
+```
 
 ### Output Formats
 
@@ -400,23 +453,30 @@ Provider-specific analysis via external plugins. Plugins run as separate process
 
 ## Examples
 
-Working examples with sample plan JSON, annotated config files, and expected output:
+### Full Reference Configuration
 
-| Example | Demonstrates |
-|---------|-------------|
-| [basic-classification](docs/examples/basic-classification/) | Resource type glob matching, `resource = ["*"]` catch-all, exit codes |
-| [action-filtering](docs/examples/action-filtering/) | Action-specific rules, same type with different classifications based on action |
-| [mixed-changes](docs/examples/mixed-changes/) | Multiple rules per classification, glob precision (`*_key_vault` vs `*_key_vault_*`) |
-| [full-reference](docs/examples/full-reference/) | Every configurable field annotated: plugins, `not_resource`, `plugin_timeout`, five precedence levels |
-
-Each example directory contains a `.tfclassify.hcl`, a `plan.json`, and a `README.md` with run instructions and expected output. Run any example:
+The [full-reference example](docs/examples/full-reference/) is the canonical annotated configuration demonstrating every `.tfclassify.hcl` capability: five precedence levels, multiple rules per classification, `not_resource` exclusions, classification-scoped plugin config with graduated thresholds, and all `defaults` options.
 
 ```bash
 tfclassify \
-  -p docs/examples/basic-classification/plan.json \
-  -c docs/examples/basic-classification/.tfclassify.hcl \
+  -p docs/examples/full-reference/plan.json \
+  -c docs/examples/full-reference/.tfclassify.hcl \
   -v
 ```
+
+### Learning Path via E2E Scenarios
+
+The [e2e test scenarios](testdata/e2e/) serve as a progressive learning path from simple to advanced. Each scenario is CI-tested against real Azure infrastructure:
+
+| Concept | Scenario | What It Shows |
+|---------|----------|---------------|
+| Glob matching basics | [route-table](testdata/e2e/route-table/) | `resource = ["*"]` catch-all, no plugins |
+| Action filtering | [role-assignment-reader](testdata/e2e/role-assignment-reader/) | Same type classified differently based on action |
+| Plugin deep inspection | [role-assignment-privileged](testdata/e2e/role-assignment-privileged/) | Permission-based detection via azurerm plugin |
+| Graduated thresholds | [role-escalation-threshold](testdata/e2e/role-escalation-threshold/) | Different action patterns per classification level |
+| Role exclusions | [role-exclusion](testdata/e2e/role-exclusion/) | `exclude` list bypasses plugin detection |
+| Attribute inspection | [keyvault-destructive](testdata/e2e/keyvault-destructive/) | Deep inspection of permission arrays |
+| Module support | [modules-pluginless](testdata/e2e/modules-pluginless/) | Resources inside Terraform modules |
 
 ## E2E Test Scenarios
 
@@ -459,6 +519,13 @@ These scenarios demonstrate real-world classification behavior across all three 
 | [data-plane-detection](testdata/e2e/data-plane-detection/) | `data_actions = ["Microsoft.Storage/*"]` on critical | **CR-0027.** Storage Blob Data Owner triggers `critical` via data-plane pattern matching (`Microsoft.Storage/*/blobs/*` matches `Microsoft.Storage/*`). Reader (no data actions) falls through to `standard` via control-plane `*/read` pattern. |
 | [control-plane-patterns](testdata/e2e/control-plane-patterns/) | `actions = ["Microsoft.Authorization/*", "*"]` on critical, `actions = ["*/read"]` on standard | **CR-0028.** User Access Administrator (has `Microsoft.Authorization/*`) triggers `critical`. Reader (only `*/read`) triggers `standard`. Demonstrates pattern-based control-plane detection. |
 
+### Module Support
+
+| Scenario | Config | What It Tests |
+|----------|--------|---------------|
+| [modules-pluginless](testdata/e2e/modules-pluginless/) | Glob rules only, no plugins | Resources created inside Terraform modules are classified correctly. Module-expanded addresses (e.g., `module.network.azurerm_network_security_group.nsg`) match glob patterns on the resource type. |
+| [modules-plugin](testdata/e2e/modules-plugin/) | Plugin with `privilege_escalation` | Resources inside modules are passed to plugins for deep inspection. Module-expanded role assignments are analyzed for privilege escalation patterns. |
+
 ### How E2E Tests Run
 
 Each scenario is executed by the reusable [e2e.yml](.github/workflows/e2e.yml) workflow:
@@ -471,6 +538,59 @@ Each scenario is executed by the reusable [e2e.yml](.github/workflows/e2e.yml) w
 6. `terraform destroy` to clean up
 
 CI ([ci.yml](.github/workflows/ci.yml)) runs all scenarios on PRs and pushes to main, building from source with both JSON and binary plan formats. The nightly [verify.yml](.github/workflows/verify.yml) runs against published releases.
+
+## CI/CD Integration
+
+### GitHub Actions
+
+```yaml
+- name: Install tfclassify
+  run: |
+    curl -sSL https://github.com/jokarl/tfclassify/releases/latest/download/tfclassify_linux_amd64.tar.gz | tar xz
+    chmod +x tfclassify
+    sudo mv tfclassify /usr/local/bin/
+
+- name: Install plugins
+  run: tfclassify init
+
+- name: Validate config
+  run: tfclassify validate
+
+- name: Classify plan
+  id: classify
+  run: tfclassify -p tfplan --output github --detailed-exitcode
+  continue-on-error: true
+
+- name: Gate on classification
+  run: |
+    echo "Classification: ${{ steps.classify.outputs.classification }}"
+    echo "Exit code: ${{ steps.classify.outputs.exit_code }}"
+    if [ "${{ steps.classify.outputs.classification }}" = "critical" ]; then
+      echo "::error::Critical changes detected — requires security team approval"
+      exit 1
+    fi
+```
+
+### Generic CI
+
+```bash
+# Validate config (no plan needed — fast, catches config drift early)
+tfclassify validate
+
+# Generate and classify the plan
+terraform plan -out=tfplan
+tfclassify -p tfplan --output json --detailed-exitcode > classification.json
+EXIT_CODE=$?
+
+# Route based on exit code
+case $EXIT_CODE in
+  0) echo "Auto-approved" ;;
+  1) echo "Standard review required" ;;
+  2) echo "Critical — blocking pipeline" && exit 1 ;;
+esac
+```
+
+The `--output github` format sets GitHub Actions output variables (`classification`, `exit_code`, `no_changes`, `resource_count`) via the `GITHUB_OUTPUT` file. The `--output json` format produces machine-readable JSON for other CI systems.
 
 ## Project Structure
 
@@ -485,7 +605,7 @@ The repository uses Go workspaces (`go.work`) with three modules:
 ```
 tfclassify/
 ├── cmd/tfclassify/        # CLI entry point (Cobra)
-├── pkg/
+├── internal/
 │   ├── classify/          # Core classification engine (Layer 1 + 2)
 │   ├── config/            # HCL config loading, validation, discovery
 │   ├── output/            # Output formatters (text, json, github)
@@ -497,10 +617,11 @@ tfclassify/
 ├── plugins/
 │   └── azurerm/           # Azure plugin — see plugins/azurerm/README.md
 ├── proto/                 # gRPC protocol definitions
+├── testdata/e2e/          # End-to-end test scenarios (CI-tested)
 ├── docs/
 │   ├── adr/               # Architecture Decision Records
 │   ├── cr/                # Change Requests
-│   ├── examples/          # Working examples with sample plans
+│   ├── examples/          # Annotated reference configuration
 │   └── plugin-authoring.md
 ├── go.work                # Go workspace tying all three modules together
 └── Makefile
@@ -523,7 +644,7 @@ make clean                    # Remove build artifacts
 Run a single test:
 
 ```bash
-go test ./pkg/classify/ -run TestClassifier_Deletion
+go test ./internal/classify/ -run TestClassifier_Deletion
 go test ./plugins/azurerm/ -run TestPrivilege
 ```
 

@@ -9,7 +9,7 @@ See [`.tfclassify.hcl`](.tfclassify.hcl) for the fully annotated configuration f
 | Feature | Where |
 |---------|-------|
 | Plugin declaration (enabled + disabled) | `plugin "azurerm"`, `plugin "aws"` |
-| Plugin-specific config block | `config { privilege_enabled = true ... }` |
+| Classification-scoped plugin config | `azurerm { privilege_escalation { ... } }` inside classification blocks |
 | Multiple rules per classification | `classification "critical"` has 3 rules |
 | Rule descriptions | `description = "..."` on each rule block |
 | Action filtering | `actions = ["delete"]` on critical rules |
@@ -90,5 +90,5 @@ Exit code **4** corresponds to `critical` in a five-level precedence list (auto=
 | `not_resource` | Standard catches everything except monitoring resources |
 | `actions` filtering | Same resource type can be critical (delete) vs high (create/update) |
 | No-op classification | Resources with no changes classified as auto (exit code 0) |
-| Plugin configuration | Disabled plugins keep config for re-enabling later |
+| Plugin configuration | Classification-scoped plugin config with graduated thresholds |
 | Sensitive attributes | `db_password` has `after_sensitive.value = true` (detected by builtin analyzer) |
