@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/jokarl/tfclassify/compare/tfclassify-v0.2.1...tfclassify-v0.3.0) (2026-02-18)
+
+
+### Features
+
+* add validate and explain subcommands (CR-0025, CR-0026) ([#35](https://github.com/jokarl/tfclassify/issues/35)) ([012ea82](https://github.com/jokarl/tfclassify/commit/012ea820109756a1cfb78fcfbca0cfbd22fc90fa))
+
 ## [0.2.1](https://github.com/jokarl/tfclassify/compare/tfclassify-v0.2.0...tfclassify-v0.2.1) (2026-02-18)
 
 
