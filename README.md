@@ -2,6 +2,8 @@
 
 Classify Terraform plan changes based on organization-defined rules. tfclassify analyzes `terraform show -json` output and categorizes each resource change (critical, review, standard, auto-approved, etc.) so you can automate change approval workflows.
 
+**How is this different from Trivy or Checkov?** Tools like [Trivy](https://trivy.dev/) and [Checkov](https://www.checkov.io/) scan Terraform configs and plans for *misconfigurations* — "is this storage account public?", "does this security group allow 0.0.0.0/0?". Even when scanning plan files, they evaluate the planned final state against security checks. They answer **"is this resource configured correctly?"** tfclassify answers a different question: **"how risky is this change?"** It analyzes the *diff* between before and after states and classifies changes into organizational categories that drive your approval workflow. A storage account might pass every Checkov check but still require security team sign-off because it's being *deleted* in production. tfclassify handles that routing; misconfiguration scanners don't.
+
 ## Table of Contents
 
 - [How It Works](#how-it-works)
@@ -477,6 +479,7 @@ The [e2e test scenarios](testdata/e2e/) serve as a progressive learning path fro
 | Role exclusions | [role-exclusion](testdata/e2e/role-exclusion/) | `exclude` list bypasses plugin detection |
 | Attribute inspection | [keyvault-destructive](testdata/e2e/keyvault-destructive/) | Deep inspection of permission arrays |
 | Module support | [modules-pluginless](testdata/e2e/modules-pluginless/) | Resources inside Terraform modules |
+| CIS benchmark mapping | [cis-azure-foundations](testdata/e2e/cis-azure-foundations/) | Classifications named after CIS controls |
 
 ## E2E Test Scenarios
 
@@ -504,7 +507,7 @@ These scenarios demonstrate real-world classification behavior across all three 
 
 | Scenario | Config | What It Tests |
 |----------|--------|---------------|
-| [nsg-open-inbound](testdata/e2e/nsg-open-inbound/) | Glob rules only (no plugin block) | NSG rule allowing `*` inbound from `*`. Classified as `standard` on create (no network exposure plugin configured), `critical` on destroy (glob `*_security_rule` + `delete`). |
+| [nsg-open-inbound](testdata/e2e/nsg-open-inbound/) | `network_exposure {}` on critical | NSG rule allowing `*` inbound from `*`. Plugin detects permissive source address on create → `critical`. Delete of security group/rule also matches core rule → `critical` on destroy. |
 
 ### Deep Inspection: Key Vault
 
@@ -525,6 +528,12 @@ These scenarios demonstrate real-world classification behavior across all three 
 |----------|--------|---------------|
 | [modules-pluginless](testdata/e2e/modules-pluginless/) | Glob rules only, no plugins | Resources created inside Terraform modules are classified correctly. Module-expanded addresses (e.g., `module.network.azurerm_network_security_group.nsg`) match glob patterns on the resource type. |
 | [modules-plugin](testdata/e2e/modules-plugin/) | Plugin with `privilege_escalation` | Resources inside modules are passed to plugins for deep inspection. Module-expanded role assignments are analyzed for privilege escalation patterns. |
+
+### Compliance Benchmark Mapping
+
+| Scenario | Config | What It Tests |
+|----------|--------|---------------|
+| [cis-azure-foundations](testdata/e2e/cis-azure-foundations/) | `network_exposure`, `privilege_escalation`, `keyvault_access` across three CIS-named classifications | Classifications named after CIS Azure Foundations Benchmark sections. Demonstrates mapping CIS 6.1/6.2 (restrict Internet access), CIS 1.23 (no privileged role assignments), and CIS 8.5 (key vault recoverability) to tfclassify analyzers. No special compliance feature needed — classification and rule names carry the CIS references directly. |
 
 ### How E2E Tests Run
 
