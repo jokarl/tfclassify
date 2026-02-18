@@ -180,3 +180,181 @@ func TestWarnRedundantNotResource_NoNotResource(t *testing.T) {
 		t.Errorf("expected no warning when no not_resource rules exist, got: %q", buf.String())
 	}
 }
+
+func TestValidateGlobPatterns_Valid(t *testing.T) {
+	cfg := &Config{
+		Classifications: []ClassificationConfig{
+			{
+				Name: "critical",
+				Rules: []RuleConfig{
+					{Resource: []string{"*_role_*", "*"}},
+				},
+			},
+		},
+	}
+
+	if err := ValidateGlobPatterns(cfg); err != nil {
+		t.Errorf("expected no error for valid patterns, got: %v", err)
+	}
+}
+
+func TestValidateGlobPatterns_Invalid(t *testing.T) {
+	cfg := &Config{
+		Classifications: []ClassificationConfig{
+			{
+				Name: "critical",
+				Rules: []RuleConfig{
+					{Resource: []string{"*_role_[*"}},
+				},
+			},
+		},
+	}
+
+	err := ValidateGlobPatterns(cfg)
+	if err == nil {
+		t.Fatal("expected error for invalid glob pattern, got nil")
+	}
+
+	if !strings.Contains(err.Error(), "critical") {
+		t.Errorf("expected error to mention classification name, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "*_role_[*") {
+		t.Errorf("expected error to mention pattern, got: %v", err)
+	}
+}
+
+func TestValidateGlobPatterns_InvalidNotResource(t *testing.T) {
+	cfg := &Config{
+		Classifications: []ClassificationConfig{
+			{
+				Name: "standard",
+				Rules: []RuleConfig{
+					{NotResource: []string{"[bad"}},
+				},
+			},
+		},
+	}
+
+	err := ValidateGlobPatterns(cfg)
+	if err == nil {
+		t.Fatal("expected error for invalid not_resource pattern, got nil")
+	}
+	if !strings.Contains(err.Error(), "not_resource") {
+		t.Errorf("expected error to mention not_resource, got: %v", err)
+	}
+}
+
+func TestValidateWarnings_UnreachableRule(t *testing.T) {
+	cfg := &Config{
+		Classifications: []ClassificationConfig{
+			{
+				Name: "critical",
+				Rules: []RuleConfig{
+					{Resource: []string{"*"}},
+				},
+			},
+			{
+				Name: "standard",
+				Rules: []RuleConfig{
+					{Resource: []string{"*_role_*"}},
+				},
+			},
+		},
+		Precedence: []string{"critical", "standard"},
+	}
+
+	warnings := ValidateWarnings(cfg)
+
+	found := false
+	for _, w := range warnings {
+		if strings.Contains(w.Message, "unreachable") && w.Classification == "standard" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected unreachable rule warning for standard, got: %v", warnings)
+	}
+}
+
+func TestValidateWarnings_UnreachableRule_WithActions(t *testing.T) {
+	cfg := &Config{
+		Classifications: []ClassificationConfig{
+			{
+				Name: "critical",
+				Rules: []RuleConfig{
+					{Resource: []string{"*"}, Actions: []string{"delete"}},
+				},
+			},
+			{
+				Name: "standard",
+				Rules: []RuleConfig{
+					{Resource: []string{"*_role_*"}},
+				},
+			},
+		},
+		Precedence: []string{"critical", "standard"},
+	}
+
+	warnings := ValidateWarnings(cfg)
+
+	for _, w := range warnings {
+		if strings.Contains(w.Message, "unreachable") {
+			t.Errorf("expected no unreachable warning when catch-all has actions, got: %v", w)
+		}
+	}
+}
+
+func TestValidateWarnings_EmptyClassification(t *testing.T) {
+	cfg := &Config{
+		Classifications: []ClassificationConfig{
+			{
+				Name:  "empty",
+				Rules: nil,
+			},
+			{
+				Name: "standard",
+				Rules: []RuleConfig{
+					{Resource: []string{"*"}},
+				},
+			},
+		},
+		Precedence: []string{"empty", "standard"},
+	}
+
+	warnings := ValidateWarnings(cfg)
+
+	found := false
+	for _, w := range warnings {
+		if strings.Contains(w.Message, "no rules") && w.Classification == "empty" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected empty classification warning, got: %v", warnings)
+	}
+}
+
+func TestValidateWarnings_EmptyClassification_WithPlugin(t *testing.T) {
+	cfg := &Config{
+		Classifications: []ClassificationConfig{
+			{
+				Name:  "critical",
+				Rules: nil,
+				PluginAnalyzerConfigs: map[string]*PluginAnalyzerConfig{
+					"azurerm": {NetworkExposure: &NetworkExposureConfig{}},
+				},
+			},
+		},
+		Precedence: []string{"critical"},
+	}
+
+	warnings := ValidateWarnings(cfg)
+
+	for _, w := range warnings {
+		if strings.Contains(w.Message, "no rules") && w.Classification == "critical" {
+			t.Errorf("expected no empty classification warning when plugin is configured, got: %v", w)
+		}
+	}
+}

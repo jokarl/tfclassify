@@ -56,6 +56,12 @@ jobs:
           mkdir -p "$TFCLASSIFY_PLUGIN_DIR"
           go build -o "$TFCLASSIFY_PLUGIN_DIR/tfclassify-plugin-azurerm" ./plugins/azurerm
 
+      - name: Validate config
+        if: inputs.binary-source == 'build'
+        run: |
+          tfclassify validate \
+            -c testdata/e2e/${{ inputs.use-case }}/.tfclassify.hcl
+
       - name: Download release
         if: inputs.binary-source == 'release'
         env:

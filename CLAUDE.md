@@ -80,6 +80,12 @@ Discovery order (`internal/plugin/discovery.go`): config `plugin_dir` → `TFCLA
 
 Version negotiation: host checks `SDKVersionConstraints` against plugin's reported SDK version, and plugin can specify `HostVersionConstraint` (semver). Both checked during handshake.
 
+## CLI Subcommands
+
+- `tfclassify --plan <file>` — Classify a Terraform plan (root command)
+- `tfclassify init` — Install plugins declared in configuration
+- `tfclassify validate` — Check `.tfclassify.hcl` for errors without a plan. Exits 0 if valid (warnings to stderr), exits 1 on errors. Accepts `--config` / `-c` flag.
+
 ## E2E Tests
 
 E2E test scenarios live in `testdata/e2e/`. Each scenario has `main.tf`, `.tfclassify.hcl`, and `expected.json`. These run against real Azure infrastructure in CI.

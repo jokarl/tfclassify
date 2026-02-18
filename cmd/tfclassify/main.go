@@ -63,6 +63,21 @@ requests (to avoid rate limits).`,
 	RunE: runInit,
 }
 
+var validateCmd = &cobra.Command{
+	Use:   "validate",
+	Short: "Check configuration file for errors",
+	Long: `Validates .tfclassify.hcl for correctness without requiring a Terraform plan.
+
+Checks HCL syntax, classification references, precedence ordering, glob pattern
+syntax, plugin references, and emits warnings for unreachable rules, empty
+classifications, and missing plugin binaries.
+
+Exit codes:
+  0  Configuration is valid (warnings may be printed to stderr)
+  1  Configuration has errors`,
+	RunE: runValidate,
+}
+
 func init() {
 	// Root command flags
 	rootCmd.Flags().StringVarP(&planPath, "plan", "p", "", "Path to Terraform plan file (JSON or binary)")
@@ -76,8 +91,12 @@ func init() {
 	// Init command flags
 	initCmd.Flags().StringVarP(&configPath, "config", "c", "", "Path to configuration file")
 
+	// Validate command flags
+	validateCmd.Flags().StringVarP(&configPath, "config", "c", "", "Path to configuration file")
+
 	// Add subcommands
 	rootCmd.AddCommand(initCmd)
+	rootCmd.AddCommand(validateCmd)
 }
 
 func run(cmd *cobra.Command, args []string) error {
@@ -153,6 +172,30 @@ func run(cmd *cobra.Command, args []string) error {
 		os.Exit(result.OverallExitCode)
 	}
 	os.Exit(0)
+	return nil
+}
+
+func runValidate(cmd *cobra.Command, args []string) error {
+	// Load configuration (runs all error-level validations)
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+
+	// Validate glob patterns
+	if err := config.ValidateGlobPatterns(cfg); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+
+	// Run warning-level checks
+	warnings := config.ValidateWarnings(cfg)
+	for _, w := range warnings {
+		fmt.Fprintln(os.Stderr, w)
+	}
+
+	fmt.Println("Configuration valid.")
 	return nil
 }
 

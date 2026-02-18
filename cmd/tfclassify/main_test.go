@@ -516,6 +516,201 @@ func TestCLI_ErrorExitCodeUnaffectedByFlag(t *testing.T) {
 	}
 }
 
+func TestCLI_ValidateCmd_ValidConfig(t *testing.T) {
+	binary := buildBinary(t)
+
+	tmpDir, err := os.MkdirTemp("", "tfclassify-cli")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	configPath := writeTestConfig(t, tmpDir)
+
+	cmd := exec.Command(binary, "validate", "--config", configPath)
+	output, err := cmd.CombinedOutput()
+
+	if err != nil {
+		t.Fatalf("expected exit 0 for valid config, got error: %v\n%s", err, output)
+	}
+
+	if !strings.Contains(string(output), "Configuration valid.") {
+		t.Errorf("expected 'Configuration valid.' in output, got:\n%s", output)
+	}
+}
+
+func TestCLI_ValidateCmd_InvalidConfig(t *testing.T) {
+	binary := buildBinary(t)
+
+	tmpDir, err := os.MkdirTemp("", "tfclassify-cli")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Write config with precedence referencing nonexistent classification
+	configContent := `
+classification "standard" {
+  description = "Standard"
+  rule {
+    resource = ["*"]
+  }
+}
+
+precedence = ["critical", "standard"]
+
+defaults {
+  unclassified = "standard"
+  no_changes   = "standard"
+}
+`
+	configPath := filepath.Join(tmpDir, ".tfclassify.hcl")
+	os.WriteFile(configPath, []byte(configContent), 0644)
+
+	cmd := exec.Command(binary, "validate", "--config", configPath)
+	output, err := cmd.CombinedOutput()
+
+	if err == nil {
+		t.Fatal("expected non-zero exit code for invalid config")
+	}
+
+	exitErr, ok := err.(*exec.ExitError)
+	if !ok {
+		t.Fatalf("expected *exec.ExitError, got %T: %v", err, err)
+	}
+	if exitErr.ExitCode() != 1 {
+		t.Errorf("expected exit code 1, got %d", exitErr.ExitCode())
+	}
+
+	if !strings.Contains(string(output), "undefined classification") {
+		t.Errorf("expected error about undefined classification, got:\n%s", output)
+	}
+}
+
+func TestCLI_ValidateCmd_InvalidGlob(t *testing.T) {
+	binary := buildBinary(t)
+
+	tmpDir, err := os.MkdirTemp("", "tfclassify-cli")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	configContent := `
+classification "critical" {
+  description = "Critical"
+  rule {
+    resource = ["*_role_[*"]
+  }
+}
+
+classification "standard" {
+  description = "Standard"
+  rule {
+    resource = ["*"]
+  }
+}
+
+precedence = ["critical", "standard"]
+
+defaults {
+  unclassified = "standard"
+  no_changes   = "standard"
+}
+`
+	configPath := filepath.Join(tmpDir, ".tfclassify.hcl")
+	os.WriteFile(configPath, []byte(configContent), 0644)
+
+	cmd := exec.Command(binary, "validate", "--config", configPath)
+	output, err := cmd.CombinedOutput()
+
+	if err == nil {
+		t.Fatal("expected non-zero exit code for invalid glob pattern")
+	}
+
+	exitErr, ok := err.(*exec.ExitError)
+	if !ok {
+		t.Fatalf("expected *exec.ExitError, got %T: %v", err, err)
+	}
+	if exitErr.ExitCode() != 1 {
+		t.Errorf("expected exit code 1, got %d", exitErr.ExitCode())
+	}
+
+	if !strings.Contains(string(output), "invalid resource pattern") {
+		t.Errorf("expected error about invalid pattern, got:\n%s", output)
+	}
+}
+
+func TestCLI_ValidateCmd_WarningsExitZero(t *testing.T) {
+	binary := buildBinary(t)
+
+	tmpDir, err := os.MkdirTemp("", "tfclassify-cli")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Config with empty classification (warning-level issue)
+	configContent := `
+classification "empty" {
+  description = "Empty"
+}
+
+classification "standard" {
+  description = "Standard"
+  rule {
+    resource = ["*"]
+  }
+}
+
+precedence = ["empty", "standard"]
+
+defaults {
+  unclassified = "standard"
+  no_changes   = "standard"
+}
+`
+	configPath := filepath.Join(tmpDir, ".tfclassify.hcl")
+	os.WriteFile(configPath, []byte(configContent), 0644)
+
+	cmd := exec.Command(binary, "validate", "--config", configPath)
+	output, err := cmd.CombinedOutput()
+
+	if err != nil {
+		t.Fatalf("expected exit 0 with warnings, got error: %v\n%s", err, output)
+	}
+
+	outputStr := string(output)
+	if !strings.Contains(outputStr, "Configuration valid.") {
+		t.Errorf("expected 'Configuration valid.' in output, got:\n%s", outputStr)
+	}
+}
+
+func TestCLI_ValidateCmd_NoConfigFile(t *testing.T) {
+	binary := buildBinary(t)
+
+	tmpDir, err := os.MkdirTemp("", "tfclassify-cli")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	cmd := exec.Command(binary, "validate", "--config", filepath.Join(tmpDir, "nonexistent.hcl"))
+	_, err = cmd.CombinedOutput()
+
+	if err == nil {
+		t.Fatal("expected non-zero exit code for nonexistent config")
+	}
+
+	exitErr, ok := err.(*exec.ExitError)
+	if !ok {
+		t.Fatalf("expected *exec.ExitError, got %T: %v", err, err)
+	}
+	if exitErr.ExitCode() != 1 {
+		t.Errorf("expected exit code 1, got %d", exitErr.ExitCode())
+	}
+}
+
 func TestCLI_InvalidPlanJSON(t *testing.T) {
 	binary := buildBinary(t)
 
