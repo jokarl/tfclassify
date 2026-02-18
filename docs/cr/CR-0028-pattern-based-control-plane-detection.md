@@ -2,7 +2,7 @@
 name: cr-0028-pattern-based-control-plane-detection
 description: Replace opinionated control-plane scoring tiers with user-configured pattern-based detection, aligning control-plane with the data-plane approach from CR-0027.
 id: "CR-0028"
-status: "approved"
+status: "implemented"
 date: 2026-02-16
 requestor: jokarl
 stakeholders:

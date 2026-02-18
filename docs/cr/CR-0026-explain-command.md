@@ -2,7 +2,7 @@
 name: cr-0026-explain-command
 description: Add tfclassify explain command that traces classification decisions for a specific resource through the full pipeline.
 id: "CR-0026"
-status: "accepted"
+status: "implemented"
 date: 2026-02-18
 requestor: jokarl
 stakeholders:

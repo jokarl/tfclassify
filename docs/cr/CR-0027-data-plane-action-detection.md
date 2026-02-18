@@ -2,7 +2,7 @@
 name: cr-0027-data-plane-action-detection
 description: Add pattern-based data-plane action detection to the privilege escalation analyzer, enabling users to configure which data-plane action patterns trigger classifications.
 id: "CR-0027"
-status: "approved"
+status: "implemented"
 date: 2026-02-16
 requestor: jokarl
 stakeholders:

@@ -2,7 +2,7 @@
 name: cr-0024-classification-scoped-plugin-analyzer-rules
 description: Move plugin analyzer configuration into per-classification blocks for graduated deep inspection with per-analyzer thresholds.
 id: "CR-0024"
-status: "approved"
+status: "implemented"
 date: 2026-02-15
 requestor: jokarl
 stakeholders:

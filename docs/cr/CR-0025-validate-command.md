@@ -2,7 +2,7 @@
 name: cr-0025-validate-command
 description: Add tfclassify validate command that checks .tfclassify.hcl for correctness without requiring a Terraform plan.
 id: "CR-0025"
-status: "accepted"
+status: "implemented"
 date: 2026-02-18
 requestor: jokarl
 stakeholders:
