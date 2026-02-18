@@ -3,8 +3,8 @@ package classify
 import (
 	"testing"
 
-	"github.com/jokarl/tfclassify/pkg/config"
-	"github.com/jokarl/tfclassify/pkg/plan"
+	"github.com/jokarl/tfclassify/internal/config"
+	"github.com/jokarl/tfclassify/internal/plan"
 )
 
 func defaultAnalyzers() []BuiltinAnalyzer {

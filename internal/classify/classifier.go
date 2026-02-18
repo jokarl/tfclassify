@@ -2,8 +2,8 @@
 package classify
 
 import (
-	"github.com/jokarl/tfclassify/pkg/config"
-	"github.com/jokarl/tfclassify/pkg/plan"
+	"github.com/jokarl/tfclassify/internal/config"
+	"github.com/jokarl/tfclassify/internal/plan"
 )
 
 // Classifier applies config rules to plan changes.

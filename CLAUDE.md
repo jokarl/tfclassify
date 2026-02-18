@@ -24,7 +24,7 @@ CI enforces this — the `vuln` job fails the PR if `govulncheck` finds reachabl
 
 **Run a single test:**
 ```bash
-go test ./pkg/classify/ -run TestClassifier_Deletion
+go test ./internal/classify/ -run TestClassifier_Deletion
 go test ./plugins/azurerm/ -run TestPrivilege
 ```
 
@@ -37,11 +37,11 @@ protoc --go_out=. --go-grpc_out=. proto/tfclassify.proto
 
 tfclassify classifies Terraform plan changes into organizational categories (critical, review, standard, auto-approved) using a three-layer model:
 
-**Layer 1 — Core Engine** (`pkg/classify/`): Config-driven pattern matching. Glob patterns on resource types + actions, evaluated against precedence order from `.tfclassify.hcl`. This is the fast path — no plugins involved.
+**Layer 1 — Core Engine** (`internal/classify/`): Config-driven pattern matching. Glob patterns on resource types + actions, evaluated against precedence order from `.tfclassify.hcl`. This is the fast path — no plugins involved.
 
-**Layer 2 — Builtin Analyzers** (`pkg/classify/deletion.go`, `replace.go`, `sensitive.go`): Cross-provider heuristics that run in-process. Implement `classify.BuiltinAnalyzer` interface. Detect deletions, destroy-and-recreate, and sensitive attribute changes.
+**Layer 2 — Builtin Analyzers** (`internal/classify/deletion.go`, `replace.go`, `sensitive.go`): Cross-provider heuristics that run in-process. Implement `classify.BuiltinAnalyzer` interface. Detect deletions, destroy-and-recreate, and sensitive attribute changes.
 
-**Layer 3 — External Plugins** (`sdk/` + `pkg/plugin/`): Provider-specific deep inspection via gRPC (hashicorp/go-plugin). Plugins run as separate processes, communicate bidirectionally — host calls `PluginService.Analyze()`, plugin calls back `RunnerService.GetResourceChanges()` and `RunnerService.EmitDecision()`. The broker ID in `AnalyzeRequest` enables the plugin to dial back to the host's Runner server.
+**Layer 3 — External Plugins** (`sdk/` + `internal/plugin/`): Provider-specific deep inspection via gRPC (hashicorp/go-plugin). Plugins run as separate processes, communicate bidirectionally — host calls `PluginService.Analyze()`, plugin calls back `RunnerService.GetResourceChanges()` and `RunnerService.EmitDecision()`. The broker ID in `AnalyzeRequest` enables the plugin to dial back to the host's Runner server.
 
 **Decision aggregation**: Plugin/analyzer decisions override core pattern matches based on the `precedence` list in config (lower index = higher precedence).
 
@@ -72,11 +72,11 @@ Defined in `proto/tfclassify.proto`, generated code in `sdk/pb/`. Two services:
 
 ## Configuration
 
-HCL format (`.tfclassify.hcl`), parsed by `pkg/config/` using `hashicorp/hcl/v2`. Key blocks: `classification` (rules with resource glob + actions), `plugin` (source, version, enabled, config), `precedence` list, `defaults`.
+HCL format (`.tfclassify.hcl`), parsed by `internal/config/` using `hashicorp/hcl/v2`. Key blocks: `classification` (rules with resource glob + actions), `plugin` (source, version, enabled, config), `precedence` list, `defaults`.
 
 ## Plugin System
 
-Discovery order (`pkg/plugin/discovery.go`): config `plugin_dir` → `TFCLASSIFY_PLUGIN_DIR` env → `.tfclassify/plugins/` → `~/.tfclassify/plugins/`. Binaries named `tfclassify-plugin-{name}`.
+Discovery order (`internal/plugin/discovery.go`): config `plugin_dir` → `TFCLASSIFY_PLUGIN_DIR` env → `.tfclassify/plugins/` → `~/.tfclassify/plugins/`. Binaries named `tfclassify-plugin-{name}`.
 
 Version negotiation: host checks `SDKVersionConstraints` against plugin's reported SDK version, and plugin can specify `HostVersionConstraint` (semver). Both checked during handshake.
 

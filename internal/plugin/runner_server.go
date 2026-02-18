@@ -5,7 +5,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/jokarl/tfclassify/pkg/classify"
+	"github.com/jokarl/tfclassify/internal/classify"
 	"github.com/jokarl/tfclassify/sdk"
 	"github.com/jokarl/tfclassify/sdk/pb"
 	sdkplugin "github.com/jokarl/tfclassify/sdk/plugin"

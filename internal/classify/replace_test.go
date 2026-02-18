@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jokarl/tfclassify/pkg/plan"
+	"github.com/jokarl/tfclassify/internal/plan"
 )
 
 func TestReplaceAnalyzer_Name(t *testing.T) {

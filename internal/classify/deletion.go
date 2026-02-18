@@ -3,7 +3,7 @@ package classify
 import (
 	"fmt"
 
-	"github.com/jokarl/tfclassify/pkg/plan"
+	"github.com/jokarl/tfclassify/internal/plan"
 )
 
 // DeletionAnalyzer detects standalone resource deletions (delete without create).

@@ -7,7 +7,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/jokarl/tfclassify/pkg/classify"
+	"github.com/jokarl/tfclassify/internal/classify"
 )
 
 // Format represents the output format type.

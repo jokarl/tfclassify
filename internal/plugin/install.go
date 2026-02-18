@@ -12,7 +12,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/jokarl/tfclassify/pkg/config"
+	"github.com/jokarl/tfclassify/internal/config"
 )
 
 // ManifestFileName is the name of the plugin manifest file.

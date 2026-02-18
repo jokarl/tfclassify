@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/jokarl/tfclassify/pkg/plan"
+	"github.com/jokarl/tfclassify/internal/plan"
 )
 
 // SensitiveAnalyzer detects changes to attributes marked as sensitive by Terraform.
