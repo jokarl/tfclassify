@@ -420,6 +420,76 @@ func TestValidateWarnings_EmptyClassification(t *testing.T) {
 	}
 }
 
+func TestValidate_SARIFLevel_Valid(t *testing.T) {
+	cfg := &Config{
+		Classifications: []ClassificationConfig{
+			{
+				Name:        "critical",
+				Description: "Critical",
+				SARIFLevel:  "error",
+				Rules:       []RuleConfig{{Resource: []string{"*_role_*"}}},
+			},
+			{
+				Name:        "standard",
+				Description: "Standard",
+				SARIFLevel:  "note",
+				Rules:       []RuleConfig{{Resource: []string{"*"}}},
+			},
+		},
+		Precedence: []string{"critical", "standard"},
+		Defaults:   &DefaultsConfig{Unclassified: "standard", NoChanges: "standard"},
+	}
+
+	if err := Validate(cfg); err != nil {
+		t.Errorf("expected no error for valid sarif_level values, got: %v", err)
+	}
+}
+
+func TestValidate_SARIFLevel_Invalid(t *testing.T) {
+	cfg := &Config{
+		Classifications: []ClassificationConfig{
+			{
+				Name:        "critical",
+				Description: "Critical",
+				SARIFLevel:  "critical",
+				Rules:       []RuleConfig{{Resource: []string{"*"}}},
+			},
+		},
+		Precedence: []string{"critical"},
+		Defaults:   &DefaultsConfig{Unclassified: "critical", NoChanges: "critical"},
+	}
+
+	err := Validate(cfg)
+	if err == nil {
+		t.Fatal("expected error for invalid sarif_level value, got nil")
+	}
+
+	if !strings.Contains(err.Error(), "sarif_level") {
+		t.Errorf("expected error to mention sarif_level, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "critical") {
+		t.Errorf("expected error to mention the invalid value, got: %v", err)
+	}
+}
+
+func TestValidate_SARIFLevel_Empty(t *testing.T) {
+	cfg := &Config{
+		Classifications: []ClassificationConfig{
+			{
+				Name:        "standard",
+				Description: "Standard",
+				Rules:       []RuleConfig{{Resource: []string{"*"}}},
+			},
+		},
+		Precedence: []string{"standard"},
+		Defaults:   &DefaultsConfig{Unclassified: "standard", NoChanges: "standard"},
+	}
+
+	if err := Validate(cfg); err != nil {
+		t.Errorf("expected no error when sarif_level is omitted, got: %v", err)
+	}
+}
+
 func TestValidateWarnings_EmptyClassification_WithPlugin(t *testing.T) {
 	cfg := &Config{
 		Classifications: []ClassificationConfig{

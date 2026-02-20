@@ -17,22 +17,42 @@ const (
 	FormatJSON   Format = "json"
 	FormatText   Format = "text"
 	FormatGitHub Format = "github"
+	FormatSARIF  Format = "sarif"
 )
 
 // Formatter outputs classification results.
 type Formatter struct {
-	writer  io.Writer
-	format  Format
-	verbose bool
+	writer      io.Writer
+	format      Format
+	verbose     bool
+	version     string
+	sarifLevels map[string]string // classification name → SARIF level
+}
+
+// Option configures a Formatter.
+type Option func(*Formatter)
+
+// WithVersion sets the tool version for formats that report it (e.g., SARIF).
+func WithVersion(version string) Option {
+	return func(f *Formatter) { f.version = version }
+}
+
+// WithSARIFLevels sets the classification-to-SARIF-level mapping.
+func WithSARIFLevels(levels map[string]string) Option {
+	return func(f *Formatter) { f.sarifLevels = levels }
 }
 
 // NewFormatter creates a new Formatter.
-func NewFormatter(w io.Writer, format Format, verbose bool) *Formatter {
-	return &Formatter{
+func NewFormatter(w io.Writer, format Format, verbose bool, opts ...Option) *Formatter {
+	f := &Formatter{
 		writer:  w,
 		format:  format,
 		verbose: verbose,
 	}
+	for _, opt := range opts {
+		opt(f)
+	}
+	return f
 }
 
 // Format outputs the classification result in the configured format.
@@ -42,6 +62,8 @@ func (f *Formatter) Format(result *classify.Result) error {
 		return f.formatJSON(result)
 	case FormatGitHub:
 		return f.formatGitHub(result)
+	case FormatSARIF:
+		return f.formatSARIF(result)
 	case FormatText:
 		fallthrough
 	default:
