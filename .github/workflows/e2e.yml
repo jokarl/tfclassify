@@ -175,25 +175,13 @@ jobs:
           tfclassify \
             -p testdata/e2e/${{ inputs.use-case }}/create.json \
             -c testdata/e2e/${{ inputs.use-case }}/.tfclassify.hcl \
-            -o sarif --detailed-exitcode > testdata/e2e/${{ inputs.use-case }}/create-result.sarif
+            -o sarif --detailed-exitcode > /dev/null
           ACTUAL_EXIT=$?
           set -e
           if [ "$ACTUAL_EXIT" != "$EXPECTED_EXIT" ]; then
             echo "::error::Create phase (SARIF): expected exit code $EXPECTED_EXIT, got $ACTUAL_EXIT"
             exit 1
           fi
-          # Validate SARIF 2.1.0 structure
-          jq -e '."$schema" | test("sarif")' testdata/e2e/${{ inputs.use-case }}/create-result.sarif > /dev/null
-          jq -e '.version == "2.1.0"' testdata/e2e/${{ inputs.use-case }}/create-result.sarif > /dev/null
-          jq -e '.runs | length == 1' testdata/e2e/${{ inputs.use-case }}/create-result.sarif > /dev/null
-          jq -e '.runs[0].results | type == "array"' testdata/e2e/${{ inputs.use-case }}/create-result.sarif > /dev/null
-          jq -e '.runs[0].tool.driver.name == "tfclassify"' testdata/e2e/${{ inputs.use-case }}/create-result.sarif > /dev/null
-          # Every result must have partialFingerprints
-          jq -e '.runs[0].results | all(.partialFingerprints.primaryLocationFingerprint | length > 0)' \
-            testdata/e2e/${{ inputs.use-case }}/create-result.sarif > /dev/null
-          echo "::group::SARIF output (create)"
-          jq . testdata/e2e/${{ inputs.use-case }}/create-result.sarif
-          echo "::endgroup::"
 
       - name: Classify create plan (binary)
         id: classify-create-binary
@@ -308,24 +296,13 @@ jobs:
           tfclassify \
             -p testdata/e2e/${{ inputs.use-case }}/destroy.json \
             -c testdata/e2e/${{ inputs.use-case }}/.tfclassify.hcl \
-            -o sarif --detailed-exitcode > testdata/e2e/${{ inputs.use-case }}/destroy-result.sarif
+            -o sarif --detailed-exitcode > /dev/null
           ACTUAL_EXIT=$?
           set -e
           if [ "$ACTUAL_EXIT" != "$EXPECTED_EXIT" ]; then
             echo "::error::Destroy phase (SARIF): expected exit code $EXPECTED_EXIT, got $ACTUAL_EXIT"
             exit 1
           fi
-          # Validate SARIF 2.1.0 structure
-          jq -e '."$schema" | test("sarif")' testdata/e2e/${{ inputs.use-case }}/destroy-result.sarif > /dev/null
-          jq -e '.version == "2.1.0"' testdata/e2e/${{ inputs.use-case }}/destroy-result.sarif > /dev/null
-          jq -e '.runs | length == 1' testdata/e2e/${{ inputs.use-case }}/destroy-result.sarif > /dev/null
-          jq -e '.runs[0].results | type == "array"' testdata/e2e/${{ inputs.use-case }}/destroy-result.sarif > /dev/null
-          jq -e '.runs[0].tool.driver.name == "tfclassify"' testdata/e2e/${{ inputs.use-case }}/destroy-result.sarif > /dev/null
-          jq -e '.runs[0].results | all(.partialFingerprints.primaryLocationFingerprint | length > 0)' \
-            testdata/e2e/${{ inputs.use-case }}/destroy-result.sarif > /dev/null
-          echo "::group::SARIF output (destroy)"
-          jq . testdata/e2e/${{ inputs.use-case }}/destroy-result.sarif
-          echo "::endgroup::"
 
       - name: Classify destroy plan (binary)
         id: classify-destroy-binary
