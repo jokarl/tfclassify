@@ -79,24 +79,22 @@ func (r *Runner) EmitDecisionWithMetadata(analyzerName string, change *sdk.Resou
 	r.host.mu.Lock()
 	defer r.host.mu.Unlock()
 
+	matchedRule := fmt.Sprintf("plugin: %s - %s", analyzerName, decision.Reason)
+	if decision.Severity > 0 {
+		matchedRule = fmt.Sprintf("%s (severity: %d)", matchedRule, decision.Severity)
+	}
+
 	rd := classify.ResourceDecision{
 		Address:      change.Address,
 		ResourceType: change.Type,
 		Actions:      change.Actions,
-		MatchedRule:  fmt.Sprintf("plugin: %s - %s", analyzerName, decision.Reason),
+		MatchedRules: []string{matchedRule},
 	}
 
 	// If Classification is empty, this is metadata-only augmentation
 	// The core classification will be preserved and plugin reason/severity/metadata appended
 	if decision.Classification != "" {
 		rd.Classification = decision.Classification
-	}
-
-	// Store severity and reason for aggregation
-	if decision.Severity > 0 {
-		if rd.MatchedRule != "" {
-			rd.MatchedRule = fmt.Sprintf("%s (severity: %d)", rd.MatchedRule, decision.Severity)
-		}
 	}
 
 	r.host.decisions = append(r.host.decisions, rd)

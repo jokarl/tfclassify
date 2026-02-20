@@ -2,7 +2,7 @@
 name: cr-0030-blast-radius-analyzer
 description: Add a blast radius builtin analyzer that classifies based on plan-wide change scale, and change MatchedRule to MatchedRules for multi-reason visibility.
 id: "CR-0030"
-status: "proposed"
+status: "implemented"
 date: 2026-02-18
 requestor: jokarl
 stakeholders:

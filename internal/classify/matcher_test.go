@@ -139,6 +139,64 @@ func TestMatchesActions_MultipleActions(t *testing.T) {
 	}
 }
 
+func TestMatchesActions_NotActions(t *testing.T) {
+	rule := compiledRule{
+		notActions: map[string]struct{}{"no-op": {}},
+	}
+
+	if !rule.matchesActions([]string{"create"}) {
+		t.Error("expected create to match rule with not_actions=[no-op]")
+	}
+	if !rule.matchesActions([]string{"update"}) {
+		t.Error("expected update to match rule with not_actions=[no-op]")
+	}
+	if !rule.matchesActions([]string{"delete"}) {
+		t.Error("expected delete to match rule with not_actions=[no-op]")
+	}
+}
+
+func TestMatchesActions_NotActionsExcluded(t *testing.T) {
+	rule := compiledRule{
+		notActions: map[string]struct{}{"no-op": {}},
+	}
+
+	if rule.matchesActions([]string{"no-op"}) {
+		t.Error("expected no-op NOT to match rule with not_actions=[no-op]")
+	}
+}
+
+func TestMatchesActions_NotActionsMultiple(t *testing.T) {
+	rule := compiledRule{
+		notActions: map[string]struct{}{"read": {}, "no-op": {}},
+	}
+
+	if rule.matchesActions([]string{"read"}) {
+		t.Error("expected read NOT to match rule with not_actions=[read, no-op]")
+	}
+	if rule.matchesActions([]string{"no-op"}) {
+		t.Error("expected no-op NOT to match rule with not_actions=[read, no-op]")
+	}
+	if !rule.matchesActions([]string{"create"}) {
+		t.Error("expected create to match rule with not_actions=[read, no-op]")
+	}
+	if !rule.matchesActions([]string{"delete"}) {
+		t.Error("expected delete to match rule with not_actions=[read, no-op]")
+	}
+}
+
+func TestMatchesActions_NeitherActionsNorNotActions(t *testing.T) {
+	rule := compiledRule{
+		actions:    nil,
+		notActions: nil,
+	}
+
+	for _, action := range []string{"create", "update", "delete", "read", "no-op"} {
+		if !rule.matchesActions([]string{action}) {
+			t.Errorf("expected %s to match rule with neither actions nor not_actions", action)
+		}
+	}
+}
+
 func TestMatchesResource_NoGlobsSpecified(t *testing.T) {
 	// A rule with neither resource nor not_resource globs should not match anything.
 	// This is an edge case that shouldn't occur in valid configs (validation should catch it),

@@ -7,6 +7,8 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"time"
+
 	"github.com/jokarl/tfclassify/internal/classify"
 	"github.com/jokarl/tfclassify/internal/config"
 	"github.com/jokarl/tfclassify/internal/output"
@@ -24,14 +26,16 @@ var (
 	verbose          bool
 	detailedExitCode bool
 	resourceFilters  []string
+	evidenceFile     string
 )
 
 // builtinAnalyzers returns the default set of builtin analyzers.
-func builtinAnalyzers() []classify.BuiltinAnalyzer {
+func builtinAnalyzers(cfg *config.Config) []classify.BuiltinAnalyzer {
 	return []classify.BuiltinAnalyzer{
 		&classify.DeletionAnalyzer{},
 		&classify.ReplaceAnalyzer{},
 		&classify.SensitiveAnalyzer{},
+		classify.NewBlastRadiusAnalyzer(cfg.Classifications),
 	}
 }
 
@@ -99,6 +103,7 @@ func init() {
 	rootCmd.Flags().StringVarP(&outputFmt, "output", "o", "text", "Output format: json, text, github")
 	rootCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose output")
 	rootCmd.Flags().BoolVarP(&detailedExitCode, "detailed-exitcode", "d", false, "Use classification-based exit codes (0=auto, 1+=higher precedence)")
+	rootCmd.Flags().StringVar(&evidenceFile, "evidence-file", "", "Write evidence artifact to file")
 
 	rootCmd.MarkFlagRequired("plan")
 
@@ -149,7 +154,7 @@ func run(cmd *cobra.Command, args []string) error {
 	result := classifier.Classify(planResult.Changes)
 
 	// Run builtin analyzers (deletion, replace, sensitive detection)
-	classifier.RunBuiltinAnalyzers(result, planResult.Changes, builtinAnalyzers())
+	classifier.RunBuiltinAnalyzers(result, planResult.Changes, builtinAnalyzers(cfg))
 
 	// Run external plugins (if any configured)
 	if hasExternalPlugins(cfg) {
@@ -187,6 +192,11 @@ func run(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to format output: %w", err)
 	}
 
+	// Generate evidence artifact if configured or requested
+	if err := generateEvidence(cfg, result, planResult, classifier); err != nil {
+		return err
+	}
+
 	// Exit with appropriate code
 	// When --detailed-exitcode is set, use classification-based exit codes.
 	// Otherwise, exit 0 for any successful classification (CI-friendly default).
@@ -194,6 +204,59 @@ func run(cmd *cobra.Command, args []string) error {
 		os.Exit(result.OverallExitCode)
 	}
 	os.Exit(0)
+	return nil
+}
+
+// generateEvidence creates and writes the evidence artifact if configured.
+func generateEvidence(cfg *config.Config, result *classify.Result, planResult *plan.ParseResult, classifier *classify.Classifier) error {
+	evidencePath := evidenceFile
+	hasEvidenceConfig := cfg.Evidence != nil
+
+	if evidencePath == "" && !hasEvidenceConfig {
+		return nil
+	}
+
+	// Determine output path
+	if evidencePath == "" {
+		// Default filename with timestamp
+		ts := time.Now().UTC().Format("20060102T150405Z")
+		evidencePath = fmt.Sprintf("tfclassify-evidence-%s.json", ts)
+		fmt.Fprintf(os.Stderr, "Warning: --evidence-file not provided, writing %s to current directory\n", evidencePath)
+	}
+
+	// Resolve config file path for hashing
+	resolvedConfigPath, err := config.Discover(configPath)
+	if err != nil {
+		return fmt.Errorf("failed to discover config path for evidence: %w", err)
+	}
+
+	timestamp := time.Now().UTC().Format(time.RFC3339)
+	opts := output.ResolveEvidenceOptions(cfg, Version, timestamp, planPath, resolvedConfigPath)
+
+	// Collect explain trace if requested
+	var explainResult *classify.ExplainResult
+	if opts.IncludeTrace {
+		explainResult = classifier.ExplainClassify(planResult.Changes)
+		classifier.AddExplainBuiltinAnalyzers(explainResult, planResult.Changes, builtinAnalyzers(cfg))
+		classifier.FinalizeExplanation(explainResult)
+	}
+
+	artifact, err := output.BuildEvidence(result, explainResult, opts)
+	if err != nil {
+		return fmt.Errorf("failed to build evidence: %w", err)
+	}
+
+	// Sign if configured
+	if opts.SigningKeyPath != "" {
+		if err := output.SignEvidence(artifact, opts.SigningKeyPath); err != nil {
+			return fmt.Errorf("failed to sign evidence: %w", err)
+		}
+	}
+
+	if err := output.WriteEvidence(artifact, evidencePath); err != nil {
+		return fmt.Errorf("failed to write evidence: %w", err)
+	}
+
 	return nil
 }
 
@@ -244,7 +307,7 @@ func runExplain(cmd *cobra.Command, args []string) error {
 	result := classifier.ExplainClassify(planResult.Changes)
 
 	// Run builtin analyzers with trace collection
-	builtinDecisions := classifier.AddExplainBuiltinAnalyzers(result, planResult.Changes, builtinAnalyzers())
+	builtinDecisions := classifier.AddExplainBuiltinAnalyzers(result, planResult.Changes, builtinAnalyzers(cfg))
 
 	// Run external plugins (if any configured)
 	if hasExternalPlugins(cfg) {

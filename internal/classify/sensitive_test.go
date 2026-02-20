@@ -32,11 +32,11 @@ func TestSensitiveAnalyzer_DetectsChange(t *testing.T) {
 	if len(decisions) != 1 {
 		t.Fatalf("expected 1 decision, got %d", len(decisions))
 	}
-	if !strings.Contains(decisions[0].MatchedRule, "builtin: sensitive") {
-		t.Errorf("expected MatchedRule to contain 'builtin: sensitive', got %q", decisions[0].MatchedRule)
+	if !strings.Contains(decisions[0].MatchedRules[0], "builtin: sensitive") {
+		t.Errorf("expected MatchedRule to contain 'builtin: sensitive', got %q", decisions[0].MatchedRules[0])
 	}
-	if !strings.Contains(decisions[0].MatchedRule, "value") {
-		t.Errorf("expected MatchedRule to mention 'value' attribute, got %q", decisions[0].MatchedRule)
+	if !strings.Contains(decisions[0].MatchedRules[0], "value") {
+		t.Errorf("expected MatchedRule to mention 'value' attribute, got %q", decisions[0].MatchedRules[0])
 	}
 }
 
@@ -80,11 +80,11 @@ func TestSensitiveAnalyzer_NoValueExposed(t *testing.T) {
 	if len(decisions) != 1 {
 		t.Fatalf("expected 1 decision, got %d", len(decisions))
 	}
-	if strings.Contains(decisions[0].MatchedRule, sensitiveValue) {
-		t.Errorf("MatchedRule should NOT expose sensitive value, got: %s", decisions[0].MatchedRule)
+	if strings.Contains(decisions[0].MatchedRules[0], sensitiveValue) {
+		t.Errorf("MatchedRule should NOT expose sensitive value, got: %s", decisions[0].MatchedRules[0])
 	}
-	if !strings.Contains(decisions[0].MatchedRule, "value") {
-		t.Errorf("MatchedRule should mention attribute name 'value', got: %s", decisions[0].MatchedRule)
+	if !strings.Contains(decisions[0].MatchedRules[0], "value") {
+		t.Errorf("MatchedRule should mention attribute name 'value', got: %s", decisions[0].MatchedRules[0])
 	}
 }
 
@@ -106,8 +106,8 @@ func TestSensitiveAnalyzer_NewSensitiveAttribute(t *testing.T) {
 	if len(decisions) != 1 {
 		t.Fatalf("expected 1 decision, got %d", len(decisions))
 	}
-	if !strings.Contains(decisions[0].MatchedRule, "password") {
-		t.Errorf("expected MatchedRule to mention password, got: %s", decisions[0].MatchedRule)
+	if !strings.Contains(decisions[0].MatchedRules[0], "password") {
+		t.Errorf("expected MatchedRule to mention password, got: %s", decisions[0].MatchedRules[0])
 	}
 }
 
@@ -169,7 +169,7 @@ func TestSensitiveAnalyzer_MultipleSensitive(t *testing.T) {
 	if len(decisions) != 1 {
 		t.Fatalf("expected 1 decision (aggregated), got %d", len(decisions))
 	}
-	rule := decisions[0].MatchedRule
+	rule := decisions[0].MatchedRules[0]
 	if !strings.Contains(rule, "password") || !strings.Contains(rule, "api_key") {
 		t.Errorf("expected MatchedRule to mention both attrs, got: %s", rule)
 	}

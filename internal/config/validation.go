@@ -38,6 +38,10 @@ func Validate(cfg *Config) error {
 		return err
 	}
 
+	if err := validateBlastRadius(cfg); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -85,13 +89,35 @@ func validateClassifications(cfg *Config) error {
 	return nil
 }
 
-// validateRules checks that each rule has at least resource or not_resource defined.
+// validActions is the set of recognized Terraform plan actions.
+var validActions = map[string]bool{
+	"create": true,
+	"update": true,
+	"delete": true,
+	"read":   true,
+	"no-op":  true,
+}
+
+// validateRules checks that each rule has at least resource or not_resource defined,
+// and that actions/not_actions are valid and mutually exclusive.
 func validateRules(cfg *Config) error {
 	for _, classification := range cfg.Classifications {
 		for i, rule := range classification.Rules {
 			if len(rule.Resource) == 0 && len(rule.NotResource) == 0 {
 				return fmt.Errorf("classification %q rule %d: rule must specify resource or not_resource",
 					classification.Name, i+1)
+			}
+
+			if len(rule.Actions) > 0 && len(rule.NotActions) > 0 {
+				return fmt.Errorf("classification %q rule %d: cannot combine actions and not_actions in the same rule",
+					classification.Name, i+1)
+			}
+
+			for _, a := range rule.NotActions {
+				if !validActions[a] {
+					return fmt.Errorf("classification %q rule %d: invalid not_actions value %q (valid: create, update, delete, read, no-op)",
+						classification.Name, i+1, a)
+				}
 			}
 		}
 	}
@@ -115,6 +141,29 @@ func validatePluginReferences(cfg *Config) error {
 				return fmt.Errorf("classification %q references plugin %q which is not enabled",
 					classification.Name, pluginName)
 			}
+		}
+	}
+	return nil
+}
+
+// validateBlastRadius checks that blast radius threshold values are positive integers.
+func validateBlastRadius(cfg *Config) error {
+	for _, c := range cfg.Classifications {
+		if c.BlastRadius == nil {
+			continue
+		}
+		br := c.BlastRadius
+		if br.MaxDeletions != nil && *br.MaxDeletions <= 0 {
+			return fmt.Errorf("classification %q: blast_radius.max_deletions must be a positive integer, got %d",
+				c.Name, *br.MaxDeletions)
+		}
+		if br.MaxReplacements != nil && *br.MaxReplacements <= 0 {
+			return fmt.Errorf("classification %q: blast_radius.max_replacements must be a positive integer, got %d",
+				c.Name, *br.MaxReplacements)
+		}
+		if br.MaxChanges != nil && *br.MaxChanges <= 0 {
+			return fmt.Errorf("classification %q: blast_radius.max_changes must be a positive integer, got %d",
+				c.Name, *br.MaxChanges)
 		}
 	}
 	return nil
@@ -266,7 +315,7 @@ func warnUnreachableRules(cfg *Config) []Warning {
 
 // isCatchAllRule returns true if the rule matches all resources with no action constraint.
 func isCatchAllRule(rule RuleConfig) bool {
-	if len(rule.Actions) > 0 {
+	if len(rule.Actions) > 0 || len(rule.NotActions) > 0 {
 		return false
 	}
 	for _, pattern := range rule.Resource {
@@ -282,7 +331,7 @@ func isCatchAllRule(rule RuleConfig) bool {
 func warnEmptyClassifications(cfg *Config) []Warning {
 	var warnings []Warning
 	for _, c := range cfg.Classifications {
-		if len(c.Rules) == 0 && !hasPluginAnalyzers(c) {
+		if len(c.Rules) == 0 && !hasPluginAnalyzers(c) && c.BlastRadius == nil {
 			warnings = append(warnings, Warning{
 				Classification: c.Name,
 				Message:        "has no rules and no plugin analyzer blocks; it will never match any resource",

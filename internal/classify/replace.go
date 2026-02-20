@@ -24,7 +24,7 @@ func (a *ReplaceAnalyzer) Analyze(changes []plan.ResourceChange) []ResourceDecis
 				Address:      change.Address,
 				ResourceType: change.Type,
 				Actions:      change.Actions,
-				MatchedRule:  fmt.Sprintf("builtin: replace - Resource %s will be replaced (destroy and recreate)", change.Address),
+				MatchedRules: []string{fmt.Sprintf("builtin: replace - Resource %s will be replaced (destroy and recreate)", change.Address)},
 			})
 		}
 	}

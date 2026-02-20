@@ -65,7 +65,7 @@ type JSONResource struct {
 	Actions                   []string `json:"actions"`
 	Classification            string   `json:"classification"`
 	ClassificationDescription string   `json:"classification_description,omitempty"`
-	MatchedRule               string   `json:"matched_rule"`
+	MatchedRules              []string `json:"matched_rules"`
 }
 
 func (f *Formatter) formatJSON(result *classify.Result) error {
@@ -84,7 +84,7 @@ func (f *Formatter) formatJSON(result *classify.Result) error {
 			Actions:                   decision.Actions,
 			Classification:            decision.Classification,
 			ClassificationDescription: decision.ClassificationDescription,
-			MatchedRule:               decision.MatchedRule,
+			MatchedRules:              decision.MatchedRules,
 		})
 	}
 
@@ -131,7 +131,9 @@ func (f *Formatter) formatText(result *classify.Result) error {
 				for _, decision := range decisions {
 					fmt.Fprintf(&sb, "  - %s (%s) %v\n",
 						decision.Address, decision.ResourceType, decision.Actions)
-					fmt.Fprintf(&sb, "    Rule: %s\n", decision.MatchedRule)
+					for _, rule := range decision.MatchedRules {
+						fmt.Fprintf(&sb, "    Rule: %s\n", rule)
+					}
 				}
 				sb.WriteByte('\n')
 			}

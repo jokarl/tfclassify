@@ -351,7 +351,7 @@ func TestClassify_WithPluginDecisions(t *testing.T) {
 			ResourceType:   "azurerm_virtual_network",
 			Actions:        []string{"update"},
 			Classification: "critical",
-			MatchedRule:    "plugin: sensitive change detected",
+			MatchedRules:   []string{"plugin: sensitive change detected"},
 		},
 	}
 
@@ -397,7 +397,7 @@ func TestClassify_PluginDecisionsWithEmptyClassification(t *testing.T) {
 			ResourceType:   "azurerm_virtual_network",
 			Actions:        []string{"update"},
 			Classification: "", // Empty - should be ignored
-			MatchedRule:    "plugin: some detection",
+			MatchedRules:   []string{"plugin: some detection"},
 		},
 	}
 
@@ -633,7 +633,7 @@ func TestExplainClassify_PluginDecisionTrace(t *testing.T) {
 		{
 			Address:        "azurerm_role_assignment.example",
 			Classification: "critical",
-			MatchedRule:    "azurerm/privilege-escalation",
+			MatchedRules:   []string{"azurerm/privilege-escalation"},
 		},
 	}
 
@@ -692,7 +692,7 @@ func TestClassify_PluginDecisionsWithUnknownClassification(t *testing.T) {
 			ResourceType:   "azurerm_virtual_network",
 			Actions:        []string{"update"},
 			Classification: "unknown_classification", // Not in precedence list
-			MatchedRule:    "plugin: some detection",
+			MatchedRules:   []string{"plugin: some detection"},
 		},
 	}
 
@@ -706,5 +706,94 @@ func TestClassify_PluginDecisionsWithUnknownClassification(t *testing.T) {
 	if result.ResourceDecisions[0].Classification != "standard" {
 		t.Errorf("expected resource to remain 'standard' when unknown classification is ignored, got '%s'",
 			result.ResourceDecisions[0].Classification)
+	}
+}
+
+func TestClassify_NotActions(t *testing.T) {
+	cfg := &config.Config{
+		Classifications: []config.ClassificationConfig{
+			{
+				Name:        "critical",
+				Description: "Critical changes",
+				Rules: []config.RuleConfig{
+					{Resource: []string{"*_role_*"}, Actions: []string{"delete"}},
+				},
+			},
+			{
+				Name:        "standard",
+				Description: "Standard changes",
+				Rules: []config.RuleConfig{
+					{Resource: []string{"*"}, NotActions: []string{"no-op"}},
+				},
+			},
+			{
+				Name:        "auto",
+				Description: "Auto-approved",
+				Rules: []config.RuleConfig{
+					{Resource: []string{"*"}, Actions: []string{"no-op"}},
+				},
+			},
+		},
+		Precedence: []string{"critical", "standard", "auto"},
+		Defaults: &config.DefaultsConfig{
+			Unclassified: "standard",
+			NoChanges:    "auto",
+		},
+	}
+
+	classifier, err := New(cfg)
+	if err != nil {
+		t.Fatalf("failed to create classifier: %v", err)
+	}
+
+	tests := []struct {
+		name           string
+		resourceType   string
+		actions        []string
+		wantClass      string
+	}{
+		{
+			name:         "create matches not_actions=[no-op]",
+			resourceType: "azurerm_resource_group",
+			actions:      []string{"create"},
+			wantClass:    "standard",
+		},
+		{
+			name:         "update matches not_actions=[no-op]",
+			resourceType: "azurerm_resource_group",
+			actions:      []string{"update"},
+			wantClass:    "standard",
+		},
+		{
+			name:         "no-op excluded by not_actions, falls through to auto",
+			resourceType: "azurerm_resource_group",
+			actions:      []string{"no-op"},
+			wantClass:    "auto",
+		},
+		{
+			name:         "delete on role still matched by higher-precedence critical rule",
+			resourceType: "azurerm_role_assignment",
+			actions:      []string{"delete"},
+			wantClass:    "critical",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			changes := []plan.ResourceChange{
+				{
+					Address: tt.resourceType + ".test",
+					Type:    tt.resourceType,
+					Actions: tt.actions,
+				},
+			}
+
+			result := classifier.Classify(changes)
+
+			if result.ResourceDecisions[0].Classification != tt.wantClass {
+				t.Errorf("expected classification %q, got %q",
+					tt.wantClass, result.ResourceDecisions[0].Classification)
+			}
+		})
 	}
 }

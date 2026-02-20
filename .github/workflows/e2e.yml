@@ -21,6 +21,11 @@ on:
         type: boolean
         default: false
         description: Only run plan + classify (skip apply/destroy). Use when the scenario requires permissions the CI service principal lacks.
+      evidence:
+        required: false
+        type: boolean
+        default: false
+        description: Generate and verify signed evidence artifacts alongside classification
       open-issue-on-failure:
         required: false
         type: boolean
@@ -90,6 +95,13 @@ jobs:
           echo "tfclassify=$(tfclassify --version)" >> "$GITHUB_OUTPUT"
           echo "terraform=$(terraform --version -json | jq -r .terraform_version)" >> "$GITHUB_OUTPUT"
 
+      - name: Generate signing key pair
+        if: inputs.evidence
+        run: |
+          openssl genpkey -algorithm Ed25519 -out /tmp/evidence-private.pem
+          openssl pkey -in /tmp/evidence-private.pem -pubout -out /tmp/evidence-public.pem
+          echo "TFCLASSIFY_SIGNING_KEY=/tmp/evidence-private.pem" >> "$GITHUB_ENV"
+
       - name: Azure login
         uses: azure/login@v2
         with:
@@ -114,11 +126,15 @@ jobs:
         if: inputs.plan-formats == 'json' || inputs.plan-formats == 'both'
         run: |
           EXPECTED_EXIT=$(jq -r '.create.exit_code' testdata/e2e/${{ inputs.use-case }}/expected.json)
+          EVIDENCE_FLAG=""
+          if [ "${{ inputs.evidence }}" = "true" ]; then
+            EVIDENCE_FLAG="--evidence-file /tmp/evidence-create-json.json"
+          fi
           set +e
           tfclassify \
             -p testdata/e2e/${{ inputs.use-case }}/create.json \
             -c testdata/e2e/${{ inputs.use-case }}/.tfclassify.hcl \
-            -o json --detailed-exitcode > testdata/e2e/${{ inputs.use-case }}/create-result.json
+            -o json --detailed-exitcode $EVIDENCE_FLAG > testdata/e2e/${{ inputs.use-case }}/create-result.json
           ACTUAL_EXIT=$?
           set -e
           echo "::group::Classification result (JSON)"
@@ -130,6 +146,14 @@ jobs:
             echo "::error::Create phase (JSON): expected exit code $EXPECTED_EXIT, got $ACTUAL_EXIT"
             exit 1
           fi
+
+      - name: Verify evidence (create JSON)
+        if: inputs.evidence && steps.classify-create-json.outcome == 'success'
+        run: |
+          tfclassify verify \
+            --evidence-file /tmp/evidence-create-json.json \
+            --public-key /tmp/evidence-public.pem
+          echo "Evidence verification passed (create JSON)"
 
       - name: Explain create plan (JSON)
         if: steps.classify-create-json.outcome == 'success'
@@ -148,11 +172,15 @@ jobs:
         if: inputs.plan-formats == 'binary' || inputs.plan-formats == 'both'
         run: |
           EXPECTED_EXIT=$(jq -r '.create.exit_code' testdata/e2e/${{ inputs.use-case }}/expected.json)
+          EVIDENCE_FLAG=""
+          if [ "${{ inputs.evidence }}" = "true" ]; then
+            EVIDENCE_FLAG="--evidence-file /tmp/evidence-create-binary.json"
+          fi
           set +e
           tfclassify \
             -p testdata/e2e/${{ inputs.use-case }}/create.tfplan \
             -c testdata/e2e/${{ inputs.use-case }}/.tfclassify.hcl \
-            -o json --detailed-exitcode > testdata/e2e/${{ inputs.use-case }}/create-result-binary.json
+            -o json --detailed-exitcode $EVIDENCE_FLAG > testdata/e2e/${{ inputs.use-case }}/create-result-binary.json
           ACTUAL_EXIT=$?
           set -e
           echo "::group::Classification result (binary)"
@@ -162,6 +190,14 @@ jobs:
             echo "::error::Create phase (binary): expected exit code $EXPECTED_EXIT, got $ACTUAL_EXIT"
             exit 1
           fi
+
+      - name: Verify evidence (create binary)
+        if: inputs.evidence && steps.classify-create-binary.outcome == 'success'
+        run: |
+          tfclassify verify \
+            --evidence-file /tmp/evidence-create-binary.json \
+            --public-key /tmp/evidence-public.pem
+          echo "Evidence verification passed (create binary)"
 
       - name: Explain create plan (binary)
         if: steps.classify-create-binary.outcome == 'success'
@@ -195,11 +231,15 @@ jobs:
         if: ${{ !inputs.plan-only && (inputs.plan-formats == 'json' || inputs.plan-formats == 'both') }}
         run: |
           EXPECTED_EXIT=$(jq -r '.destroy.exit_code' testdata/e2e/${{ inputs.use-case }}/expected.json)
+          EVIDENCE_FLAG=""
+          if [ "${{ inputs.evidence }}" = "true" ]; then
+            EVIDENCE_FLAG="--evidence-file /tmp/evidence-destroy-json.json"
+          fi
           set +e
           tfclassify \
             -p testdata/e2e/${{ inputs.use-case }}/destroy.json \
             -c testdata/e2e/${{ inputs.use-case }}/.tfclassify.hcl \
-            -o json --detailed-exitcode > testdata/e2e/${{ inputs.use-case }}/destroy-result.json
+            -o json --detailed-exitcode $EVIDENCE_FLAG > testdata/e2e/${{ inputs.use-case }}/destroy-result.json
           ACTUAL_EXIT=$?
           set -e
           echo "::group::Classification result (JSON)"
@@ -211,6 +251,14 @@ jobs:
             echo "::error::Destroy phase (JSON): expected exit code $EXPECTED_EXIT, got $ACTUAL_EXIT"
             exit 1
           fi
+
+      - name: Verify evidence (destroy JSON)
+        if: inputs.evidence && steps.classify-destroy-json.outcome == 'success'
+        run: |
+          tfclassify verify \
+            --evidence-file /tmp/evidence-destroy-json.json \
+            --public-key /tmp/evidence-public.pem
+          echo "Evidence verification passed (destroy JSON)"
 
       - name: Explain destroy plan (JSON)
         if: steps.classify-destroy-json.outcome == 'success'
@@ -229,11 +277,15 @@ jobs:
         if: ${{ !inputs.plan-only && (inputs.plan-formats == 'binary' || inputs.plan-formats == 'both') }}
         run: |
           EXPECTED_EXIT=$(jq -r '.destroy.exit_code' testdata/e2e/${{ inputs.use-case }}/expected.json)
+          EVIDENCE_FLAG=""
+          if [ "${{ inputs.evidence }}" = "true" ]; then
+            EVIDENCE_FLAG="--evidence-file /tmp/evidence-destroy-binary.json"
+          fi
           set +e
           tfclassify \
             -p testdata/e2e/${{ inputs.use-case }}/destroy.tfplan \
             -c testdata/e2e/${{ inputs.use-case }}/.tfclassify.hcl \
-            -o json --detailed-exitcode > testdata/e2e/${{ inputs.use-case }}/destroy-result-binary.json
+            -o json --detailed-exitcode $EVIDENCE_FLAG > testdata/e2e/${{ inputs.use-case }}/destroy-result-binary.json
           ACTUAL_EXIT=$?
           set -e
           echo "::group::Classification result (binary)"
@@ -243,6 +295,14 @@ jobs:
             echo "::error::Destroy phase (binary): expected exit code $EXPECTED_EXIT, got $ACTUAL_EXIT"
             exit 1
           fi
+
+      - name: Verify evidence (destroy binary)
+        if: inputs.evidence && steps.classify-destroy-binary.outcome == 'success'
+        run: |
+          tfclassify verify \
+            --evidence-file /tmp/evidence-destroy-binary.json \
+            --public-key /tmp/evidence-public.pem
+          echo "Evidence verification passed (destroy binary)"
 
       - name: Explain destroy plan (binary)
         if: steps.classify-destroy-binary.outcome == 'success'

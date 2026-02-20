@@ -247,8 +247,8 @@ func TestEmitDecisionWithMetadata(t *testing.T) {
 	if d.Classification != "" {
 		t.Errorf("expected empty classification, got %q", d.Classification)
 	}
-	if d.MatchedRule == "" {
-		t.Error("expected non-empty MatchedRule")
+	if len(d.MatchedRules) == 0 || d.MatchedRules[0] == "" {
+		t.Error("expected non-empty MatchedRules")
 	}
 
 	// Test with classification

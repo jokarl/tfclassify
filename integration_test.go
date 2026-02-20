@@ -321,7 +321,7 @@ defaults {
 			ResourceType:   "azurerm_virtual_network",
 			Actions:        []string{"update"},
 			Classification: "critical",
-			MatchedRule:    "plugin: sensitive network change",
+			MatchedRules:   []string{"plugin: sensitive network change"},
 		},
 	}
 

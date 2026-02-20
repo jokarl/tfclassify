@@ -2,7 +2,7 @@
 name: cr-0029-evidence-artifact-output
 description: Add tamper-evident evidence artifact output with Ed25519 signing and verification for regulated environments.
 id: "CR-0029"
-status: "proposed"
+status: "implemented"
 date: 2026-02-18
 requestor: jokarl
 stakeholders:

@@ -302,7 +302,7 @@ func (r *Runner) EmitDecision(analyzer sdk.Analyzer, change *sdk.ResourceChange,
 		ResourceType:   change.Type,
 		Actions:        change.Actions,
 		Classification: decision.Classification,
-		MatchedRule:    fmt.Sprintf("plugin: %s - %s", analyzer.Name(), decision.Reason),
+		MatchedRules:   []string{fmt.Sprintf("plugin: %s - %s", analyzer.Name(), decision.Reason)},
 	})
 
 	return nil

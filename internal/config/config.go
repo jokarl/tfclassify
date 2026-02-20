@@ -13,6 +13,26 @@ type Config struct {
 	Classifications []ClassificationConfig `hcl:"classification,block"`
 	Precedence      []string               `hcl:"precedence"`
 	Defaults        *DefaultsConfig        `hcl:"defaults,block"`
+	Evidence        *EvidenceConfig        `hcl:"evidence,block"`
+}
+
+// EvidenceConfig holds configuration for the evidence artifact output.
+type EvidenceConfig struct {
+	IncludeTrace     bool   `hcl:"include_trace,optional"`
+	IncludeResources *bool  `hcl:"include_resources,optional"`
+	SigningKey       string `hcl:"signing_key,optional"`
+}
+
+// ShouldIncludeResources returns whether resources should be included.
+// Default is true when not explicitly set.
+func (e *EvidenceConfig) ShouldIncludeResources() bool {
+	if e == nil {
+		return true
+	}
+	if e.IncludeResources == nil {
+		return true
+	}
+	return *e.IncludeResources
 }
 
 // PluginConfig represents a plugin declaration in the configuration.
@@ -37,6 +57,10 @@ type ClassificationConfig struct {
 	Name        string       `hcl:"name,label"`
 	Description string       `hcl:"description"`
 	Rules       []RuleConfig `hcl:"rule,block"`
+
+	// BlastRadius holds the optional blast radius thresholds for this classification.
+	// Populated during parsing from blast_radius {} blocks.
+	BlastRadius *BlastRadiusConfig
 
 	// PluginAnalyzerConfigs holds per-analyzer configuration for each plugin.
 	// Key is the plugin name (e.g., "azurerm").
@@ -117,12 +141,24 @@ func (c *PluginAnalyzerConfig) ToJSON() ([]byte, error) {
 	return json.Marshal(c)
 }
 
+// BlastRadiusConfig holds thresholds for the blast radius analyzer.
+// Each field is a pointer so that omitted fields are distinguishable from zero.
+type BlastRadiusConfig struct {
+	// MaxDeletions triggers when standalone deletions exceed this count.
+	MaxDeletions *int `json:"max_deletions,omitempty"`
+	// MaxReplacements triggers when replacements (delete+create) exceed this count.
+	MaxReplacements *int `json:"max_replacements,omitempty"`
+	// MaxChanges triggers when total non-no-op changes exceed this count.
+	MaxChanges *int `json:"max_changes,omitempty"`
+}
+
 // RuleConfig represents a classification rule.
 type RuleConfig struct {
 	Description string   `hcl:"description,optional"`
 	Resource    []string `hcl:"resource,optional"`
 	NotResource []string `hcl:"not_resource,optional"`
 	Actions     []string `hcl:"actions,optional"`
+	NotActions  []string `hcl:"not_actions,optional"`
 }
 
 // DefaultsConfig contains default configuration values.

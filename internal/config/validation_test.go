@@ -305,6 +305,90 @@ func TestValidateWarnings_UnreachableRule_WithActions(t *testing.T) {
 	}
 }
 
+func TestValidateRules_ActionsAndNotActionsMutuallyExclusive(t *testing.T) {
+	cfg := &Config{
+		Classifications: []ClassificationConfig{
+			{
+				Name:        "standard",
+				Description: "Standard",
+				Rules: []RuleConfig{
+					{
+						Resource:   []string{"*"},
+						Actions:    []string{"create"},
+						NotActions: []string{"no-op"},
+					},
+				},
+			},
+		},
+		Precedence: []string{"standard"},
+		Defaults:   &DefaultsConfig{Unclassified: "standard", NoChanges: "standard"},
+	}
+
+	err := Validate(cfg)
+	if err == nil {
+		t.Fatal("expected error for rule with both actions and not_actions, got nil")
+	}
+
+	if !strings.Contains(err.Error(), "cannot combine actions and not_actions") {
+		t.Errorf("expected mutual exclusivity error, got: %v", err)
+	}
+}
+
+func TestValidateRules_NotActionsInvalidValue(t *testing.T) {
+	cfg := &Config{
+		Classifications: []ClassificationConfig{
+			{
+				Name:        "standard",
+				Description: "Standard",
+				Rules: []RuleConfig{
+					{
+						Resource:   []string{"*"},
+						NotActions: []string{"destroy"},
+					},
+				},
+			},
+		},
+		Precedence: []string{"standard"},
+		Defaults:   &DefaultsConfig{Unclassified: "standard", NoChanges: "standard"},
+	}
+
+	err := Validate(cfg)
+	if err == nil {
+		t.Fatal("expected error for invalid not_actions value, got nil")
+	}
+
+	if !strings.Contains(err.Error(), "invalid not_actions value") {
+		t.Errorf("expected error about invalid not_actions value, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "destroy") {
+		t.Errorf("expected error to mention 'destroy', got: %v", err)
+	}
+}
+
+func TestValidateRules_NotActionsValid(t *testing.T) {
+	cfg := &Config{
+		Classifications: []ClassificationConfig{
+			{
+				Name:        "standard",
+				Description: "Standard",
+				Rules: []RuleConfig{
+					{
+						Resource:   []string{"*"},
+						NotActions: []string{"no-op"},
+					},
+				},
+			},
+		},
+		Precedence: []string{"standard"},
+		Defaults:   &DefaultsConfig{Unclassified: "standard", NoChanges: "standard"},
+	}
+
+	err := Validate(cfg)
+	if err != nil {
+		t.Errorf("expected no error for valid not_actions, got: %v", err)
+	}
+}
+
 func TestValidateWarnings_EmptyClassification(t *testing.T) {
 	cfg := &Config{
 		Classifications: []ClassificationConfig{

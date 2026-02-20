@@ -15,6 +15,7 @@ type compiledRule struct {
 	resourceGlobs             []glob.Glob
 	notResourceGlobs          []glob.Glob
 	actions                   map[string]struct{} // pre-computed set for O(1) lookup
+	notActions                map[string]struct{} // pre-computed exclusion set for O(1) lookup
 	ruleDescription           string
 }
 
@@ -41,10 +42,20 @@ func compileRules(cfg *config.Config) (map[string][]compiledRule, error) {
 				}
 			}
 
+			// Pre-compute not_actions exclusion set
+			var notActionSet map[string]struct{}
+			if len(rule.NotActions) > 0 {
+				notActionSet = make(map[string]struct{}, len(rule.NotActions))
+				for _, a := range rule.NotActions {
+					notActionSet[a] = struct{}{}
+				}
+			}
+
 			compiled := compiledRule{
 				classification:            classification.Name,
 				classificationDescription: classification.Description,
 				actions:                   actionSet,
+				notActions:                notActionSet,
 				ruleDescription:           ruleDesc,
 			}
 
@@ -100,36 +111,67 @@ func (r *compiledRule) matchesResource(resourceType string) bool {
 	return false
 }
 
-// matchesActions returns true if any of the change actions match this rule's actions.
-// If the rule has no actions specified, it matches any actions.
+// matchesActions returns true if the change actions match this rule's action constraints.
+// If actions specified: match if ANY change action is in the set.
+// If not_actions specified: match if NO change action is in the exclusion set.
+// If neither specified: match all actions.
 func (r *compiledRule) matchesActions(changeActions []string) bool {
-	if len(r.actions) == 0 {
+	if len(r.actions) > 0 {
+		for _, changeAction := range changeActions {
+			if _, ok := r.actions[changeAction]; ok {
+				return true
+			}
+		}
+		return false
+	}
+
+	if len(r.notActions) > 0 {
+		for _, changeAction := range changeActions {
+			if _, ok := r.notActions[changeAction]; ok {
+				return false
+			}
+		}
 		return true
 	}
 
-	for _, changeAction := range changeActions {
-		if _, ok := r.actions[changeAction]; ok {
-			return true
-		}
-	}
-
-	return false
+	return true
 }
 
 // formatRuleDescription creates a human-readable description of a rule.
 func formatRuleDescription(classification string, ruleIndex int, rule config.RuleConfig) string {
 	desc := fmt.Sprintf("%s rule %d", classification, ruleIndex)
 
+	var parts []string
+
 	if len(rule.Resource) > 0 {
-		desc += " (resource: " + rule.Resource[0]
+		part := "resource: " + rule.Resource[0]
 		if len(rule.Resource) > 1 {
-			desc += ", ..."
+			part += ", ..."
 		}
-		desc += ")"
+		parts = append(parts, part)
 	} else if len(rule.NotResource) > 0 {
-		desc += " (not_resource: " + rule.NotResource[0]
+		part := "not_resource: " + rule.NotResource[0]
 		if len(rule.NotResource) > 1 {
-			desc += ", ..."
+			part += ", ..."
+		}
+		parts = append(parts, part)
+	}
+
+	if len(rule.NotActions) > 0 {
+		part := "not_actions: " + rule.NotActions[0]
+		if len(rule.NotActions) > 1 {
+			part += ", ..."
+		}
+		parts = append(parts, part)
+	}
+
+	if len(parts) > 0 {
+		desc += " ("
+		for i, p := range parts {
+			if i > 0 {
+				desc += "; "
+			}
+			desc += p
 		}
 		desc += ")"
 	}

@@ -96,6 +96,15 @@ classification "critical" {
     # No "actions" field — matches create, update, delete, read, and no-op.
   }
 
+  # Blast radius thresholds — triggers when plan-wide counts exceed limits.
+  # When any threshold is exceeded, ALL resources in the plan receive a
+  # decision at this classification level. Omitted fields are not evaluated.
+  blast_radius {
+    max_deletions    = 5    # Standalone deletions (delete without create)
+    max_replacements = 10   # Replacements (delete + create)
+    max_changes      = 50   # All resources with non-no-op actions
+  }
+
   # Plugin-specific analyzer configuration for this classification level.
   # Each enabled plugin can have per-analyzer sub-blocks here.
   azurerm {
@@ -176,6 +185,12 @@ classification "high" {
     resource    = ["*_dns_*"]
   }
 
+  # Less strict blast radius for "high" — catches medium-scale changes.
+  blast_radius {
+    max_deletions = 2
+    max_changes   = 20
+  }
+
   # Plugin analyzer configuration for "high" — catch roles with write access
   azurerm {
     privilege_escalation {
@@ -205,10 +220,12 @@ classification "standard" {
   #
   # Cannot combine "resource" and "not_resource" in the same rule.
   rule {
-    description = "All infrastructure changes not covered above"
+    description  = "All infrastructure changes not covered above"
     not_resource = ["*_monitor_*", "*_log_*", "*_diagnostic_*"]
-    # Matches everything except monitoring/logging resources, which are
-    # handled by "low" below.
+    not_actions  = ["no-op"]
+    # "not_actions" is the inverse of "actions". This rule matches everything
+    # EXCEPT no-op actions. Cannot combine "actions" and "not_actions" in the
+    # same rule. Valid values: "create", "update", "delete", "read", "no-op".
     #
     # In practice, resources already matched by "critical" or "high" above
     # will never reach this rule due to precedence-ordered evaluation.
@@ -270,4 +287,34 @@ defaults {
   # (e.g., "10s", "2m30s", "500ms"). If omitted or invalid, defaults to 30s.
   # Only relevant when external plugins are configured.
   plugin_timeout = "30s"
+}
+
+# ─── Evidence ──────────────────────────────────────────────────────────────────
+#
+# Evidence artifact output for audit retention. When configured, tfclassify
+# produces a self-contained JSON evidence file alongside the normal output.
+# The artifact includes input hashes, timestamps, and an optional Ed25519
+# signature for tamper evidence.
+#
+# Usage:
+#   tfclassify --plan tfplan --evidence-file evidence.json
+#
+# If the evidence block is present but --evidence-file is not provided,
+# tfclassify writes to the current directory with an auto-generated filename
+# and warns to stderr.
+evidence {
+  # Include per-resource classification decisions in the evidence artifact.
+  # Default: true.
+  include_resources = true
+
+  # Include the full explain trace (every rule evaluated per resource).
+  # Runs the explain pipeline alongside classification — doubles computation
+  # but captures full audit trail. Default: false.
+  include_trace = false
+
+  # Path to an Ed25519 PEM private key for signing the artifact.
+  # Supports environment variable expansion: "$TFCLASSIFY_SIGNING_KEY".
+  # When set, the artifact includes signature and signed_content_hash fields.
+  # When omitted, the artifact is produced unsigned.
+  # signing_key = "$TFCLASSIFY_SIGNING_KEY"
 }
