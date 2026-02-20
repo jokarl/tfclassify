@@ -175,13 +175,21 @@ jobs:
           tfclassify \
             -p testdata/e2e/${{ inputs.use-case }}/create.json \
             -c testdata/e2e/${{ inputs.use-case }}/.tfclassify.hcl \
-            -o sarif --detailed-exitcode > /dev/null
+            -o sarif --detailed-exitcode > /tmp/tfclassify-${{ inputs.use-case }}.sarif
           ACTUAL_EXIT=$?
           set -e
           if [ "$ACTUAL_EXIT" != "$EXPECTED_EXIT" ]; then
             echo "::error::Create phase (SARIF): expected exit code $EXPECTED_EXIT, got $ACTUAL_EXIT"
             exit 1
           fi
+
+      - name: Upload SARIF to GitHub Code Scanning
+        if: (inputs.plan-formats == 'json' || inputs.plan-formats == 'both') && steps.classify-create-json.outcome == 'success'
+        uses: github/codeql-action/upload-sarif@v3
+        continue-on-error: true
+        with:
+          sarif_file: /tmp/tfclassify-${{ inputs.use-case }}.sarif
+          category: tfclassify-${{ inputs.use-case }}
 
       - name: Classify create plan (binary)
         id: classify-create-binary
