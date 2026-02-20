@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/jokarl/tfclassify/compare/tfclassify-v0.3.0...tfclassify-v0.4.0) (2026-02-20)
+
+
+### Features
+
+* blast radius analyzer, not_actions, evidence artifacts (CR-0029/0030/0032) ([#37](https://github.com/jokarl/tfclassify/issues/37)) ([1db2990](https://github.com/jokarl/tfclassify/commit/1db29906fc7a2bec2af2d658c69cd80bfd2d735f))
+
 ## [0.3.0](https://github.com/jokarl/tfclassify/compare/tfclassify-v0.2.1...tfclassify-v0.3.0) (2026-02-18)
 
 
