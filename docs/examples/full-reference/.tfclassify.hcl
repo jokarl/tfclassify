@@ -60,9 +60,15 @@ plugin "aws" {
 # Every classification has a description that appears in the output report.
 # This is what reviewers read when deciding whether to approve a change, so
 # make it actionable.
+#
+# The optional "sarif_level" field controls the SARIF severity when using
+# --output sarif. Valid values: "error", "warning", "note", "none".
+# When omitted, defaults to "error" for the highest-precedence classification
+# and "warning" for all others. The no_changes default gets "none".
 
 classification "critical" {
   description = "Requires security team approval — blocks automated deployment"
+  sarif_level = "error"
 
   # Multiple rules per classification are OR'd: match any one and the
   # resource is classified at this level.
@@ -156,6 +162,7 @@ classification "critical" {
 
 classification "high" {
   description = "Requires team lead approval before merge"
+  sarif_level = "warning"
 
   # Rule 1: Creating or updating IAM/role resources (deletes are critical above).
   rule {
@@ -211,6 +218,7 @@ classification "high" {
 
 classification "standard" {
   description = "Standard change process — peer review required"
+  sarif_level = "note"
 
   # Rule using "not_resource" — matches everything EXCEPT the listed patterns.
   # This is an alternative to using resource = ["*"] as a catch-all.
@@ -234,6 +242,7 @@ classification "standard" {
 
 classification "low" {
   description = "Observability changes — auto-approved with notification"
+  sarif_level = "note"
 
   rule {
     description = "Monitoring and logging changes are low-risk"
@@ -243,6 +252,7 @@ classification "low" {
 
 classification "auto" {
   description = "No approval needed"
+  sarif_level = "none"
 
   # No-op only: Terraform evaluated the resource but found no changes.
   rule {
