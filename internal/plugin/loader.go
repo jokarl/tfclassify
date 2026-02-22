@@ -17,6 +17,7 @@ import (
 	"github.com/jokarl/tfclassify/sdk"
 	"github.com/jokarl/tfclassify/sdk/pb"
 	sdkplugin "github.com/jokarl/tfclassify/sdk/plugin"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 )
 
@@ -29,6 +30,7 @@ type Host struct {
 	cfg       *config.Config
 	plugins   map[string]*DiscoveredPlugin
 	clients   map[string]*goplugin.Client
+	verified  map[string]bool // plugins that passed verification + config
 	changes   []plan.ResourceChange
 	decisions []classify.ResourceDecision
 	mu        sync.Mutex
@@ -39,6 +41,7 @@ func NewHost(cfg *config.Config) *Host {
 	return &Host{
 		cfg:       cfg,
 		clients:   make(map[string]*goplugin.Client),
+		verified:  make(map[string]bool),
 		decisions: make([]classify.ResourceDecision, 0),
 	}
 }
@@ -53,8 +56,68 @@ func (h *Host) DiscoverAndStart(selfPath string) error {
 
 	for name, plugin := range h.plugins {
 		h.startPlugin(name, plugin)
+		if err := h.verifyAndConfigurePlugin(name); err != nil {
+			return fmt.Errorf("plugin %q: %w", name, err)
+		}
 	}
 
+	return nil
+}
+
+// verifyAndConfigurePlugin performs the one-time handshake RPCs (GetPluginInfo,
+// VerifyPlugin, ApplyConfig) for a started plugin. Called once per plugin at
+// startup so that runPluginAnalysis can skip these on every invocation.
+func (h *Host) verifyAndConfigurePlugin(name string) error {
+	client, ok := h.clients[name]
+	if !ok {
+		return fmt.Errorf("plugin client not found: %s", name)
+	}
+
+	rpcClient, err := client.Client()
+	if err != nil {
+		return fmt.Errorf("failed to get RPC client: %w", err)
+	}
+
+	raw, err := rpcClient.Dispense(sdkplugin.PluginName)
+	if err != nil {
+		return fmt.Errorf("failed to dispense plugin: %w", err)
+	}
+
+	pluginClient, ok := raw.(*sdkplugin.PluginClient)
+	if !ok {
+		return fmt.Errorf("unexpected plugin type: %T", raw)
+	}
+
+	conn := pluginClient.Conn()
+	if conn == nil {
+		return fmt.Errorf("plugin connection not available")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	pluginSvcClient := pb.NewPluginServiceClient(conn)
+
+	infoResp, err := pluginSvcClient.GetPluginInfo(ctx, &pb.GetPluginInfoRequest{})
+	if err != nil {
+		return fmt.Errorf("failed to get plugin info: %w", err)
+	}
+
+	pluginInfo := &PluginInfo{
+		Name:                  infoResp.Name,
+		Version:               infoResp.Version,
+		SDKVersion:            infoResp.SdkVersion,
+		HostVersionConstraint: infoResp.HostVersionConstraint,
+	}
+	if err := VerifyPlugin(name, pluginInfo); err != nil {
+		return fmt.Errorf("plugin verification failed: %w", err)
+	}
+
+	if _, err := pluginSvcClient.ApplyConfig(ctx, &pb.ApplyConfigRequest{Config: nil}); err != nil {
+		return fmt.Errorf("failed to apply config: %w", err)
+	}
+
+	h.verified[name] = true
 	return nil
 }
 
@@ -111,33 +174,38 @@ func (h *Host) RunAnalysis(changes []plan.ResourceChange) ([]classify.ResourceDe
 		}
 	}
 
-	// Run each plugin
+	// Run plugins concurrently — each plugin's classifications run sequentially
+	// within that plugin, but different plugins run in parallel.
+	g, _ := errgroup.WithContext(context.Background())
 	for name := range h.plugins {
-		// Get classification-scoped configs for this plugin
 		configs := classificationConfigs[name]
 
-		// If no classification-scoped configs, run with empty classification
-		if len(configs) == 0 {
-			ctx, cancel := context.WithTimeout(context.Background(), timeout)
-			err := h.runPluginAnalysis(ctx, name, "", nil)
-			cancel()
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Warning: plugin %q failed: %v\n", name, err)
+		g.Go(func() error {
+			// If no classification-scoped configs, run with empty classification
+			if len(configs) == 0 {
+				ctx, cancel := context.WithTimeout(context.Background(), timeout)
+				err := h.runPluginAnalysis(ctx, name, "", nil)
+				cancel()
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "Warning: plugin %q failed: %v\n", name, err)
+				}
+				return nil
 			}
-			continue
-		}
 
-		// Run analysis for each classification that has config for this plugin
-		for _, cfg := range configs {
-			ctx, cancel := context.WithTimeout(context.Background(), timeout)
-			err := h.runPluginAnalysis(ctx, name, cfg.classificationName, cfg.analyzerConfig)
-			cancel()
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Warning: plugin %q failed for classification %q: %v\n",
-					name, cfg.classificationName, err)
+			// Run analysis for each classification that has config for this plugin
+			for _, cfg := range configs {
+				ctx, cancel := context.WithTimeout(context.Background(), timeout)
+				err := h.runPluginAnalysis(ctx, name, cfg.classificationName, cfg.analyzerConfig)
+				cancel()
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "Warning: plugin %q failed for classification %q: %v\n",
+						name, cfg.classificationName, err)
+				}
 			}
-		}
+			return nil
+		})
 	}
+	_ = g.Wait()
 
 	return h.decisions, nil
 }
@@ -151,19 +219,20 @@ type classificationAnalysisRequest struct {
 
 // runPluginAnalysis runs a single plugin's analysis using gRPC.
 // If classification is non-empty, it's passed to the plugin for classification-scoped analysis.
+// Verification and config are handled once at startup by verifyAndConfigurePlugin.
 func (h *Host) runPluginAnalysis(ctx context.Context, name string, classification string, analyzerConfig []byte) error {
 	client, ok := h.clients[name]
 	if !ok {
 		return fmt.Errorf("plugin client not found: %s", name)
 	}
 
-	// Connect to the plugin process via gRPC
+	// Connect to the plugin process via gRPC (cached by go-plugin)
 	rpcClient, err := client.Client()
 	if err != nil {
 		return fmt.Errorf("failed to get RPC client: %w", err)
 	}
 
-	// Get the raw plugin interface
+	// Get the raw plugin interface (cached by go-plugin)
 	raw, err := rpcClient.Dispense(sdkplugin.PluginName)
 	if err != nil {
 		return fmt.Errorf("failed to dispense plugin: %w", err)
@@ -193,31 +262,8 @@ func (h *Host) runPluginAnalysis(ctx context.Context, name string, classificatio
 		return s
 	})
 
-	// Create a typed gRPC client for the plugin service
-	pluginSvcClient := pb.NewPluginServiceClient(conn)
-
-	// First, verify plugin version compatibility
-	infoResp, err := pluginSvcClient.GetPluginInfo(ctx, &pb.GetPluginInfoRequest{})
-	if err != nil {
-		return fmt.Errorf("failed to get plugin info: %w", err)
-	}
-
-	pluginInfo := &PluginInfo{
-		Name:                  infoResp.Name,
-		Version:               infoResp.Version,
-		SDKVersion:            infoResp.SdkVersion,
-		HostVersionConstraint: infoResp.HostVersionConstraint,
-	}
-	if err := VerifyPlugin(name, pluginInfo); err != nil {
-		return fmt.Errorf("plugin verification failed: %w", err)
-	}
-
-	// Apply configuration to the plugin
-	if _, err := pluginSvcClient.ApplyConfig(ctx, &pb.ApplyConfigRequest{Config: nil}); err != nil {
-		return fmt.Errorf("failed to apply config: %w", err)
-	}
-
 	// Call Analyze on the plugin, passing the broker ID, classification, and analyzer config
+	pluginSvcClient := pb.NewPluginServiceClient(conn)
 	req := &pb.AnalyzeRequest{
 		BrokerId:       brokerID,
 		Classification: classification,
@@ -241,13 +287,14 @@ func (h *Host) Shutdown() {
 
 // Runner implements the SDK Runner interface for plugins to call back to the host.
 type Runner struct {
-	host *Host
-	mu   sync.Mutex
+	host      *Host
+	mu        sync.Mutex
+	globCache map[string]glob.Glob
 }
 
 // NewRunner creates a new Runner for a host.
 func NewRunner(host *Host) *Runner {
-	return &Runner{host: host}
+	return &Runner{host: host, globCache: make(map[string]glob.Glob)}
 }
 
 // GetResourceChanges returns resource changes matching the given patterns.
@@ -255,12 +302,17 @@ func (r *Runner) GetResourceChanges(patterns []string) ([]*sdk.ResourceChange, e
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	// Compile patterns
+	// Compile patterns (cached across calls within this Runner)
 	globs := make([]glob.Glob, 0, len(patterns))
 	for _, pattern := range patterns {
-		g, err := glob.Compile(pattern)
-		if err != nil {
-			return nil, fmt.Errorf("invalid pattern %q: %w", pattern, err)
+		g, ok := r.globCache[pattern]
+		if !ok {
+			var err error
+			g, err = glob.Compile(pattern)
+			if err != nil {
+				return nil, fmt.Errorf("invalid pattern %q: %w", pattern, err)
+			}
+			r.globCache[pattern] = g
 		}
 		globs = append(globs, g)
 	}

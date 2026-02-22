@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+**Always use the `golang-pro` skill when writing Go code.** Invoke it before implementing any Go changes to get expert-level guidance on concurrency, gRPC, and idiomatic patterns.
+
 ## Build & Test Commands
 
 ```bash
