@@ -6,8 +6,12 @@ run:
 linters:
   default: standard
   enable:
+    - bodyclose
+    - durationcheck
     - errorlint
     - misspell
+    - nilerr
+    - noctx
     - unconvert
     - unparam
 
@@ -17,10 +21,11 @@ linters:
 
   exclusions:
     rules:
-      # Test files: ignore error wrapping lint — not worth the churn
+      # Test files: suppress linters that produce churn without catching bugs
       - path: _test\.go
         linters:
           - errorlint
+          - noctx
 
 issues:
   # Report ALL issues. Never silently cap output.

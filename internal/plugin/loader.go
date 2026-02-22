@@ -60,7 +60,7 @@ func (h *Host) DiscoverAndStart(selfPath string) error {
 
 // startPlugin starts a single plugin process.
 func (h *Host) startPlugin(name string, plugin *DiscoveredPlugin) {
-	cmd := exec.Command(plugin.Path)
+	cmd := exec.CommandContext(context.TODO(), plugin.Path)
 
 	client := goplugin.NewClient(&goplugin.ClientConfig{
 		HandshakeConfig: sdkplugin.HandshakeConfig,

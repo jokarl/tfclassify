@@ -18,6 +18,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -119,7 +120,12 @@ func fetchFromMicrosoftDocs() (*actionRegistry, error) {
 		url := fmt.Sprintf("%s/%s.md", rawBaseURL, category)
 		fmt.Fprintf(os.Stderr, "Fetching %s...\n", url)
 
-		resp, err := client.Get(url)
+		req, err := http.NewRequestWithContext(context.TODO(), "GET", url, nil)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "warning: failed to create request for %s: %v\n", category, err)
+			continue
+		}
+		resp, err := client.Do(req)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "warning: failed to fetch %s: %v\n", category, err)
 			continue

@@ -3,6 +3,7 @@ package plan
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -72,7 +73,7 @@ func parseBinaryPlan(path string) (*ParseResult, error) {
 
 	// Run terraform show -json from the plan file's directory so that
 	// terraform can find the .terraform/ provider plugins created by init.
-	cmd := exec.Command(terraformPath, "show", "-json", filepath.Base(absPath))
+	cmd := exec.CommandContext(context.TODO(), terraformPath, "show", "-json", filepath.Base(absPath))
 	cmd.Dir = filepath.Dir(absPath)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout

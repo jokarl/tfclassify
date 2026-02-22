@@ -3,6 +3,7 @@ package plugin
 
 import (
 	"archive/zip"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -171,7 +172,7 @@ var githubAPIBase = "https://api.github.com"
 func fetchRelease(owner, repo, tag string) (*githubRelease, error) {
 	apiURL := fmt.Sprintf("%s/repos/%s/%s/releases/tags/%s", githubAPIBase, owner, repo, tag)
 
-	req, err := http.NewRequest("GET", apiURL, nil)
+	req, err := http.NewRequestWithContext(context.TODO(), "GET", apiURL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -279,7 +280,7 @@ func parseGitHubSource(source string) (string, string, error) {
 
 // downloadFile downloads a file from a URL and returns the path to a temp file.
 func downloadFile(url string) (string, error) {
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequestWithContext(context.TODO(), "GET", url, nil)
 	if err != nil {
 		return "", err
 	}
