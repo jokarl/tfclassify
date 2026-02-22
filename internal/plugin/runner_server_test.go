@@ -140,10 +140,18 @@ func TestRunnerServiceServer_EmitDecision(t *testing.T) {
 
 func TestProtoConversions_ResourceChange(t *testing.T) {
 	// Test nil
-	if sdkplugin.SDKToProtoResourceChange(nil) != nil {
+	result, err := sdkplugin.SDKToProtoResourceChange(nil)
+	if err != nil {
+		t.Errorf("unexpected error for nil SDK change: %v", err)
+	}
+	if result != nil {
 		t.Error("expected nil for nil SDK change")
 	}
-	if sdkplugin.ProtoToSDKResourceChange(nil) != nil {
+	resultSDK, err := sdkplugin.ProtoToSDKResourceChange(nil)
+	if err != nil {
+		t.Errorf("unexpected error for nil proto change: %v", err)
+	}
+	if resultSDK != nil {
 		t.Error("expected nil for nil proto change")
 	}
 
@@ -158,7 +166,10 @@ func TestProtoConversions_ResourceChange(t *testing.T) {
 		After:        map[string]interface{}{"key": "value"},
 	}
 
-	proto := sdkplugin.SDKToProtoResourceChange(sdkChange)
+	proto, err := sdkplugin.SDKToProtoResourceChange(sdkChange)
+	if err != nil {
+		t.Fatalf("SDKToProtoResourceChange: %v", err)
+	}
 	if proto.Address != "test.resource" {
 		t.Errorf("expected address 'test.resource', got %q", proto.Address)
 	}
@@ -167,7 +178,10 @@ func TestProtoConversions_ResourceChange(t *testing.T) {
 	}
 
 	// Round-trip
-	converted := sdkplugin.ProtoToSDKResourceChange(proto)
+	converted, err := sdkplugin.ProtoToSDKResourceChange(proto)
+	if err != nil {
+		t.Fatalf("ProtoToSDKResourceChange: %v", err)
+	}
 	if converted.Address != sdkChange.Address {
 		t.Errorf("round-trip failed for address: expected %q, got %q", sdkChange.Address, converted.Address)
 	}
@@ -175,7 +189,11 @@ func TestProtoConversions_ResourceChange(t *testing.T) {
 
 func TestProtoConversions_Decision(t *testing.T) {
 	// Test nil
-	if sdkplugin.ProtoToSDKDecision(nil) != nil {
+	resultDec, err := sdkplugin.ProtoToSDKDecision(nil)
+	if err != nil {
+		t.Errorf("unexpected error for nil proto decision: %v", err)
+	}
+	if resultDec != nil {
 		t.Error("expected nil for nil proto decision")
 	}
 
@@ -187,7 +205,10 @@ func TestProtoConversions_Decision(t *testing.T) {
 		Metadata:       []byte(`{"key":"value"}`),
 	}
 
-	sdkDecision := sdkplugin.ProtoToSDKDecision(protoDecision)
+	sdkDecision, err := sdkplugin.ProtoToSDKDecision(protoDecision)
+	if err != nil {
+		t.Fatalf("ProtoToSDKDecision: %v", err)
+	}
 	if sdkDecision.Classification != "critical" {
 		t.Errorf("expected classification 'critical', got %q", sdkDecision.Classification)
 	}

@@ -33,7 +33,11 @@ func (s *RunnerServiceServer) GetResourceChanges(ctx context.Context, req *pb.Ge
 
 	protoChanges := make([]*pb.ResourceChange, len(changes))
 	for i, c := range changes {
-		protoChanges[i] = sdkplugin.SDKToProtoResourceChange(c)
+		pc, err := sdkplugin.SDKToProtoResourceChange(c)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert resource change %q: %w", c.Address, err)
+		}
+		protoChanges[i] = pc
 	}
 
 	return &pb.GetResourceChangesResponse{Changes: protoChanges}, nil
@@ -46,13 +50,23 @@ func (s *RunnerServiceServer) GetResourceChange(ctx context.Context, req *pb.Get
 		return nil, err
 	}
 
-	return &pb.GetResourceChangeResponse{Change: sdkplugin.SDKToProtoResourceChange(change)}, nil
+	pc, err := sdkplugin.SDKToProtoResourceChange(change)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert resource change %q: %w", change.Address, err)
+	}
+	return &pb.GetResourceChangeResponse{Change: pc}, nil
 }
 
 // EmitDecision handles the EmitDecision RPC from plugins.
 func (s *RunnerServiceServer) EmitDecision(ctx context.Context, req *pb.EmitDecisionRequest) (*pb.EmitDecisionResponse, error) {
-	change := sdkplugin.ProtoToSDKResourceChange(req.Change)
-	decision := sdkplugin.ProtoToSDKDecision(req.Decision)
+	change, err := sdkplugin.ProtoToSDKResourceChange(req.Change)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert resource change: %w", err)
+	}
+	decision, err := sdkplugin.ProtoToSDKDecision(req.Decision)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert decision: %w", err)
+	}
 
 	analyzer := &pluginAnalyzerWrapper{name: req.AnalyzerName}
 

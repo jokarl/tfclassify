@@ -38,7 +38,10 @@ func TestProtoConversions_SDKToProto_WithSensitiveFields(t *testing.T) {
 		AfterSensitive:  map[string]interface{}{"password": true, "api_key": true},
 	}
 
-	proto := sdkplugin.SDKToProtoResourceChange(sdkChange)
+	proto, err := sdkplugin.SDKToProtoResourceChange(sdkChange)
+	if err != nil {
+		t.Fatalf("SDKToProtoResourceChange: %v", err)
+	}
 
 	if proto.BeforeSensitive == nil {
 		t.Fatal("expected BeforeSensitive to be non-nil")
@@ -48,7 +51,10 @@ func TestProtoConversions_SDKToProto_WithSensitiveFields(t *testing.T) {
 	}
 
 	// Round-trip and verify
-	converted := sdkplugin.ProtoToSDKResourceChange(proto)
+	converted, err := sdkplugin.ProtoToSDKResourceChange(proto)
+	if err != nil {
+		t.Fatalf("ProtoToSDKResourceChange: %v", err)
+	}
 	if converted.BeforeSensitive == nil {
 		t.Fatal("expected BeforeSensitive to survive round-trip")
 	}
@@ -71,7 +77,10 @@ func TestProtoConversions_ProtoToSDK_WithAllSensitiveFields(t *testing.T) {
 		AfterSensitive:  []byte(`{"secret":true,"token":true}`),
 	}
 
-	converted := sdkplugin.ProtoToSDKResourceChange(proto)
+	converted, err := sdkplugin.ProtoToSDKResourceChange(proto)
+	if err != nil {
+		t.Fatalf("ProtoToSDKResourceChange: %v", err)
+	}
 
 	if converted.Before == nil || converted.Before["key"] != "old" {
 		t.Errorf("Before round-trip failed: %v", converted.Before)
@@ -99,7 +108,10 @@ func TestProtoConversions_Decision_WithAllFields(t *testing.T) {
 		Metadata:       []byte(`{"role":"Owner","scope":"/subscriptions/abc"}`),
 	}
 
-	converted := sdkplugin.ProtoToSDKDecision(proto)
+	converted, err := sdkplugin.ProtoToSDKDecision(proto)
+	if err != nil {
+		t.Fatalf("ProtoToSDKDecision: %v", err)
+	}
 
 	if converted.Classification != "critical" {
 		t.Errorf("classification mismatch: %q", converted.Classification)
