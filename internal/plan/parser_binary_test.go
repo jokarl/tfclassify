@@ -163,13 +163,17 @@ func TestFindTerraform_FallbackToTofu(t *testing.T) {
 
 	// Clear TERRAFORM_PATH
 	oldTfPath := os.Getenv("TERRAFORM_PATH")
-	os.Setenv("TERRAFORM_PATH", "")
-	defer os.Setenv("TERRAFORM_PATH", oldTfPath)
+	if err := os.Setenv("TERRAFORM_PATH", ""); err != nil {
+		t.Fatalf("failed to set TERRAFORM_PATH: %v", err)
+	}
+	defer func() { _ = os.Setenv("TERRAFORM_PATH", oldTfPath) }()
 
 	// Set PATH to only include our temp directory (so system terraform isn't found)
 	oldSystemPath := os.Getenv("PATH")
-	os.Setenv("PATH", tmpDir)
-	defer os.Setenv("PATH", oldSystemPath)
+	if err := os.Setenv("PATH", tmpDir); err != nil {
+		t.Fatalf("failed to set PATH: %v", err)
+	}
+	defer func() { _ = os.Setenv("PATH", oldSystemPath) }()
 
 	path, err := findTerraform()
 	if err != nil {

@@ -423,7 +423,7 @@ func TestParseFile_BinaryPlanDetection(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Create a fake binary plan file (starts with PK)
 	binaryPlanPath := tmpDir + "/plan.tfplan"
@@ -455,7 +455,7 @@ func TestParseFile_JSONWithLeadingWhitespace(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	jsonWithWhitespace := `
 {
@@ -484,7 +484,7 @@ func TestFindTerraform_ValidPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	terraformPath := tmpDir + "/terraform"
 	if err := os.WriteFile(terraformPath, []byte("#!/bin/sh\necho mock"), 0755); err != nil {

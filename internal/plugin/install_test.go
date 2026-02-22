@@ -587,7 +587,7 @@ func TestDownloadFile_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	defer os.Remove(tempPath)
+	defer func() { _ = os.Remove(tempPath) }()
 
 	// Verify the content
 	content, err := os.ReadFile(tempPath)
@@ -648,7 +648,7 @@ func TestDownloadFile_WithGitHubToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	defer os.Remove(tempPath)
+	defer func() { _ = os.Remove(tempPath) }()
 
 	if receivedAuth != "token test-token-12345" {
 		t.Errorf("expected auth header 'token test-token-12345', got %q", receivedAuth)
