@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/jokarl/tfclassify/compare/tfclassify-v0.4.0...tfclassify-v0.5.0) (2026-02-22)
+
+
+### Features
+
+* SARIF 2.1.0 output format (CR-0033) ([#39](https://github.com/jokarl/tfclassify/issues/39)) ([f23854d](https://github.com/jokarl/tfclassify/commit/f23854dae8be20bf5eae562b8c14aba29f13c9cc))
+
 ## [0.4.0](https://github.com/jokarl/tfclassify/compare/tfclassify-v0.3.0...tfclassify-v0.4.0) (2026-02-20)
 
 
