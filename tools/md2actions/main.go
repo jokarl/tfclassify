@@ -125,7 +125,7 @@ func fetchFromMicrosoftDocs() (*actionRegistry, error) {
 			continue
 		}
 		body, err := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "warning: failed to read %s: %v\n", category, err)
 			continue

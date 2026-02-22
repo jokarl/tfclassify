@@ -565,7 +565,9 @@ defaults {
 }
 `
 	configPath := filepath.Join(tmpDir, ".tfclassify.hcl")
-	os.WriteFile(configPath, []byte(configContent), 0644)
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("failed to write config: %v", err)
+	}
 
 	cmd := exec.Command(binary, "validate", "--config", configPath)
 	output, err := cmd.CombinedOutput()
@@ -619,7 +621,9 @@ defaults {
 }
 `
 	configPath := filepath.Join(tmpDir, ".tfclassify.hcl")
-	os.WriteFile(configPath, []byte(configContent), 0644)
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("failed to write config: %v", err)
+	}
 
 	cmd := exec.Command(binary, "validate", "--config", configPath)
 	output, err := cmd.CombinedOutput()
@@ -671,7 +675,9 @@ defaults {
 }
 `
 	configPath := filepath.Join(tmpDir, ".tfclassify.hcl")
-	os.WriteFile(configPath, []byte(configContent), 0644)
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("failed to write config: %v", err)
+	}
 
 	cmd := exec.Command(binary, "validate", "--config", configPath)
 	output, err := cmd.CombinedOutput()
@@ -724,7 +730,9 @@ func TestCLI_InvalidPlanJSON(t *testing.T) {
 
 	// Write invalid JSON
 	invalidPlanPath := filepath.Join(tmpDir, "invalid.json")
-	os.WriteFile(invalidPlanPath, []byte("this is not json"), 0644)
+	if err := os.WriteFile(invalidPlanPath, []byte("this is not json"), 0644); err != nil {
+		t.Fatalf("failed to write invalid plan: %v", err)
+	}
 
 	cmd := exec.Command(binary, "--plan", invalidPlanPath, "--config", configPath)
 	output, err := cmd.CombinedOutput()

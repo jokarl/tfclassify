@@ -225,7 +225,7 @@ func WarnRedundantNotResource(cfg *Config, w io.Writer) {
 		for ruleIdx, rule := range classification.Rules {
 			// Check if this not_resource list is fully covered by higher-precedence patterns
 			if len(rule.NotResource) > 0 && allPatternsKnown(rule.NotResource, higherPatterns) {
-				fmt.Fprintf(w, "Warning: classification %q rule %d uses not_resource with patterns "+
+				_, _ = fmt.Fprintf(w, "Warning: classification %q rule %d uses not_resource with patterns "+
 					"already covered by higher-precedence rules. Consider using resource = [\"*\"] instead.\n",
 					classificationName, ruleIdx+1)
 			}

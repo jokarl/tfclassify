@@ -105,7 +105,8 @@ func init() {
 	rootCmd.Flags().BoolVarP(&detailedExitCode, "detailed-exitcode", "d", false, "Use classification-based exit codes (0=auto, 1+=higher precedence)")
 	rootCmd.Flags().StringVar(&evidenceFile, "evidence-file", "", "Write evidence artifact to file")
 
-	rootCmd.MarkFlagRequired("plan")
+	// MarkFlagRequired only errors if flag doesn't exist; safe to ignore for known flags
+	_ = rootCmd.MarkFlagRequired("plan")
 
 	// Init command flags
 	initCmd.Flags().StringVarP(&configPath, "config", "c", "", "Path to configuration file")
@@ -118,7 +119,7 @@ func init() {
 	explainCmd.Flags().StringVarP(&configPath, "config", "c", "", "Path to configuration file")
 	explainCmd.Flags().StringVarP(&outputFmt, "output", "o", "text", "Output format: json, text")
 	explainCmd.Flags().StringArrayVarP(&resourceFilters, "resource", "r", nil, "Resource address to explain (repeatable)")
-	explainCmd.MarkFlagRequired("plan")
+	_ = explainCmd.MarkFlagRequired("plan")
 
 	// Add subcommands
 	rootCmd.AddCommand(initCmd)

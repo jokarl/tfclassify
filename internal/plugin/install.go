@@ -77,12 +77,12 @@ func InstallPlugins(cfg *config.Config, w io.Writer) error {
 
 	for _, p := range cfg.Plugins {
 		if p.Source == "" {
-			fmt.Fprintf(w, "  %s: builtin (skip)\n", p.Name)
+			_, _ = fmt.Fprintf(w, "  %s: builtin (skip)\n", p.Name)
 			continue
 		}
 
 		if !p.Enabled {
-			fmt.Fprintf(w, "  %s: disabled (skip)\n", p.Name)
+			_, _ = fmt.Fprintf(w, "  %s: disabled (skip)\n", p.Name)
 			continue
 		}
 
@@ -90,15 +90,15 @@ func InstallPlugins(cfg *config.Config, w io.Writer) error {
 		binaryPath := filepath.Join(pluginDir, binaryName)
 
 		if isInstalledAtVersion(binaryPath, p.Name, p.Version, manifest) {
-			fmt.Fprintf(w, "  %s: already installed (v%s)\n", p.Name, p.Version)
+			_, _ = fmt.Fprintf(w, "  %s: already installed (v%s)\n", p.Name, p.Version)
 			continue
 		}
 
 		// Check if a different version is installed
 		if installedVersion, exists := manifest.Plugins[p.Name]; exists {
-			fmt.Fprintf(w, "  %s: upgrading from v%s to v%s...\n", p.Name, installedVersion, p.Version)
+			_, _ = fmt.Fprintf(w, "  %s: upgrading from v%s to v%s...\n", p.Name, installedVersion, p.Version)
 		} else {
-			fmt.Fprintf(w, "  %s: installing v%s from %s...\n", p.Name, p.Version, p.Source)
+			_, _ = fmt.Fprintf(w, "  %s: installing v%s from %s...\n", p.Name, p.Version, p.Source)
 		}
 
 		if err := downloadAndInstall(p.Name, p.Source, p.Version, pluginDir); err != nil {
@@ -108,7 +108,7 @@ func InstallPlugins(cfg *config.Config, w io.Writer) error {
 		// Update manifest with new version
 		manifest.Plugins[p.Name] = p.Version
 		manifestChanged = true
-		fmt.Fprintf(w, "  %s: installed\n", p.Name)
+		_, _ = fmt.Fprintf(w, "  %s: installed\n", p.Name)
 	}
 
 	// Save manifest if changed
@@ -185,7 +185,7 @@ func fetchRelease(owner, repo, tag string) (*githubRelease, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to query GitHub Releases API: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, fmt.Errorf("release %q not found in %s/%s", tag, owner, repo)
@@ -247,7 +247,7 @@ func downloadAndInstall(name, source, version, pluginDir string) error {
 	if err != nil {
 		return fmt.Errorf("failed to download plugin: %w", err)
 	}
-	defer os.Remove(tempFile)
+	defer func() { _ = os.Remove(tempFile) }()
 
 	binaryName := PluginBinaryPrefix + name
 	if err := extractBinaryFromZip(tempFile, binaryName, pluginDir); err != nil {
@@ -295,7 +295,7 @@ func downloadFile(url string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		// Read a limited amount of the response body for error context
@@ -313,10 +313,10 @@ func downloadFile(url string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer tempFile.Close()
+	defer func() { _ = tempFile.Close() }()
 
 	if _, err := io.Copy(tempFile, resp.Body); err != nil {
-		os.Remove(tempFile.Name())
+		_ = os.Remove(tempFile.Name())
 		return "", err
 	}
 
@@ -329,7 +329,7 @@ func extractBinaryFromZip(zipPath, binaryName, destDir string) error {
 	if err != nil {
 		return err
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	for _, file := range reader.File {
 		// Look for the plugin binary (may be at root or in a subdirectory)
@@ -339,14 +339,14 @@ func extractBinaryFromZip(zipPath, binaryName, destDir string) error {
 			if err != nil {
 				return err
 			}
-			defer rc.Close()
+			defer func() { _ = rc.Close() }()
 
 			destPath := filepath.Join(destDir, fileName)
 			dest, err := os.OpenFile(destPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
 			if err != nil {
 				return err
 			}
-			defer dest.Close()
+			defer func() { _ = dest.Close() }()
 
 			if _, err := io.Copy(dest, rc); err != nil {
 				return err

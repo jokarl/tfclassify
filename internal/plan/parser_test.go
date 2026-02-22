@@ -233,7 +233,7 @@ func TestParse_FromReader(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to open test file: %v", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	result, err := Parse(f)
 	if err != nil {
