@@ -263,6 +263,23 @@ run_scenario() {
       fi
     fi
 
+    # Classify create (SARIF)
+    echo "--- Classify create (SARIF) ---"
+    set +e
+    "$TFCLASSIFY_BIN" \
+      -p "$scenario_dir/create.json" \
+      -c "$scenario_dir/.tfclassify.hcl" \
+      -o sarif --detailed-exitcode > /dev/null 2>&1
+    local actual_create_sarif=$?
+    set -e
+
+    if [[ "$actual_create_sarif" != "$expected_create" ]]; then
+      echo "FAIL: create (SARIF) expected exit $expected_create, got $actual_create_sarif"
+      failed=true
+    else
+      echo "PASS: create (SARIF) exit code $actual_create_sarif"
+    fi
+
     # Classify create (binary plan)
     evidence_flag=""
     if [[ "$use_evidence" == true ]]; then
@@ -355,6 +372,23 @@ run_scenario() {
         echo "PASS: destroy (JSON) exit code $actual_destroy"
       fi
 
+      # Classify destroy (SARIF)
+      echo "--- Classify destroy (SARIF) ---"
+      set +e
+      "$TFCLASSIFY_BIN" \
+        -p "$scenario_dir/destroy.json" \
+        -c "$scenario_dir/.tfclassify.hcl" \
+        -o sarif --detailed-exitcode > /dev/null 2>&1
+      local actual_destroy_sarif=$?
+      set -e
+
+      if [[ "$actual_destroy_sarif" != "$expected_destroy" ]]; then
+        echo "FAIL: destroy (SARIF) expected exit $expected_destroy, got $actual_destroy_sarif"
+        failed=true
+      else
+        echo "PASS: destroy (SARIF) exit code $actual_destroy_sarif"
+      fi
+
       # Classify destroy (binary plan)
       evidence_flag=""
       if [[ "$use_evidence" == true ]]; then
@@ -422,12 +456,12 @@ run_scenario() {
 
 # --- Launch all scenarios in parallel ---
 PIDS=()
-declare -A PID_SCENARIO
+PID_SCENARIOS=()
 for scenario in "${SCENARIOS[@]}"; do
   run_scenario "$scenario" &
   pid=$!
   PIDS+=($pid)
-  PID_SCENARIO[$pid]="$scenario"
+  PID_SCENARIOS+=("$pid:$scenario")
   echo -e "  ${CYAN}Started${NC}  $scenario (pid $pid)"
 done
 
@@ -436,8 +470,9 @@ echo -e "${BOLD}Waiting for ${#PIDS[@]} scenario(s)...${NC}"
 echo ""
 
 # Wait and report as each finishes
-for pid in "${PIDS[@]}"; do
-  scenario="${PID_SCENARIO[$pid]}"
+for entry in "${PID_SCENARIOS[@]}"; do
+  pid="${entry%%:*}"
+  scenario="${entry#*:}"
   if wait "$pid" 2>/dev/null; then
     : # process exited (status in file)
   fi
