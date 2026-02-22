@@ -4,6 +4,7 @@ package plan
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -37,7 +38,7 @@ func ParseFile(path string) (*ParseResult, error) {
 	// Read first few bytes to detect format
 	header := make([]byte, 4)
 	n, err := f.Read(header)
-	if err != nil && err != io.EOF {
+	if err != nil && !errors.Is(err, io.EOF) {
 		return nil, fmt.Errorf("failed to read plan header: %w", err)
 	}
 
@@ -78,7 +79,7 @@ func parseBinaryPlan(path string) (*ParseResult, error) {
 	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("failed to convert binary plan: %s (stderr: %s)", err, stderr.String())
+		return nil, fmt.Errorf("failed to convert binary plan: %w (stderr: %s)", err, stderr.String())
 	}
 
 	return Parse(bytes.NewReader(stdout.Bytes()))

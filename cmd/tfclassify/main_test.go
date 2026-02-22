@@ -477,7 +477,11 @@ func TestCLI_DetailedExitCodeFlag(t *testing.T) {
 		t.Errorf("expected overall 'critical', got %v", result["overall"])
 	}
 	// The exit_code in JSON should always contain the precedence-derived code
-	if int(result["exit_code"].(float64)) != 2 {
+	exitCode, ok := result["exit_code"].(float64)
+	if !ok {
+		t.Fatalf("expected exit_code to be a number, got %T", result["exit_code"])
+	}
+	if int(exitCode) != 2 {
 		t.Errorf("expected exit_code 2 in JSON, got %v", result["exit_code"])
 	}
 }
@@ -809,7 +813,10 @@ func TestCLI_ExplainCmd_JSONOutput(t *testing.T) {
 	}
 
 	// Check first resource has required fields
-	res := resources[0].(map[string]any)
+	res, ok := resources[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected resource to be a map, got %T", resources[0])
+	}
 	if res["address"] == nil {
 		t.Error("expected address field")
 	}

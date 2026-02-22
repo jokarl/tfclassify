@@ -1,0 +1,27 @@
+version: "2"
+
+run:
+  go: "1.25"
+
+linters:
+  default: standard
+  enable:
+    - errorlint
+    - misspell
+    - unconvert
+
+  settings:
+    errcheck:
+      check-type-assertions: true
+
+  exclusions:
+    rules:
+      # Test files: ignore error wrapping lint — not worth the churn
+      - path: _test\.go
+        linters:
+          - errorlint
+
+issues:
+  # Report ALL issues. Never silently cap output.
+  max-issues-per-linter: 0
+  max-same-issues: 0

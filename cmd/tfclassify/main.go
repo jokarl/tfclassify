@@ -2,12 +2,12 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
-
-	"time"
 
 	"github.com/jokarl/tfclassify/internal/classify"
 	"github.com/jokarl/tfclassify/internal/config"
@@ -168,7 +168,8 @@ func run(cmd *cobra.Command, args []string) error {
 		defer host.Shutdown()
 
 		if err := host.DiscoverAndStart(selfPath); err != nil {
-			if missingErr, ok := err.(*plugin.PluginNotInstalledError); ok {
+			var missingErr *plugin.PluginNotInstalledError
+			if errors.As(err, &missingErr) {
 				return fmt.Errorf("plugin %q is enabled but not installed.\nRun \"tfclassify init\" to install plugins declared in your configuration", missingErr.PluginName)
 			}
 			if verbose {
@@ -324,7 +325,8 @@ func runExplain(cmd *cobra.Command, args []string) error {
 		defer host.Shutdown()
 
 		if err := host.DiscoverAndStart(selfPath); err != nil {
-			if _, ok := err.(*plugin.PluginNotInstalledError); ok {
+			var missingErr *plugin.PluginNotInstalledError
+			if errors.As(err, &missingErr) {
 				fmt.Fprintf(os.Stderr, "Warning: %v\nPlugin decisions will not appear in trace.\n", err)
 			} else {
 				fmt.Fprintf(os.Stderr, "Warning: plugin discovery failed: %v\n", err)
