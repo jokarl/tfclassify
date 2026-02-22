@@ -3,9 +3,6 @@ name: Verify
 on:
   schedule:
     - cron: '0 2 * * *'
-  workflow_run:
-    workflows: [Release]
-    types: [completed]
   workflow_dispatch:
 
 concurrency:
@@ -26,7 +23,6 @@ env:
 
 jobs:
   cleanup:
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Azure login

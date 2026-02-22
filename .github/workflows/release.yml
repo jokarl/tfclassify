@@ -147,3 +147,13 @@ jobs:
             plugins/azurerm/dist/tfclassify-plugin-azurerm_*.zip \
             plugins/azurerm/dist/tfclassify-plugin-azurerm_*_checksums.txt \
             --clobber
+
+  trigger-verify:
+    needs: [goreleaser-cli, goreleaser-plugin]
+    if: always() && (needs.goreleaser-cli.result == 'success' || needs.goreleaser-plugin.result == 'success')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger verify workflow
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run verify.yml --repo "${{ github.repository }}"
