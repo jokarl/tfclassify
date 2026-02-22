@@ -41,7 +41,7 @@ func DiscoverPlugins(cfg *config.Config, selfPath string) (map[string]*Discovere
 			continue
 		}
 
-		discovered, err := discoverPlugin(pluginCfg, cfg, selfPath)
+		discovered, err := discoverPlugin(pluginCfg)
 		if err != nil {
 			return nil, err
 		}
@@ -53,7 +53,7 @@ func DiscoverPlugins(cfg *config.Config, selfPath string) (map[string]*Discovere
 }
 
 // discoverPlugin finds the binary for a single plugin.
-func discoverPlugin(pluginCfg *config.PluginConfig, cfg *config.Config, selfPath string) (*DiscoveredPlugin, error) {
+func discoverPlugin(pluginCfg *config.PluginConfig) (*DiscoveredPlugin, error) {
 	// Search for external plugin binary
 	binaryName := PluginBinaryPrefix + pluginCfg.Name
 	paths := searchPaths()

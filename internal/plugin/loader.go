@@ -52,18 +52,14 @@ func (h *Host) DiscoverAndStart(selfPath string) error {
 	h.plugins = discovered
 
 	for name, plugin := range h.plugins {
-		if err := h.startPlugin(name, plugin); err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: plugin %q failed to start, skipping: %v\n", name, err)
-			delete(h.plugins, name)
-			continue
-		}
+		h.startPlugin(name, plugin)
 	}
 
 	return nil
 }
 
 // startPlugin starts a single plugin process.
-func (h *Host) startPlugin(name string, plugin *DiscoveredPlugin) error {
+func (h *Host) startPlugin(name string, plugin *DiscoveredPlugin) {
 	cmd := exec.Command(plugin.Path)
 
 	client := goplugin.NewClient(&goplugin.ClientConfig{
@@ -78,7 +74,6 @@ func (h *Host) startPlugin(name string, plugin *DiscoveredPlugin) error {
 	h.mu.Lock()
 	h.clients[name] = client
 	h.mu.Unlock()
-	return nil
 }
 
 // RunAnalysis runs all plugins against the plan changes.
@@ -117,14 +112,14 @@ func (h *Host) RunAnalysis(changes []plan.ResourceChange) ([]classify.ResourceDe
 	}
 
 	// Run each plugin
-	for name, plugin := range h.plugins {
+	for name := range h.plugins {
 		// Get classification-scoped configs for this plugin
 		configs := classificationConfigs[name]
 
 		// If no classification-scoped configs, run with empty classification
 		if len(configs) == 0 {
 			ctx, cancel := context.WithTimeout(context.Background(), timeout)
-			err := h.runPluginAnalysis(ctx, name, plugin, "", nil)
+			err := h.runPluginAnalysis(ctx, name, "", nil)
 			cancel()
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Warning: plugin %q failed: %v\n", name, err)
@@ -135,7 +130,7 @@ func (h *Host) RunAnalysis(changes []plan.ResourceChange) ([]classify.ResourceDe
 		// Run analysis for each classification that has config for this plugin
 		for _, cfg := range configs {
 			ctx, cancel := context.WithTimeout(context.Background(), timeout)
-			err := h.runPluginAnalysis(ctx, name, plugin, cfg.classificationName, cfg.analyzerConfig)
+			err := h.runPluginAnalysis(ctx, name, cfg.classificationName, cfg.analyzerConfig)
 			cancel()
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Warning: plugin %q failed for classification %q: %v\n",
@@ -156,7 +151,7 @@ type classificationAnalysisRequest struct {
 
 // runPluginAnalysis runs a single plugin's analysis using gRPC.
 // If classification is non-empty, it's passed to the plugin for classification-scoped analysis.
-func (h *Host) runPluginAnalysis(ctx context.Context, name string, plugin *DiscoveredPlugin, classification string, analyzerConfig []byte) error {
+func (h *Host) runPluginAnalysis(ctx context.Context, name string, classification string, analyzerConfig []byte) error {
 	client, ok := h.clients[name]
 	if !ok {
 		return fmt.Errorf("plugin client not found: %s", name)
