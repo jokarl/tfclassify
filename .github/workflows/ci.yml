@@ -147,3 +147,4 @@ jobs:
       plan-formats: both
       plan-only: ${{ matrix.plan-only || false }}
       evidence: ${{ matrix.evidence || false }}
+    secrets: inherit

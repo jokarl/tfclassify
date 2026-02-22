@@ -90,3 +90,4 @@ jobs:
       plan-only: ${{ matrix.plan-only || false }}
       evidence: ${{ matrix.evidence || false }}
       open-issue-on-failure: true
+    secrets: inherit
