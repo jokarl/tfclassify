@@ -112,12 +112,8 @@ func TestParse_SensitiveValues(t *testing.T) {
 	}
 
 	// Check that sensitive markers are preserved
-	beforeSens, ok := rc.BeforeSensitive.(map[string]interface{})
-	if !ok {
-		t.Fatalf("expected BeforeSensitive to be map, got %T", rc.BeforeSensitive)
-	}
-	if beforeSens["value"] != true {
-		t.Errorf("expected BeforeSensitive[value] to be true, got %v", beforeSens["value"])
+	if rc.BeforeSensitive["value"] != true {
+		t.Errorf("expected BeforeSensitive[value] to be true, got %v", rc.BeforeSensitive["value"])
 	}
 }
 

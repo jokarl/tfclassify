@@ -80,9 +80,21 @@ jobs:
         run: git tag "v${{ needs.resolve.outputs.cli_version || needs.release-please.outputs.cli_version }}"
       - uses: goreleaser/goreleaser-action@v6
         with:
-          args: release --clean ${{ github.event_name == 'workflow_dispatch' && '--skip=validate' || '' }}
+          args: release --clean
         env:
           GORELEASER_CURRENT_TAG: v${{ needs.resolve.outputs.cli_version || needs.release-please.outputs.cli_version }}
+      - name: Verify dist artifacts exist
+        run: |
+          if ! ls dist/tfclassify_*.zip 1>/dev/null 2>&1; then
+            echo "::error::No tfclassify zip artifacts found in dist/"
+            exit 1
+          fi
+          if ! ls dist/tfclassify_*_checksums.txt 1>/dev/null 2>&1; then
+            echo "::error::No checksums file found in dist/"
+            exit 1
+          fi
+          echo "Artifacts found:"
+          ls -la dist/tfclassify_*.zip dist/tfclassify_*_checksums.txt
       - name: Upload artifacts to GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -112,9 +124,21 @@ jobs:
       - uses: goreleaser/goreleaser-action@v6
         with:
           workdir: plugins/azurerm
-          args: release --clean ${{ github.event_name == 'workflow_dispatch' && '--skip=validate' || '' }}
+          args: release --clean
         env:
           GORELEASER_CURRENT_TAG: v${{ needs.resolve.outputs.plugin_version || needs.release-please.outputs.plugin_version }}
+      - name: Verify dist artifacts exist
+        run: |
+          if ! ls plugins/azurerm/dist/tfclassify-plugin-azurerm_*.zip 1>/dev/null 2>&1; then
+            echo "::error::No plugin zip artifacts found in plugins/azurerm/dist/"
+            exit 1
+          fi
+          if ! ls plugins/azurerm/dist/tfclassify-plugin-azurerm_*_checksums.txt 1>/dev/null 2>&1; then
+            echo "::error::No plugin checksums file found in plugins/azurerm/dist/"
+            exit 1
+          fi
+          echo "Artifacts found:"
+          ls -la plugins/azurerm/dist/tfclassify-plugin-azurerm_*.zip plugins/azurerm/dist/tfclassify-plugin-azurerm_*_checksums.txt
       - name: Upload artifacts to GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -57,6 +57,66 @@ func TestAddPluginDecisions_UnknownResource(t *testing.T) {
 	}
 }
 
+func TestAddPluginDecisions_GhostResourceAdded(t *testing.T) {
+	// Test that plugin decisions for ghost resources (not in plan) are added
+	// with a warning when the classification is valid.
+	cfg := &config.Config{
+		Classifications: []config.ClassificationConfig{
+			{
+				Name:        "critical",
+				Description: "Critical",
+				Rules:       []config.RuleConfig{{Resource: []string{"*_role_*"}}},
+			},
+			{
+				Name:        "standard",
+				Description: "Standard",
+				Rules:       []config.RuleConfig{{Resource: []string{"*"}}},
+			},
+		},
+		Precedence: []string{"critical", "standard"},
+		Defaults:   &config.DefaultsConfig{Unclassified: "standard", NoChanges: "standard"},
+	}
+
+	classifier, err := New(cfg)
+	if err != nil {
+		t.Fatalf("New failed: %v", err)
+	}
+
+	changes := []plan.ResourceChange{
+		{Address: "aws_instance.web", Type: "aws_instance", Actions: []string{"create"}},
+	}
+
+	result := classifier.Classify(changes)
+
+	// Plugin decision for a resource NOT in the plan but with valid classification
+	pluginDecisions := []ResourceDecision{
+		{
+			Address:        "aws_s3_bucket.ghost",
+			ResourceType:   "aws_s3_bucket",
+			Actions:        []string{"create"},
+			Classification: "critical",
+			MatchedRules:   []string{"plugin: ghost resource"},
+		},
+	}
+
+	classifier.AddPluginDecisions(result, pluginDecisions)
+
+	// Ghost resource should be added because classification is valid
+	if len(result.ResourceDecisions) != 2 {
+		t.Errorf("expected 2 decisions (original + ghost), got %d", len(result.ResourceDecisions))
+	}
+
+	found := false
+	for _, d := range result.ResourceDecisions {
+		if d.Address == "aws_s3_bucket.ghost" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected ghost resource to be added when classification is valid")
+	}
+}
+
 func TestAddPluginDecisions_LowerPrecedenceIgnored(t *testing.T) {
 	// Test that a plugin cannot downgrade a classification to lower precedence.
 	cfg := &config.Config{

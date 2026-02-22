@@ -35,6 +35,7 @@ Classify Terraform plan changes based on organization-defined rules. tfclassify 
 - [Project Structure](#project-structure)
 - [Development](#development)
 - [Architecture Decisions](#architecture-decisions)
+- [Known Limitations](#known-limitations)
 
 ## How It Works
 
@@ -764,3 +765,11 @@ protoc --go_out=. --go-grpc_out=. proto/tfclassify.proto
 | [ADR-0004](docs/adr/ADR-0004-hcl-configuration-format.md) | HCL configuration format |
 | [ADR-0005](docs/adr/ADR-0005-plugin-sdk-versioning-and-protocol-compatibility.md) | Plugin SDK versioning and protocol compatibility |
 | [ADR-0006](docs/adr/ADR-0006-permission-based-privilege-escalation-detection.md) | Permission-based privilege escalation detection |
+
+## Known Limitations
+
+- **Sensitive attribute detection is top-level only.** The builtin `sensitive` analyzer detects changes to Terraform-marked sensitive attributes at the top level of a resource. Sensitive values nested inside objects or lists are not detected.
+
+- **Blast radius thresholds count all resources including no-ops.** The `max_changes` threshold in `blast_radius` applies to every resource with a non-no-op action. There is no way to scope thresholds to specific resource types or exclude certain actions from the count.
+
+- **Plugin analyzer errors are silently skipped.** If an external plugin analyzer returns an error during analysis, the error is logged but does not fail the classification run. This means plugin failures may produce incomplete results without an obvious indication in the output. Check verbose (`-v`) output or the explain command if you suspect a plugin is not producing expected decisions.

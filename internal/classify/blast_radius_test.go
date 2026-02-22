@@ -240,6 +240,46 @@ func TestBlastRadius_EmitsForAllResources(t *testing.T) {
 	}
 }
 
+func TestBlastRadius_NoOpExcludedFromDecisions(t *testing.T) {
+	a := NewBlastRadiusAnalyzer([]config.ClassificationConfig{
+		{Name: "critical", BlastRadius: &config.BlastRadiusConfig{MaxChanges: intPtr(2)}},
+	})
+
+	changes := []plan.ResourceChange{
+		{Address: "vm.one", Type: "azurerm_virtual_machine", Actions: []string{"create"}},
+		{Address: "vm.two", Type: "azurerm_virtual_machine", Actions: []string{"update"}},
+		{Address: "vm.three", Type: "azurerm_virtual_machine", Actions: []string{"delete"}},
+		{Address: "noop.one", Type: "azurerm_resource_group", Actions: []string{"no-op"}},
+		{Address: "noop.two", Type: "azurerm_resource_group", Actions: []string{"no-op"}},
+		{Address: "noop.three", Type: "azurerm_resource_group", Actions: []string{"no-op"}},
+	}
+
+	decisions := a.Analyze(changes)
+	// 3 changed resources exceed max_changes=2, but the 3 no-op resources
+	// should NOT receive blast radius decisions.
+	if len(decisions) != 3 {
+		t.Fatalf("expected 3 decisions (excluding no-ops), got %d", len(decisions))
+	}
+
+	addresses := make(map[string]bool)
+	for _, d := range decisions {
+		addresses[d.Address] = true
+		if d.Classification != "critical" {
+			t.Errorf("expected classification 'critical', got %q", d.Classification)
+		}
+	}
+	for _, addr := range []string{"vm.one", "vm.two", "vm.three"} {
+		if !addresses[addr] {
+			t.Errorf("expected decision for %s", addr)
+		}
+	}
+	for _, addr := range []string{"noop.one", "noop.two", "noop.three"} {
+		if addresses[addr] {
+			t.Errorf("no-op resource %s should NOT have a decision", addr)
+		}
+	}
+}
+
 func TestBlastRadius_NoChanges(t *testing.T) {
 	a := NewBlastRadiusAnalyzer([]config.ClassificationConfig{
 		{Name: "critical", BlastRadius: &config.BlastRadiusConfig{MaxChanges: intPtr(1)}},

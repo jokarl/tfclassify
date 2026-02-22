@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	goplugin "github.com/hashicorp/go-plugin"
 	"github.com/jokarl/tfclassify/sdk"
@@ -93,6 +94,7 @@ func (s *PluginServiceServer) Analyze(ctx context.Context, req *pb.AnalyzeReques
 	classification := req.Classification
 	analyzerConfig := req.AnalyzerConfig
 
+	var analyzerErrors []string
 	for _, analyzer := range provider.GetAnalyzers() {
 		if !analyzer.Enabled() {
 			continue
@@ -102,7 +104,7 @@ func (s *PluginServiceServer) Analyze(ctx context.Context, req *pb.AnalyzeReques
 		if classification != "" {
 			if classificationAware, ok := analyzer.(sdk.ClassificationAwareAnalyzer); ok {
 				if err := classificationAware.AnalyzeWithClassification(runner, classification, analyzerConfig); err != nil {
-					continue
+					analyzerErrors = append(analyzerErrors, fmt.Sprintf("analyzer %s: %v", analyzer.Name(), err))
 				}
 				continue
 			}
@@ -110,8 +112,12 @@ func (s *PluginServiceServer) Analyze(ctx context.Context, req *pb.AnalyzeReques
 
 		// Standard analysis (no classification context)
 		if err := analyzer.Analyze(runner); err != nil {
-			continue
+			analyzerErrors = append(analyzerErrors, fmt.Sprintf("analyzer %s: %v", analyzer.Name(), err))
 		}
+	}
+
+	if len(analyzerErrors) > 0 {
+		return nil, fmt.Errorf("analyzer errors: %s", strings.Join(analyzerErrors, "; "))
 	}
 
 	return &pb.AnalyzeResponse{}, nil
@@ -161,7 +167,11 @@ func (r *RunnerClient) GetResourceChanges(patterns []string) ([]*sdk.ResourceCha
 
 	changes := make([]*sdk.ResourceChange, len(resp.Changes))
 	for i, c := range resp.Changes {
-		changes[i] = ProtoToSDKResourceChange(c)
+		change, err := ProtoToSDKResourceChange(c)
+		if err != nil {
+			return nil, fmt.Errorf("converting resource change %d: %w", i, err)
+		}
+		changes[i] = change
 	}
 	return changes, nil
 }
@@ -176,18 +186,27 @@ func (r *RunnerClient) GetResourceChange(address string) (*sdk.ResourceChange, e
 	if resp.Change == nil {
 		return nil, fmt.Errorf("resource not found: %s", address)
 	}
-	return ProtoToSDKResourceChange(resp.Change), nil
+	return ProtoToSDKResourceChange(resp.Change)
 }
 
 // EmitDecision records a classification decision for a resource.
 func (r *RunnerClient) EmitDecision(analyzer sdk.Analyzer, change *sdk.ResourceChange, decision *sdk.Decision) error {
-	req := &pb.EmitDecisionRequest{
-		AnalyzerName: analyzer.Name(),
-		Change:       SDKToProtoResourceChange(change),
-		Decision:     SDKToProtoDecision(decision),
+	protoChange, err := SDKToProtoResourceChange(change)
+	if err != nil {
+		return fmt.Errorf("EmitDecision: %w", err)
+	}
+	protoDecision, err := SDKToProtoDecision(decision)
+	if err != nil {
+		return fmt.Errorf("EmitDecision: %w", err)
 	}
 
-	_, err := r.client.EmitDecision(context.Background(), req)
+	req := &pb.EmitDecisionRequest{
+		AnalyzerName: analyzer.Name(),
+		Change:       protoChange,
+		Decision:     protoDecision,
+	}
+
+	_, err = r.client.EmitDecision(context.Background(), req)
 	if err != nil {
 		return fmt.Errorf("EmitDecision RPC failed: %w", err)
 	}
@@ -197,25 +216,33 @@ func (r *RunnerClient) EmitDecision(analyzer sdk.Analyzer, change *sdk.ResourceC
 // Conversion functions between SDK types and protobuf types.
 
 // ProtoToSDKResourceChange converts a protobuf ResourceChange to an SDK ResourceChange.
-func ProtoToSDKResourceChange(p *pb.ResourceChange) *sdk.ResourceChange {
+func ProtoToSDKResourceChange(p *pb.ResourceChange) (*sdk.ResourceChange, error) {
 	if p == nil {
-		return nil
+		return nil, nil
 	}
 
 	var before, after map[string]interface{}
-	var beforeSensitive, afterSensitive interface{}
+	var beforeSensitive, afterSensitive map[string]interface{}
 
 	if len(p.Before) > 0 {
-		json.Unmarshal(p.Before, &before)
+		if err := json.Unmarshal(p.Before, &before); err != nil {
+			return nil, fmt.Errorf("unmarshal Before for %s: %w", p.Address, err)
+		}
 	}
 	if len(p.After) > 0 {
-		json.Unmarshal(p.After, &after)
+		if err := json.Unmarshal(p.After, &after); err != nil {
+			return nil, fmt.Errorf("unmarshal After for %s: %w", p.Address, err)
+		}
 	}
 	if len(p.BeforeSensitive) > 0 {
-		json.Unmarshal(p.BeforeSensitive, &beforeSensitive)
+		if err := json.Unmarshal(p.BeforeSensitive, &beforeSensitive); err != nil {
+			return nil, fmt.Errorf("unmarshal BeforeSensitive for %s: %w", p.Address, err)
+		}
 	}
 	if len(p.AfterSensitive) > 0 {
-		json.Unmarshal(p.AfterSensitive, &afterSensitive)
+		if err := json.Unmarshal(p.AfterSensitive, &afterSensitive); err != nil {
+			return nil, fmt.Errorf("unmarshal AfterSensitive for %s: %w", p.Address, err)
+		}
 	}
 
 	return &sdk.ResourceChange{
@@ -228,28 +255,41 @@ func ProtoToSDKResourceChange(p *pb.ResourceChange) *sdk.ResourceChange {
 		After:           after,
 		BeforeSensitive: beforeSensitive,
 		AfterSensitive:  afterSensitive,
-	}
+	}, nil
 }
 
 // SDKToProtoResourceChange converts an SDK ResourceChange to a protobuf ResourceChange.
-func SDKToProtoResourceChange(s *sdk.ResourceChange) *pb.ResourceChange {
+func SDKToProtoResourceChange(s *sdk.ResourceChange) (*pb.ResourceChange, error) {
 	if s == nil {
-		return nil
+		return nil, nil
 	}
 
 	var before, after, beforeSensitive, afterSensitive []byte
+	var err error
 
 	if s.Before != nil {
-		before, _ = json.Marshal(s.Before)
+		before, err = json.Marshal(s.Before)
+		if err != nil {
+			return nil, fmt.Errorf("marshal Before for %s: %w", s.Address, err)
+		}
 	}
 	if s.After != nil {
-		after, _ = json.Marshal(s.After)
+		after, err = json.Marshal(s.After)
+		if err != nil {
+			return nil, fmt.Errorf("marshal After for %s: %w", s.Address, err)
+		}
 	}
 	if s.BeforeSensitive != nil {
-		beforeSensitive, _ = json.Marshal(s.BeforeSensitive)
+		beforeSensitive, err = json.Marshal(s.BeforeSensitive)
+		if err != nil {
+			return nil, fmt.Errorf("marshal BeforeSensitive for %s: %w", s.Address, err)
+		}
 	}
 	if s.AfterSensitive != nil {
-		afterSensitive, _ = json.Marshal(s.AfterSensitive)
+		afterSensitive, err = json.Marshal(s.AfterSensitive)
+		if err != nil {
+			return nil, fmt.Errorf("marshal AfterSensitive for %s: %w", s.Address, err)
+		}
 	}
 
 	return &pb.ResourceChange{
@@ -262,18 +302,22 @@ func SDKToProtoResourceChange(s *sdk.ResourceChange) *pb.ResourceChange {
 		After:           after,
 		BeforeSensitive: beforeSensitive,
 		AfterSensitive:  afterSensitive,
-	}
+	}, nil
 }
 
 // SDKToProtoDecision converts an SDK Decision to a protobuf Decision.
-func SDKToProtoDecision(s *sdk.Decision) *pb.Decision {
+func SDKToProtoDecision(s *sdk.Decision) (*pb.Decision, error) {
 	if s == nil {
-		return nil
+		return nil, nil
 	}
 
 	var metadata []byte
 	if s.Metadata != nil {
-		metadata, _ = json.Marshal(s.Metadata)
+		var err error
+		metadata, err = json.Marshal(s.Metadata)
+		if err != nil {
+			return nil, fmt.Errorf("marshal Decision metadata: %w", err)
+		}
 	}
 
 	return &pb.Decision{
@@ -281,18 +325,20 @@ func SDKToProtoDecision(s *sdk.Decision) *pb.Decision {
 		Reason:         s.Reason,
 		Severity:       int32(s.Severity),
 		Metadata:       metadata,
-	}
+	}, nil
 }
 
 // ProtoToSDKDecision converts a protobuf Decision to an SDK Decision.
-func ProtoToSDKDecision(p *pb.Decision) *sdk.Decision {
+func ProtoToSDKDecision(p *pb.Decision) (*sdk.Decision, error) {
 	if p == nil {
-		return nil
+		return nil, nil
 	}
 
 	var metadata map[string]interface{}
 	if len(p.Metadata) > 0 {
-		json.Unmarshal(p.Metadata, &metadata)
+		if err := json.Unmarshal(p.Metadata, &metadata); err != nil {
+			return nil, fmt.Errorf("unmarshal Decision metadata: %w", err)
+		}
 	}
 
 	return &sdk.Decision{
@@ -300,5 +346,5 @@ func ProtoToSDKDecision(p *pb.Decision) *sdk.Decision {
 		Reason:         p.Reason,
 		Severity:       int(p.Severity),
 		Metadata:       metadata,
-	}
+	}, nil
 }

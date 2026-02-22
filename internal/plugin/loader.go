@@ -53,7 +53,9 @@ func (h *Host) DiscoverAndStart(selfPath string) error {
 
 	for name, plugin := range h.plugins {
 		if err := h.startPlugin(name, plugin); err != nil {
-			return fmt.Errorf("failed to start plugin %q: %w", name, err)
+			fmt.Fprintf(os.Stderr, "Warning: plugin %q failed to start, skipping: %v\n", name, err)
+			delete(h.plugins, name)
+			continue
 		}
 	}
 

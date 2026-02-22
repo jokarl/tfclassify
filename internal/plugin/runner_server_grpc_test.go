@@ -52,20 +52,12 @@ func TestProtoConversions_SDKToProto_WithSensitiveFields(t *testing.T) {
 	if converted.BeforeSensitive == nil {
 		t.Fatal("expected BeforeSensitive to survive round-trip")
 	}
-	beforeSens, ok := converted.BeforeSensitive.(map[string]interface{})
-	if !ok {
-		t.Fatalf("expected map type, got %T", converted.BeforeSensitive)
-	}
-	if beforeSens["password"] != true {
-		t.Errorf("expected password to be true, got %v", beforeSens["password"])
+	if converted.BeforeSensitive["password"] != true {
+		t.Errorf("expected password to be true, got %v", converted.BeforeSensitive["password"])
 	}
 
-	afterSens, ok := converted.AfterSensitive.(map[string]interface{})
-	if !ok {
-		t.Fatalf("expected map type, got %T", converted.AfterSensitive)
-	}
-	if afterSens["api_key"] != true {
-		t.Errorf("expected api_key to be true, got %v", afterSens["api_key"])
+	if converted.AfterSensitive["api_key"] != true {
+		t.Errorf("expected api_key to be true, got %v", converted.AfterSensitive["api_key"])
 	}
 }
 
@@ -94,12 +86,8 @@ func TestProtoConversions_ProtoToSDK_WithAllSensitiveFields(t *testing.T) {
 		t.Fatal("AfterSensitive should not be nil")
 	}
 
-	afterSens, ok := converted.AfterSensitive.(map[string]interface{})
-	if !ok {
-		t.Fatalf("expected map type, got %T", converted.AfterSensitive)
-	}
-	if afterSens["token"] != true {
-		t.Errorf("expected token to be true, got %v", afterSens["token"])
+	if converted.AfterSensitive["token"] != true {
+		t.Errorf("expected token to be true, got %v", converted.AfterSensitive["token"])
 	}
 }
 

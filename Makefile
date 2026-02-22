@@ -1,4 +1,4 @@
-.PHONY: build build-all test vet lint clean generate-roles generate-actions generate-actions-offline
+.PHONY: build build-all test vet lint clean generate-roles generate-actions generate-actions-offline proto
 
 # Build the CLI binary
 build:
@@ -32,6 +32,10 @@ generate-actions:
 # Regenerate Azure action registry from role database only (no network access)
 generate-actions-offline:
 	go run tools/md2actions/main.go -from-roles plugins/azurerm/roledata/roles.json > plugins/azurerm/actiondata/actions.json
+
+# Regenerate protobuf Go code from proto/tfclassify.proto
+proto:
+	protoc --go_out=. --go_opt=module=github.com/jokarl/tfclassify --go-grpc_out=. --go-grpc_opt=module=github.com/jokarl/tfclassify proto/tfclassify.proto
 
 # Clean build artifacts
 clean:

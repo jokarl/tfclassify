@@ -181,8 +181,8 @@ func extractResourceChanges(plan *tfjson.Plan) []ResourceChange {
 			change.Actions = actionsToStrings(rc.Change.Actions)
 			change.Before = convertToMap(rc.Change.Before)
 			change.After = convertToMap(rc.Change.After)
-			change.BeforeSensitive = rc.Change.BeforeSensitive
-			change.AfterSensitive = rc.Change.AfterSensitive
+			change.BeforeSensitive = convertToMap(rc.Change.BeforeSensitive)
+			change.AfterSensitive = convertToMap(rc.Change.AfterSensitive)
 		}
 
 		changes = append(changes, change)

@@ -3,6 +3,7 @@ package classify
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/jokarl/tfclassify/internal/config"
 	"github.com/jokarl/tfclassify/internal/plan"
@@ -383,7 +384,8 @@ func (c *Classifier) AddPluginDecisions(result *Result, pluginDecisions []Resour
 
 		existing, ok := decisionMap[pluginDecision.Address]
 		if !ok {
-			// New resource from plugin (shouldn't happen in normal flow)
+			// Ghost resource: plugin emitted a decision for a resource not in the plan
+			fmt.Fprintf(os.Stderr, "Warning: plugin decision references unknown resource %q (not in plan)\n", pluginDecision.Address)
 			result.ResourceDecisions = append(result.ResourceDecisions, pluginDecision)
 			continue
 		}

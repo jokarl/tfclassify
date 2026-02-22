@@ -10,8 +10,8 @@ type ResourceChange struct {
 	Actions         []string
 	Before          map[string]interface{}
 	After           map[string]interface{}
-	BeforeSensitive interface{}
-	AfterSensitive  interface{}
+	BeforeSensitive map[string]interface{}
+	AfterSensitive  map[string]interface{}
 }
 
 // ParseResult contains the parsed plan data.
