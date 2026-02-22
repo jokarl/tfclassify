@@ -1,0 +1,93 @@
+name: Verify
+
+on:
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-azure
+  cancel-in-progress: true
+
+permissions:
+  id-token: write
+  contents: read
+  issues: write
+
+env:
+  ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+  ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+  ARM_USE_OIDC: "true"
+  RESOURCE_GROUP: rg-lab-johan.karlsson
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ env.ARM_CLIENT_ID }}
+          tenant-id: ${{ env.ARM_TENANT_ID }}
+          subscription-id: ${{ env.ARM_SUBSCRIPTION_ID }}
+
+      - name: Delete all resources in lab resource group
+        run: |
+          RG="${{ env.RESOURCE_GROUP }}"
+
+          # Delete resources with retry passes to handle dependency ordering.
+          # Role assignments are NOT deleted here — az role assignment list
+          # returns ALL assignments scoped to the RG, including the service
+          # principal's own access. Deleting those would lock us out.
+          # Orphaned role assignments (from deleted test identities) are harmless.
+          for pass in 1 2 3; do
+            RESOURCE_IDS=$(az resource list --resource-group "$RG" --query "[].id" -o tsv)
+            if [ -z "$RESOURCE_IDS" ]; then
+              echo "Resource group is clean."
+              break
+            fi
+            echo "Cleanup pass $pass..."
+            echo "$RESOURCE_IDS" | while read -r id; do
+              echo "  Deleting: $id"
+              az resource delete --ids "$id" 2>/dev/null || true
+            done
+            [ "$pass" -lt 3 ] && sleep 15
+          done
+
+  verify:
+    needs: cleanup
+    strategy:
+      fail-fast: false
+      matrix:
+        use-case:
+          - blast-radius
+          - cis-azure-foundations
+          - control-plane-patterns
+          - custom-role-cross-reference
+          - data-plane-detection
+          - evidence-signing
+          - keyvault-destructive
+          - modules-plugin
+          - modules-pluginless
+          - nsg-open-inbound
+          - role-assignment-privileged
+          - role-assignment-reader
+          - role-escalation-threshold
+          - role-exclusion
+          - route-table
+        include:
+          - use-case: custom-role-cross-reference
+            plan-only: true
+          - use-case: evidence-signing
+            plan-only: true
+            evidence: true
+    uses: ./.github/workflows/e2e.yml
+    with:
+      use-case: ${{ matrix.use-case }}
+      binary-source: release
+      plan-formats: json
+      plan-only: ${{ matrix.plan-only || false }}
+      evidence: ${{ matrix.evidence || false }}
+      open-issue-on-failure: true
+    secrets: inherit
