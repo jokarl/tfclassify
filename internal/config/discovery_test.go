@@ -35,7 +35,7 @@ func TestDiscover_CurrentDir(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	configPath := filepath.Join(tmpDir, ConfigFileName)
 	if err := os.WriteFile(configPath, []byte("# test config"), 0644); err != nil {
@@ -69,7 +69,7 @@ func TestDiscover_NotFound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Change to temp directory
 	oldWd, err := os.Getwd()

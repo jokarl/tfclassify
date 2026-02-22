@@ -260,10 +260,16 @@ func TestParseFile_JSONDetection(t *testing.T) {
 func TestFindTerraform_EnvVar(t *testing.T) {
 	// Test that TERRAFORM_PATH env var is checked
 	oldVal := os.Getenv("TERRAFORM_PATH")
-	defer os.Setenv("TERRAFORM_PATH", oldVal)
+	defer func() {
+		if err := os.Setenv("TERRAFORM_PATH", oldVal); err != nil {
+			t.Errorf("failed to restore TERRAFORM_PATH: %v", err)
+		}
+	}()
 
 	// Set to a non-existent path
-	os.Setenv("TERRAFORM_PATH", "/nonexistent/path/terraform")
+	if err := os.Setenv("TERRAFORM_PATH", "/nonexistent/path/terraform"); err != nil {
+		t.Fatalf("failed to set TERRAFORM_PATH: %v", err)
+	}
 
 	// Should fall back to PATH lookup
 	_, err := findTerraform()
@@ -434,8 +440,14 @@ func TestParseFile_BinaryPlanDetection(t *testing.T) {
 
 	// Clear TERRAFORM_PATH to ensure terraform won't be found
 	oldPath := os.Getenv("TERRAFORM_PATH")
-	os.Setenv("TERRAFORM_PATH", "/nonexistent/terraform")
-	defer os.Setenv("TERRAFORM_PATH", oldPath)
+	if err := os.Setenv("TERRAFORM_PATH", "/nonexistent/terraform"); err != nil {
+		t.Fatalf("failed to set TERRAFORM_PATH: %v", err)
+	}
+	defer func() {
+		if err := os.Setenv("TERRAFORM_PATH", oldPath); err != nil {
+			t.Errorf("failed to restore TERRAFORM_PATH: %v", err)
+		}
+	}()
 
 	// This should fail because terraform is not available
 	_, err = ParseFile(binaryPlanPath)
@@ -567,8 +579,14 @@ func TestParse_MinimalValidPlan(t *testing.T) {
 func TestParseBinaryPlan_NoTerraform(t *testing.T) {
 	// Clear TERRAFORM_PATH to ensure terraform won't be found
 	oldPath := os.Getenv("TERRAFORM_PATH")
-	os.Setenv("TERRAFORM_PATH", "/nonexistent/terraform")
-	defer os.Setenv("TERRAFORM_PATH", oldPath)
+	if err := os.Setenv("TERRAFORM_PATH", "/nonexistent/terraform"); err != nil {
+		t.Fatalf("failed to set TERRAFORM_PATH: %v", err)
+	}
+	defer func() {
+		if err := os.Setenv("TERRAFORM_PATH", oldPath); err != nil {
+			t.Errorf("failed to restore TERRAFORM_PATH: %v", err)
+		}
+	}()
 
 	// Try to parse a "binary" plan
 	_, err := parseBinaryPlan("/nonexistent/plan.tfplan")
