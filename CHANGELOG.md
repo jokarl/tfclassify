@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/jokarl/tfclassify/compare/tfclassify-v0.5.0...tfclassify-v0.5.1) (2026-02-22)
+
+
+### Bug Fixes
+
+* address v0.5.0 critique findings ([#42](https://github.com/jokarl/tfclassify/issues/42)) ([74abb72](https://github.com/jokarl/tfclassify/commit/74abb72dc035d0dda0c3fc93b1970b154330f974))
+
 ## [0.5.0](https://github.com/jokarl/tfclassify/compare/tfclassify-v0.4.0...tfclassify-v0.5.0) (2026-02-22)
 
 
