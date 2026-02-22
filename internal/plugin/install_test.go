@@ -158,7 +158,7 @@ func TestInstallPlugins_AlreadyInstalled(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Create a fake plugin binary
 	pluginPath := filepath.Join(tmpDir, "tfclassify-plugin-test")
@@ -174,8 +174,10 @@ func TestInstallPlugins_AlreadyInstalled(t *testing.T) {
 
 	// Set TFCLASSIFY_PLUGIN_DIR env var
 	oldEnv := os.Getenv("TFCLASSIFY_PLUGIN_DIR")
-	os.Setenv("TFCLASSIFY_PLUGIN_DIR", tmpDir)
-	defer os.Setenv("TFCLASSIFY_PLUGIN_DIR", oldEnv)
+	if err := os.Setenv("TFCLASSIFY_PLUGIN_DIR", tmpDir); err != nil {
+		t.Fatalf("failed to set env: %v", err)
+	}
+	defer func() { _ = os.Setenv("TFCLASSIFY_PLUGIN_DIR", oldEnv) }()
 
 	cfg := &config.Config{
 		Plugins: []config.PluginConfig{
@@ -202,8 +204,10 @@ func TestInstallPlugins_AlreadyInstalled(t *testing.T) {
 func TestDefaultPluginDir(t *testing.T) {
 	// Test with env var set
 	oldEnv := os.Getenv("TFCLASSIFY_PLUGIN_DIR")
-	os.Setenv("TFCLASSIFY_PLUGIN_DIR", "/custom/plugin/dir")
-	defer os.Setenv("TFCLASSIFY_PLUGIN_DIR", oldEnv)
+	if err := os.Setenv("TFCLASSIFY_PLUGIN_DIR", "/custom/plugin/dir"); err != nil {
+		t.Fatalf("failed to set env: %v", err)
+	}
+	defer func() { _ = os.Setenv("TFCLASSIFY_PLUGIN_DIR", oldEnv) }()
 
 	result := DefaultPluginDir()
 	if result != "/custom/plugin/dir" {
@@ -226,7 +230,7 @@ func TestExtractBinaryFromZip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Create a zip file with a test binary
 	zipPath := filepath.Join(tmpDir, "test.zip")
@@ -282,7 +286,7 @@ func TestExtractBinaryFromZip_BinaryNotFound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Create a zip file without the expected binary
 	zipPath := filepath.Join(tmpDir, "test.zip")
@@ -320,7 +324,7 @@ func TestExtractBinaryFromZip_InvalidZip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Create an invalid zip file
 	invalidZipPath := filepath.Join(tmpDir, "invalid.zip")
@@ -344,7 +348,7 @@ func TestExtractBinaryFromZip_BinaryInSubdirectory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Create a zip file with binary in subdirectory
 	zipPath := filepath.Join(tmpDir, "test.zip")
@@ -391,7 +395,7 @@ func TestExtractBinaryFromZip_WindowsExe(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Create a zip file with .exe extension
 	zipPath := filepath.Join(tmpDir, "test.zip")
@@ -439,11 +443,13 @@ func TestDiscoverPlugins_ExternalPluginNotInstalled(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	oldEnv := os.Getenv("TFCLASSIFY_PLUGIN_DIR")
-	os.Setenv("TFCLASSIFY_PLUGIN_DIR", tmpDir)
-	defer os.Setenv("TFCLASSIFY_PLUGIN_DIR", oldEnv)
+	if err := os.Setenv("TFCLASSIFY_PLUGIN_DIR", tmpDir); err != nil {
+		t.Fatalf("failed to set env: %v", err)
+	}
+	defer func() { _ = os.Setenv("TFCLASSIFY_PLUGIN_DIR", oldEnv) }()
 
 	cfg := &config.Config{
 		Plugins: []config.PluginConfig{
@@ -483,7 +489,7 @@ func TestDiscoverPlugins_LocalDir(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Resolve symlinks (macOS /var -> /private/var) so paths match os.Getwd()
 	tmpDir, err = filepath.EvalSymlinks(tmpDir)
@@ -550,8 +556,10 @@ func TestSearchPaths_Order(t *testing.T) {
 
 	// When env var is set, it should be first
 	oldEnv := os.Getenv("TFCLASSIFY_PLUGIN_DIR")
-	os.Setenv("TFCLASSIFY_PLUGIN_DIR", "/custom/path")
-	defer os.Setenv("TFCLASSIFY_PLUGIN_DIR", oldEnv)
+	if err := os.Setenv("TFCLASSIFY_PLUGIN_DIR", "/custom/path"); err != nil {
+		t.Fatalf("failed to set env: %v", err)
+	}
+	defer func() { _ = os.Setenv("TFCLASSIFY_PLUGIN_DIR", oldEnv) }()
 
 	paths = searchPaths()
 	if len(paths) < 1 || paths[0] != "/custom/path" {
@@ -641,8 +649,10 @@ func TestDownloadFile_WithGitHubToken(t *testing.T) {
 
 	// Set GITHUB_TOKEN
 	oldToken := os.Getenv("GITHUB_TOKEN")
-	os.Setenv("GITHUB_TOKEN", "test-token-12345")
-	defer os.Setenv("GITHUB_TOKEN", oldToken)
+	if err := os.Setenv("GITHUB_TOKEN", "test-token-12345"); err != nil {
+		t.Fatalf("failed to set env: %v", err)
+	}
+	defer func() { _ = os.Setenv("GITHUB_TOKEN", oldToken) }()
 
 	tempPath, err := downloadFile(server.URL)
 	if err != nil {
@@ -736,8 +746,10 @@ func TestFetchRelease_WithGitHubToken(t *testing.T) {
 	defer func() { githubAPIBase = origBase }()
 
 	oldToken := os.Getenv("GITHUB_TOKEN")
-	os.Setenv("GITHUB_TOKEN", "test-api-token")
-	defer os.Setenv("GITHUB_TOKEN", oldToken)
+	if err := os.Setenv("GITHUB_TOKEN", "test-api-token"); err != nil {
+		t.Fatalf("failed to set env: %v", err)
+	}
+	defer func() { _ = os.Setenv("GITHUB_TOKEN", oldToken) }()
 
 	_, err := fetchRelease("owner", "repo", "v1.0.0")
 	if err != nil {
@@ -869,7 +881,7 @@ func TestDownloadAndInstall_EndToEnd(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	err = downloadAndInstall("test", "github.com/owner/tfclassify-plugin-test", "1.0.0", tmpDir)
 	if err != nil {
@@ -902,11 +914,13 @@ func TestInstallPlugins_DownloadFailure(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	oldEnv := os.Getenv("TFCLASSIFY_PLUGIN_DIR")
-	os.Setenv("TFCLASSIFY_PLUGIN_DIR", tmpDir)
-	defer os.Setenv("TFCLASSIFY_PLUGIN_DIR", oldEnv)
+	if err := os.Setenv("TFCLASSIFY_PLUGIN_DIR", tmpDir); err != nil {
+		t.Fatalf("failed to set env: %v", err)
+	}
+	defer func() { _ = os.Setenv("TFCLASSIFY_PLUGIN_DIR", oldEnv) }()
 
 	cfg := &config.Config{
 		Plugins: []config.PluginConfig{
@@ -935,7 +949,7 @@ func TestInstallPlugins_MultiplePlugins(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Pre-install one plugin
 	pluginPath := filepath.Join(tmpDir, "tfclassify-plugin-existing")
@@ -950,8 +964,10 @@ func TestInstallPlugins_MultiplePlugins(t *testing.T) {
 	}
 
 	oldEnv := os.Getenv("TFCLASSIFY_PLUGIN_DIR")
-	os.Setenv("TFCLASSIFY_PLUGIN_DIR", tmpDir)
-	defer os.Setenv("TFCLASSIFY_PLUGIN_DIR", oldEnv)
+	if err := os.Setenv("TFCLASSIFY_PLUGIN_DIR", tmpDir); err != nil {
+		t.Fatalf("failed to set env: %v", err)
+	}
+	defer func() { _ = os.Setenv("TFCLASSIFY_PLUGIN_DIR", oldEnv) }()
 
 	cfg := &config.Config{
 		Plugins: []config.PluginConfig{
@@ -1006,7 +1022,7 @@ func TestManifest_LoadSave(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Test loading non-existent manifest returns empty manifest
 	manifest, err := loadManifest(tmpDir)
@@ -1043,7 +1059,7 @@ func TestManifest_LoadInvalid(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Write invalid JSON
 	manifestPath := filepath.Join(tmpDir, ManifestFileName)
@@ -1062,7 +1078,7 @@ func TestManifest_SaveCreatesDir(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Try to save to a non-existent subdirectory
 	subDir := filepath.Join(tmpDir, "newdir", "plugins")
@@ -1113,7 +1129,7 @@ func TestInstallPlugins_VersionUpgrade(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Pre-install plugin at old version
 	pluginPath := filepath.Join(tmpDir, "tfclassify-plugin-test")
@@ -1127,8 +1143,10 @@ func TestInstallPlugins_VersionUpgrade(t *testing.T) {
 	}
 
 	oldEnv := os.Getenv("TFCLASSIFY_PLUGIN_DIR")
-	os.Setenv("TFCLASSIFY_PLUGIN_DIR", tmpDir)
-	defer os.Setenv("TFCLASSIFY_PLUGIN_DIR", oldEnv)
+	if err := os.Setenv("TFCLASSIFY_PLUGIN_DIR", tmpDir); err != nil {
+		t.Fatalf("failed to set env: %v", err)
+	}
+	defer func() { _ = os.Setenv("TFCLASSIFY_PLUGIN_DIR", oldEnv) }()
 
 	cfg := &config.Config{
 		Plugins: []config.PluginConfig{
@@ -1279,7 +1297,7 @@ func TestManifest_NilPluginsMap(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Write manifest with null plugins
 	manifestPath := filepath.Join(tmpDir, ManifestFileName)

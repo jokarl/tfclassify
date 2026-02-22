@@ -84,8 +84,10 @@ func TestDiscover_NotFound(t *testing.T) {
 
 	// Temporarily set HOME to the temp directory (so home directory lookup also fails)
 	oldHome := os.Getenv("HOME")
-	os.Setenv("HOME", tmpDir)
-	defer os.Setenv("HOME", oldHome)
+	if err := os.Setenv("HOME", tmpDir); err != nil {
+		t.Fatalf("failed to set HOME: %v", err)
+	}
+	defer func() { _ = os.Setenv("HOME", oldHome) }()
 
 	_, err = Discover("")
 	if err == nil {

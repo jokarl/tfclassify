@@ -14,7 +14,7 @@ func TestDiscoverPlugins_SourcelessPluginDiscovered(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	pluginPath := filepath.Join(tmpDir, "tfclassify-plugin-test")
 	if err := os.WriteFile(pluginPath, []byte("#!/bin/sh\n"), 0755); err != nil {
@@ -22,8 +22,10 @@ func TestDiscoverPlugins_SourcelessPluginDiscovered(t *testing.T) {
 	}
 
 	oldEnv := os.Getenv("TFCLASSIFY_PLUGIN_DIR")
-	os.Setenv("TFCLASSIFY_PLUGIN_DIR", tmpDir)
-	defer os.Setenv("TFCLASSIFY_PLUGIN_DIR", oldEnv)
+	if err := os.Setenv("TFCLASSIFY_PLUGIN_DIR", tmpDir); err != nil {
+		t.Fatalf("failed to set TFCLASSIFY_PLUGIN_DIR: %v", err)
+	}
+	defer func() { _ = os.Setenv("TFCLASSIFY_PLUGIN_DIR", oldEnv) }()
 
 	cfg := &config.Config{
 		Plugins: []config.PluginConfig{
@@ -47,11 +49,13 @@ func TestDiscoverPlugins_SourcelessPluginNotFound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	oldEnv := os.Getenv("TFCLASSIFY_PLUGIN_DIR")
-	os.Setenv("TFCLASSIFY_PLUGIN_DIR", tmpDir)
-	defer os.Setenv("TFCLASSIFY_PLUGIN_DIR", oldEnv)
+	if err := os.Setenv("TFCLASSIFY_PLUGIN_DIR", tmpDir); err != nil {
+		t.Fatalf("failed to set TFCLASSIFY_PLUGIN_DIR: %v", err)
+	}
+	defer func() { _ = os.Setenv("TFCLASSIFY_PLUGIN_DIR", oldEnv) }()
 
 	cfg := &config.Config{
 		Plugins: []config.PluginConfig{
@@ -88,7 +92,7 @@ func TestDiscoverPlugins_EnvVar(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	pluginPath := filepath.Join(tmpDir, "tfclassify-plugin-test")
 	if err := os.WriteFile(pluginPath, []byte("#!/bin/sh\n"), 0755); err != nil {
@@ -97,8 +101,10 @@ func TestDiscoverPlugins_EnvVar(t *testing.T) {
 
 	// Set environment variable
 	oldEnv := os.Getenv("TFCLASSIFY_PLUGIN_DIR")
-	os.Setenv("TFCLASSIFY_PLUGIN_DIR", tmpDir)
-	defer os.Setenv("TFCLASSIFY_PLUGIN_DIR", oldEnv)
+	if err := os.Setenv("TFCLASSIFY_PLUGIN_DIR", tmpDir); err != nil {
+		t.Fatalf("failed to set TFCLASSIFY_PLUGIN_DIR: %v", err)
+	}
+	defer func() { _ = os.Setenv("TFCLASSIFY_PLUGIN_DIR", oldEnv) }()
 
 	cfg := &config.Config{
 		Plugins: []config.PluginConfig{
@@ -127,11 +133,13 @@ func TestDiscoverPlugins_NotFound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	oldEnv := os.Getenv("TFCLASSIFY_PLUGIN_DIR")
-	os.Setenv("TFCLASSIFY_PLUGIN_DIR", tmpDir)
-	defer os.Setenv("TFCLASSIFY_PLUGIN_DIR", oldEnv)
+	if err := os.Setenv("TFCLASSIFY_PLUGIN_DIR", tmpDir); err != nil {
+		t.Fatalf("failed to set TFCLASSIFY_PLUGIN_DIR: %v", err)
+	}
+	defer func() { _ = os.Setenv("TFCLASSIFY_PLUGIN_DIR", oldEnv) }()
 
 	cfg := &config.Config{
 		Plugins: []config.PluginConfig{
@@ -151,13 +159,13 @@ func TestDiscoverPlugins_Precedence(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(dir1)
+	defer func() { _ = os.RemoveAll(dir1) }()
 
 	dir2, err := os.MkdirTemp("", "tfclassify-plugins2")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(dir2)
+	defer func() { _ = os.RemoveAll(dir2) }()
 
 	// Create plugin in both directories
 	pluginPath1 := filepath.Join(dir1, "tfclassify-plugin-test")
@@ -171,8 +179,10 @@ func TestDiscoverPlugins_Precedence(t *testing.T) {
 
 	// Set environment variable to dir1 (should take precedence)
 	oldEnv := os.Getenv("TFCLASSIFY_PLUGIN_DIR")
-	os.Setenv("TFCLASSIFY_PLUGIN_DIR", dir1)
-	defer os.Setenv("TFCLASSIFY_PLUGIN_DIR", oldEnv)
+	if err := os.Setenv("TFCLASSIFY_PLUGIN_DIR", dir1); err != nil {
+		t.Fatalf("failed to set TFCLASSIFY_PLUGIN_DIR: %v", err)
+	}
+	defer func() { _ = os.Setenv("TFCLASSIFY_PLUGIN_DIR", oldEnv) }()
 
 	cfg := &config.Config{
 		Plugins: []config.PluginConfig{

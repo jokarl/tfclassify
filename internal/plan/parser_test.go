@@ -504,8 +504,14 @@ func TestFindTerraform_ValidPath(t *testing.T) {
 	}
 
 	oldPath := os.Getenv("TERRAFORM_PATH")
-	os.Setenv("TERRAFORM_PATH", terraformPath)
-	defer os.Setenv("TERRAFORM_PATH", oldPath)
+	if err := os.Setenv("TERRAFORM_PATH", terraformPath); err != nil {
+		t.Fatalf("failed to set TERRAFORM_PATH: %v", err)
+	}
+	defer func() {
+		if err := os.Setenv("TERRAFORM_PATH", oldPath); err != nil {
+			t.Errorf("failed to restore TERRAFORM_PATH: %v", err)
+		}
+	}()
 
 	path, err := findTerraform()
 	if err != nil {
