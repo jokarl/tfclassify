@@ -122,18 +122,25 @@ E2E test scenarios live in `testdata/e2e/`. Each scenario has `main.tf`, `.tfcla
 
 **E2e tests must be kept in sync with code changes.** When modifying plugin analyzers, config parsing, or classification logic, check whether existing e2e scenarios need updating and whether new scenarios are needed. The CI matrix in `.github/workflows/ci.yml` must include all scenarios.
 
-**Verify e2e on your branch** by triggering the CI workflow:
+**Run e2e locally** with `testdata/e2e/run.sh`. Use `--build` for development — it compiles both the CLI and azurerm plugin from source:
+```bash
+bash testdata/e2e/run.sh --build --plan-only -t blast-radius -t nsg-open-inbound
+```
+
+Use `--version` to test against a published GitHub release. This downloads the CLI via `gh release download` and installs plugins via `tfclassify init`:
+```bash
+bash testdata/e2e/run.sh --version 0.4.0 --plan-only -t blast-radius
+```
+
+The two flags are mutually exclusive. Add `--plan-only` to skip apply/destroy (faster iteration). Use `-t NAME` (repeatable) to run specific scenarios.
+
+**Verify e2e in CI** by triggering the workflow on your branch:
 ```bash
 gh workflow run ci.yml --ref $(git branch --show-current)
+gh run watch    # watch the latest run
 ```
 
-Monitor the run:
-```bash
-gh run list --workflow=ci.yml --branch=$(git branch --show-current) --limit=1
-gh run watch                    # watch the latest run
-```
-
-E2e tests build from source and test both JSON and binary plan formats. Each scenario runs create and destroy phases, comparing exit codes against `expected.json`.
+E2e tests run both JSON and binary `.tfplan` formats. Each scenario runs create and destroy phases, comparing exit codes against `expected.json`.
 
 ## Governance
 

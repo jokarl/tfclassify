@@ -1,6 +1,6 @@
 ---
 id: "CR-0033"
-status: "proposed"
+status: "implemented"
 date: 2026-02-20
 requestor: tfclassify maintainers
 stakeholders: [security engineering, DevSecOps, platform engineering]

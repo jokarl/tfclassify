@@ -4,8 +4,8 @@
 # Assumes Azure CLI is already authenticated (az login).
 #
 # Usage:
-#   ./testdata/e2e/run.sh --build                                 # Build from source, run all tests
-#   ./testdata/e2e/run.sh --binary bin/tfclassify                  # Use prebuilt binary
+#   ./testdata/e2e/run.sh --build                                  # Build from source, run all tests
+#   ./testdata/e2e/run.sh --version 0.4.0                          # Download released version
 #   ./testdata/e2e/run.sh --build --plan-only                      # Skip apply/destroy (faster)
 #   ./testdata/e2e/run.sh --build --evidence                       # Enable evidence signing
 #   ./testdata/e2e/run.sh --build -t route-table -t blast-radius   # Run specific tests only
@@ -14,8 +14,9 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 E2E_DIR="$REPO_ROOT/testdata/e2e"
-PLUGIN_DIR="${TFCLASSIFY_PLUGIN_DIR:-/tmp/tfclassify-plugins}"
-RESULTS_DIR="$(mktemp -d)"
+export TFCLASSIFY_PLUGIN_DIR="${TFCLASSIFY_PLUGIN_DIR:-/tmp/tfclassify-plugins}"
+PLUGIN_DIR="$TFCLASSIFY_PLUGIN_DIR"
+LOG_DIR="$REPO_ROOT/testdata/e2e/.logs"
 
 # Scenarios that always run plan-only (mirrors CI matrix).
 # custom-role-cross-reference: requires Microsoft.Authorization/roleDefinitions/write
@@ -28,6 +29,7 @@ EVIDENCE_SCENARIOS=("evidence-signing")
 # --- Defaults ---
 TFCLASSIFY_BIN=""
 BUILD=false
+VERSION=""
 EVIDENCE=false
 PLAN_ONLY=false
 TESTS=()
@@ -37,6 +39,7 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
+DIM='\033[2m'
 BOLD='\033[1m'
 NC='\033[0m'
 
@@ -49,7 +52,7 @@ Assumes you are already signed in with the Azure CLI.
 
 Options:
   --build              Build tfclassify and plugin from source
-  --binary PATH        Use a prebuilt tfclassify binary (plugin must be discoverable)
+  --version VERSION    Download released CLI at VERSION (e.g., 0.4.0)
   --evidence           Enable evidence signing and verification
   --plan-only          Skip apply/destroy for all scenarios (faster iteration)
   -t, --test NAME      Run only the named scenario (repeatable)
@@ -63,7 +66,8 @@ Examples:
   $(basename "$0") --build
   $(basename "$0") --build --plan-only
   $(basename "$0") --build -t route-table -t blast-radius
-  $(basename "$0") --binary ./bin/tfclassify --evidence
+  $(basename "$0") --build --evidence
+  $(basename "$0") --version 0.4.0 --plan-only -t blast-radius
 EOF
   exit 0
 }
@@ -72,7 +76,7 @@ EOF
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --build)     BUILD=true; shift ;;
-    --binary)    TFCLASSIFY_BIN="$2"; shift 2 ;;
+    --version)   VERSION="$2"; shift 2 ;;
     --evidence)  EVIDENCE=true; shift ;;
     --plan-only) PLAN_ONLY=true; shift ;;
     -t|--test)   TESTS+=("$2"); shift 2 ;;
@@ -81,8 +85,12 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ "$BUILD" == false && -z "$TFCLASSIFY_BIN" ]]; then
-  echo -e "${RED}Error: specify --build or --binary PATH${NC}" >&2
+if [[ "$BUILD" == false && -z "$VERSION" ]]; then
+  echo -e "${RED}Error: specify --build or --version VERSION${NC}" >&2
+  exit 1
+fi
+if [[ "$BUILD" == true && -n "$VERSION" ]]; then
+  echo -e "${RED}Error: --build and --version are mutually exclusive${NC}" >&2
   exit 1
 fi
 
@@ -97,9 +105,24 @@ if [[ "$BUILD" == true ]]; then
   (cd "$REPO_ROOT" && go build -o "$PLUGIN_DIR/tfclassify-plugin-azurerm" ./plugins/azurerm)
 fi
 
-# Resolve binary to absolute path
-if [[ ! "$TFCLASSIFY_BIN" = /* ]]; then
-  TFCLASSIFY_BIN="$(pwd)/$TFCLASSIFY_BIN"
+# --- Download released version ---
+if [[ -n "$VERSION" ]]; then
+  OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
+  ARCH="$(uname -m)"
+  case "$ARCH" in
+    x86_64)  ARCH="amd64" ;;
+    aarch64) ARCH="arm64" ;;
+  esac
+
+  ASSET="tfclassify_${VERSION}_${OS}_${ARCH}.zip"
+  TAG="tfclassify-v${VERSION}"
+  echo -e "${CYAN}Downloading tfclassify ${VERSION} (${OS}/${ARCH})...${NC}"
+  mkdir -p "$REPO_ROOT/bin"
+  gh release download "$TAG" --pattern "$ASSET" --dir "$REPO_ROOT/bin" --clobber
+  unzip -o "$REPO_ROOT/bin/$ASSET" -d "$REPO_ROOT/bin" >/dev/null
+  rm -f "$REPO_ROOT/bin/$ASSET"
+  chmod +x "$REPO_ROOT/bin/tfclassify"
+  TFCLASSIFY_BIN="$REPO_ROOT/bin/tfclassify"
 fi
 
 if [[ ! -x "$TFCLASSIFY_BIN" ]]; then
@@ -137,6 +160,10 @@ if [[ "$PLAN_ONLY" == true ]]; then
 fi
 echo ""
 
+# --- Prepare log directory ---
+rm -rf "$LOG_DIR"
+mkdir -p "$LOG_DIR"
+
 # --- Evidence key pair ---
 EVIDENCE_PRIVATE_KEY=""
 EVIDENCE_PUBLIC_KEY=""
@@ -164,17 +191,33 @@ cleanup_scenario() {
         "$dir/create-result.json" "$dir/create-result-binary.json" \
         "$dir/destroy.tfplan" "$dir/destroy.json" \
         "$dir/destroy-result.json" "$dir/destroy-result-binary.json"
+  rm -rf "$dir/.terraform"
+  rm -f "$dir/.terraform.lock.hcl" "$dir/.terraform.tfstate.lock.info" \
+        "$dir/terraform.tfstate" "$dir/terraform.tfstate.backup"
 }
 
+cleanup_all() {
+  for scenario in "${SCENARIOS[@]}"; do
+    cleanup_scenario "$E2E_DIR/$scenario"
+  done
+}
+trap cleanup_all EXIT
+
 # --- Run a single scenario ---
+# Terraform output goes to $LOG_DIR/$name/terraform.log
+# Test results (PASS/FAIL/SKIP) go to $LOG_DIR/$name/results.log
 run_scenario() {
   local name="$1"
   local scenario_dir="$E2E_DIR/$name"
-  local log_file="$RESULTS_DIR/$name.log"
+  local scenario_log_dir="$LOG_DIR/$name"
+  local tf_log="$scenario_log_dir/terraform.log"
+  local results_log="$scenario_log_dir/results.log"
   local is_plan_only="$PLAN_ONLY"
   local use_evidence=false
   local failed=false
   local applied=false
+
+  mkdir -p "$scenario_log_dir"
 
   # Force plan-only for scenarios that require it
   if in_array "$name" "${ALWAYS_PLAN_ONLY[@]}"; then
@@ -186,273 +229,269 @@ run_scenario() {
     use_evidence=true
   fi
 
-  {
-    echo "=== $name ==="
-    echo ""
+  # Export signing key for evidence scenarios
+  if [[ "$use_evidence" == true ]]; then
+    export TFCLASSIFY_SIGNING_KEY="$EVIDENCE_PRIVATE_KEY"
+  fi
 
-    # Export signing key for evidence scenarios
-    if [[ "$use_evidence" == true ]]; then
-      export TFCLASSIFY_SIGNING_KEY="$EVIDENCE_PRIVATE_KEY"
+  # Validate config
+  if ! "$TFCLASSIFY_BIN" validate -c "$scenario_dir/.tfclassify.hcl" >> "$tf_log" 2>&1; then
+    echo "FAIL: config validation (see terraform.log)" >> "$results_log"
+    echo "FAIL" > "$scenario_log_dir/status"
+    return
+  fi
+
+  # Terraform init
+  if ! terraform -chdir="$scenario_dir" init -input=false >> "$tf_log" 2>&1; then
+    echo "FAIL: terraform init (see terraform.log)" >> "$results_log"
+    echo "FAIL" > "$scenario_log_dir/status"
+    return
+  fi
+
+  # ---- Create phase ----
+  if ! terraform -chdir="$scenario_dir" plan \
+         -var-file=../e2e.tfvars -out=create.tfplan -input=false >> "$tf_log" 2>&1; then
+    echo "FAIL: terraform plan (create) (see terraform.log)" >> "$results_log"
+    echo "FAIL" > "$scenario_log_dir/status"
+    cleanup_scenario "$scenario_dir"
+    return
+  fi
+  terraform -chdir="$scenario_dir" show -json create.tfplan \
+    > "$scenario_dir/create.json" 2>> "$tf_log"
+
+  local expected_create
+  expected_create="$(jq -r '.create.exit_code' "$scenario_dir/expected.json")"
+
+  # Classify create (JSON)
+  local evidence_flag=""
+  if [[ "$use_evidence" == true ]]; then
+    evidence_flag="--evidence-file $scenario_log_dir/evidence-create-json.json"
+  fi
+
+  set +e
+  # shellcheck disable=SC2086
+  "$TFCLASSIFY_BIN" \
+    -p "$scenario_dir/create.json" \
+    -c "$scenario_dir/.tfclassify.hcl" \
+    -o json --detailed-exitcode $evidence_flag \
+    > "$scenario_dir/create-result.json" 2>> "$tf_log"
+  local actual_create=$?
+  set -e
+
+  if [[ "$actual_create" != "$expected_create" ]]; then
+    echo "FAIL: create (JSON) expected exit $expected_create, got $actual_create" >> "$results_log"
+    failed=true
+  else
+    echo "PASS: create (JSON) exit code $actual_create" >> "$results_log"
+  fi
+
+  # Verify evidence (create JSON)
+  if [[ "$use_evidence" == true && -f "$scenario_log_dir/evidence-create-json.json" ]]; then
+    if "$TFCLASSIFY_BIN" verify \
+         --evidence-file "$scenario_log_dir/evidence-create-json.json" \
+         --public-key "$EVIDENCE_PUBLIC_KEY" >> "$tf_log" 2>&1; then
+      echo "PASS: evidence verification (create JSON)" >> "$results_log"
+    else
+      echo "FAIL: evidence verification (create JSON)" >> "$results_log"
+      failed=true
     fi
+  fi
 
-    # Validate config
-    echo "--- Validate config ---"
-    if ! "$TFCLASSIFY_BIN" validate -c "$scenario_dir/.tfclassify.hcl" 2>&1; then
-      echo "FAIL: config validation"
-      echo "FAIL" > "$RESULTS_DIR/$name.status"
-      return
+  # Classify create (SARIF)
+  set +e
+  "$TFCLASSIFY_BIN" \
+    -p "$scenario_dir/create.json" \
+    -c "$scenario_dir/.tfclassify.hcl" \
+    -o sarif --detailed-exitcode > /dev/null 2>> "$tf_log"
+  local actual_create_sarif=$?
+  set -e
+
+  if [[ "$actual_create_sarif" != "$expected_create" ]]; then
+    echo "FAIL: create (SARIF) expected exit $expected_create, got $actual_create_sarif" >> "$results_log"
+    failed=true
+  else
+    echo "PASS: create (SARIF) exit code $actual_create_sarif" >> "$results_log"
+  fi
+
+  # Classify create (binary plan)
+  evidence_flag=""
+  if [[ "$use_evidence" == true ]]; then
+    evidence_flag="--evidence-file $scenario_log_dir/evidence-create-binary.json"
+  fi
+
+  set +e
+  # shellcheck disable=SC2086
+  "$TFCLASSIFY_BIN" \
+    -p "$scenario_dir/create.tfplan" \
+    -c "$scenario_dir/.tfclassify.hcl" \
+    -o json --detailed-exitcode $evidence_flag \
+    > "$scenario_dir/create-result-binary.json" 2>> "$tf_log"
+  local actual_create_bin=$?
+  set -e
+
+  if [[ "$actual_create_bin" != "$expected_create" ]]; then
+    echo "FAIL: create (binary) expected exit $expected_create, got $actual_create_bin" >> "$results_log"
+    failed=true
+  else
+    echo "PASS: create (binary) exit code $actual_create_bin" >> "$results_log"
+  fi
+
+  # Verify evidence (create binary)
+  if [[ "$use_evidence" == true && -f "$scenario_log_dir/evidence-create-binary.json" ]]; then
+    if "$TFCLASSIFY_BIN" verify \
+         --evidence-file "$scenario_log_dir/evidence-create-binary.json" \
+         --public-key "$EVIDENCE_PUBLIC_KEY" >> "$tf_log" 2>&1; then
+      echo "PASS: evidence verification (create binary)" >> "$results_log"
+    else
+      echo "FAIL: evidence verification (create binary)" >> "$results_log"
+      failed=true
     fi
+  fi
 
-    # Terraform init
-    echo "--- Terraform init ---"
-    if ! terraform -chdir="$scenario_dir" init -input=false 2>&1; then
-      echo "FAIL: terraform init"
-      echo "FAIL" > "$RESULTS_DIR/$name.status"
-      return
-    fi
-
-    # ---- Create phase ----
-    echo "--- Create plan ---"
-    if ! terraform -chdir="$scenario_dir" plan \
-           -var-file=../e2e.tfvars -out=create.tfplan -input=false 2>&1; then
-      echo "FAIL: terraform plan (create)"
-      echo "FAIL" > "$RESULTS_DIR/$name.status"
+  # ---- Apply + Destroy phase ----
+  if [[ "$is_plan_only" == true ]]; then
+    echo "SKIP: apply/destroy (plan-only)" >> "$results_log"
+  else
+    if ! terraform -chdir="$scenario_dir" apply -auto-approve create.tfplan >> "$tf_log" 2>&1; then
+      echo "FAIL: terraform apply (see terraform.log)" >> "$results_log"
+      terraform -chdir="$scenario_dir" destroy -auto-approve -var-file=../e2e.tfvars >> "$tf_log" 2>&1 || true
+      echo "FAIL" > "$scenario_log_dir/status"
       cleanup_scenario "$scenario_dir"
       return
     fi
-    terraform -chdir="$scenario_dir" show -json create.tfplan \
-      > "$scenario_dir/create.json" 2>&1
+    applied=true
 
-    local expected_create
-    expected_create="$(jq -r '.create.exit_code' "$scenario_dir/expected.json")"
-
-    # Classify create (JSON)
-    local evidence_flag=""
-    if [[ "$use_evidence" == true ]]; then
-      evidence_flag="--evidence-file $RESULTS_DIR/$name-evidence-create-json.json"
+    if ! terraform -chdir="$scenario_dir" plan -destroy \
+           -var-file=../e2e.tfvars -out=destroy.tfplan -input=false >> "$tf_log" 2>&1; then
+      echo "FAIL: terraform plan (destroy) (see terraform.log)" >> "$results_log"
+      terraform -chdir="$scenario_dir" destroy -auto-approve -var-file=../e2e.tfvars >> "$tf_log" 2>&1 || true
+      echo "FAIL" > "$scenario_log_dir/status"
+      cleanup_scenario "$scenario_dir"
+      return
     fi
+    terraform -chdir="$scenario_dir" show -json destroy.tfplan \
+      > "$scenario_dir/destroy.json" 2>> "$tf_log"
 
-    echo "--- Classify create (JSON) ---"
-    set +e
-    # shellcheck disable=SC2086
-    "$TFCLASSIFY_BIN" \
-      -p "$scenario_dir/create.json" \
-      -c "$scenario_dir/.tfclassify.hcl" \
-      -o json --detailed-exitcode $evidence_flag \
-      > "$scenario_dir/create-result.json" 2>&1
-    local actual_create=$?
-    set -e
+    local expected_destroy
+    expected_destroy="$(jq -r '.destroy.exit_code' "$scenario_dir/expected.json")"
 
-    if [[ "$actual_create" != "$expected_create" ]]; then
-      echo "FAIL: create (JSON) expected exit $expected_create, got $actual_create"
-      jq . "$scenario_dir/create-result.json" 2>/dev/null || true
-      failed=true
-    else
-      echo "PASS: create (JSON) exit code $actual_create"
-    fi
-
-    # Verify evidence (create JSON)
-    if [[ "$use_evidence" == true && -f "$RESULTS_DIR/$name-evidence-create-json.json" ]]; then
-      if "$TFCLASSIFY_BIN" verify \
-           --evidence-file "$RESULTS_DIR/$name-evidence-create-json.json" \
-           --public-key "$EVIDENCE_PUBLIC_KEY" 2>&1; then
-        echo "PASS: evidence verification (create JSON)"
-      else
-        echo "FAIL: evidence verification (create JSON)"
-        failed=true
-      fi
-    fi
-
-    # Classify create (SARIF)
-    echo "--- Classify create (SARIF) ---"
-    set +e
-    "$TFCLASSIFY_BIN" \
-      -p "$scenario_dir/create.json" \
-      -c "$scenario_dir/.tfclassify.hcl" \
-      -o sarif --detailed-exitcode > /dev/null 2>&1
-    local actual_create_sarif=$?
-    set -e
-
-    if [[ "$actual_create_sarif" != "$expected_create" ]]; then
-      echo "FAIL: create (SARIF) expected exit $expected_create, got $actual_create_sarif"
-      failed=true
-    else
-      echo "PASS: create (SARIF) exit code $actual_create_sarif"
-    fi
-
-    # Classify create (binary plan)
+    # Classify destroy (JSON)
     evidence_flag=""
     if [[ "$use_evidence" == true ]]; then
-      evidence_flag="--evidence-file $RESULTS_DIR/$name-evidence-create-binary.json"
+      evidence_flag="--evidence-file $scenario_log_dir/evidence-destroy-json.json"
     fi
 
-    echo "--- Classify create (binary) ---"
     set +e
     # shellcheck disable=SC2086
     "$TFCLASSIFY_BIN" \
-      -p "$scenario_dir/create.tfplan" \
+      -p "$scenario_dir/destroy.json" \
       -c "$scenario_dir/.tfclassify.hcl" \
       -o json --detailed-exitcode $evidence_flag \
-      > "$scenario_dir/create-result-binary.json" 2>&1
-    local actual_create_bin=$?
+      > "$scenario_dir/destroy-result.json" 2>> "$tf_log"
+    local actual_destroy=$?
     set -e
 
-    if [[ "$actual_create_bin" != "$expected_create" ]]; then
-      echo "FAIL: create (binary) expected exit $expected_create, got $actual_create_bin"
-      jq . "$scenario_dir/create-result-binary.json" 2>/dev/null || true
+    if [[ "$actual_destroy" != "$expected_destroy" ]]; then
+      echo "FAIL: destroy (JSON) expected exit $expected_destroy, got $actual_destroy" >> "$results_log"
       failed=true
     else
-      echo "PASS: create (binary) exit code $actual_create_bin"
+      echo "PASS: destroy (JSON) exit code $actual_destroy" >> "$results_log"
     fi
 
-    # Verify evidence (create binary)
-    if [[ "$use_evidence" == true && -f "$RESULTS_DIR/$name-evidence-create-binary.json" ]]; then
-      if "$TFCLASSIFY_BIN" verify \
-           --evidence-file "$RESULTS_DIR/$name-evidence-create-binary.json" \
-           --public-key "$EVIDENCE_PUBLIC_KEY" 2>&1; then
-        echo "PASS: evidence verification (create binary)"
-      else
-        echo "FAIL: evidence verification (create binary)"
-        failed=true
-      fi
-    fi
+    # Classify destroy (SARIF)
+    set +e
+    "$TFCLASSIFY_BIN" \
+      -p "$scenario_dir/destroy.json" \
+      -c "$scenario_dir/.tfclassify.hcl" \
+      -o sarif --detailed-exitcode > /dev/null 2>> "$tf_log"
+    local actual_destroy_sarif=$?
+    set -e
 
-    # ---- Apply + Destroy phase ----
-    if [[ "$is_plan_only" == true ]]; then
-      echo "SKIP: apply/destroy (plan-only)"
+    if [[ "$actual_destroy_sarif" != "$expected_destroy" ]]; then
+      echo "FAIL: destroy (SARIF) expected exit $expected_destroy, got $actual_destroy_sarif" >> "$results_log"
+      failed=true
     else
-      echo "--- Apply ---"
-      if ! terraform -chdir="$scenario_dir" apply -auto-approve create.tfplan 2>&1; then
-        echo "FAIL: terraform apply"
-        echo "--- Cleanup (forced) ---"
-        terraform -chdir="$scenario_dir" destroy -auto-approve -var-file=../e2e.tfvars 2>&1 || true
-        echo "FAIL" > "$RESULTS_DIR/$name.status"
-        cleanup_scenario "$scenario_dir"
-        return
-      fi
-      applied=true
+      echo "PASS: destroy (SARIF) exit code $actual_destroy_sarif" >> "$results_log"
+    fi
 
-      echo "--- Destroy plan ---"
-      if ! terraform -chdir="$scenario_dir" plan -destroy \
-             -var-file=../e2e.tfvars -out=destroy.tfplan -input=false 2>&1; then
-        echo "FAIL: terraform plan (destroy)"
-        terraform -chdir="$scenario_dir" destroy -auto-approve -var-file=../e2e.tfvars 2>&1 || true
-        echo "FAIL" > "$RESULTS_DIR/$name.status"
-        cleanup_scenario "$scenario_dir"
-        return
-      fi
-      terraform -chdir="$scenario_dir" show -json destroy.tfplan \
-        > "$scenario_dir/destroy.json" 2>&1
+    # Classify destroy (binary plan)
+    evidence_flag=""
+    if [[ "$use_evidence" == true ]]; then
+      evidence_flag="--evidence-file $scenario_log_dir/evidence-destroy-binary.json"
+    fi
 
-      local expected_destroy
-      expected_destroy="$(jq -r '.destroy.exit_code' "$scenario_dir/expected.json")"
+    set +e
+    # shellcheck disable=SC2086
+    "$TFCLASSIFY_BIN" \
+      -p "$scenario_dir/destroy.tfplan" \
+      -c "$scenario_dir/.tfclassify.hcl" \
+      -o json --detailed-exitcode $evidence_flag \
+      > "$scenario_dir/destroy-result-binary.json" 2>> "$tf_log"
+    local actual_destroy_bin=$?
+    set -e
 
-      # Classify destroy (JSON)
-      evidence_flag=""
-      if [[ "$use_evidence" == true ]]; then
-        evidence_flag="--evidence-file $RESULTS_DIR/$name-evidence-destroy-json.json"
-      fi
+    if [[ "$actual_destroy_bin" != "$expected_destroy" ]]; then
+      echo "FAIL: destroy (binary) expected exit $expected_destroy, got $actual_destroy_bin" >> "$results_log"
+      failed=true
+    else
+      echo "PASS: destroy (binary) exit code $actual_destroy_bin" >> "$results_log"
+    fi
 
-      echo "--- Classify destroy (JSON) ---"
-      set +e
-      # shellcheck disable=SC2086
-      "$TFCLASSIFY_BIN" \
-        -p "$scenario_dir/destroy.json" \
-        -c "$scenario_dir/.tfclassify.hcl" \
-        -o json --detailed-exitcode $evidence_flag \
-        > "$scenario_dir/destroy-result.json" 2>&1
-      local actual_destroy=$?
-      set -e
-
-      if [[ "$actual_destroy" != "$expected_destroy" ]]; then
-        echo "FAIL: destroy (JSON) expected exit $expected_destroy, got $actual_destroy"
-        jq . "$scenario_dir/destroy-result.json" 2>/dev/null || true
-        failed=true
-      else
-        echo "PASS: destroy (JSON) exit code $actual_destroy"
-      fi
-
-      # Classify destroy (SARIF)
-      echo "--- Classify destroy (SARIF) ---"
-      set +e
-      "$TFCLASSIFY_BIN" \
-        -p "$scenario_dir/destroy.json" \
-        -c "$scenario_dir/.tfclassify.hcl" \
-        -o sarif --detailed-exitcode > /dev/null 2>&1
-      local actual_destroy_sarif=$?
-      set -e
-
-      if [[ "$actual_destroy_sarif" != "$expected_destroy" ]]; then
-        echo "FAIL: destroy (SARIF) expected exit $expected_destroy, got $actual_destroy_sarif"
-        failed=true
-      else
-        echo "PASS: destroy (SARIF) exit code $actual_destroy_sarif"
-      fi
-
-      # Classify destroy (binary plan)
-      evidence_flag=""
-      if [[ "$use_evidence" == true ]]; then
-        evidence_flag="--evidence-file $RESULTS_DIR/$name-evidence-destroy-binary.json"
-      fi
-
-      echo "--- Classify destroy (binary) ---"
-      set +e
-      # shellcheck disable=SC2086
-      "$TFCLASSIFY_BIN" \
-        -p "$scenario_dir/destroy.tfplan" \
-        -c "$scenario_dir/.tfclassify.hcl" \
-        -o json --detailed-exitcode $evidence_flag \
-        > "$scenario_dir/destroy-result-binary.json" 2>&1
-      local actual_destroy_bin=$?
-      set -e
-
-      if [[ "$actual_destroy_bin" != "$expected_destroy" ]]; then
-        echo "FAIL: destroy (binary) expected exit $expected_destroy, got $actual_destroy_bin"
-        jq . "$scenario_dir/destroy-result-binary.json" 2>/dev/null || true
-        failed=true
-      else
-        echo "PASS: destroy (binary) exit code $actual_destroy_bin"
-      fi
-
-      # Verify evidence (destroy)
-      if [[ "$use_evidence" == true ]]; then
-        if [[ -f "$RESULTS_DIR/$name-evidence-destroy-json.json" ]]; then
-          if "$TFCLASSIFY_BIN" verify \
-               --evidence-file "$RESULTS_DIR/$name-evidence-destroy-json.json" \
-               --public-key "$EVIDENCE_PUBLIC_KEY" 2>&1; then
-            echo "PASS: evidence verification (destroy JSON)"
-          else
-            echo "FAIL: evidence verification (destroy JSON)"
-            failed=true
-          fi
-        fi
-        if [[ -f "$RESULTS_DIR/$name-evidence-destroy-binary.json" ]]; then
-          if "$TFCLASSIFY_BIN" verify \
-               --evidence-file "$RESULTS_DIR/$name-evidence-destroy-binary.json" \
-               --public-key "$EVIDENCE_PUBLIC_KEY" 2>&1; then
-            echo "PASS: evidence verification (destroy binary)"
-          else
-            echo "FAIL: evidence verification (destroy binary)"
-            failed=true
-          fi
+    # Verify evidence (destroy)
+    if [[ "$use_evidence" == true ]]; then
+      if [[ -f "$scenario_log_dir/evidence-destroy-json.json" ]]; then
+        if "$TFCLASSIFY_BIN" verify \
+             --evidence-file "$scenario_log_dir/evidence-destroy-json.json" \
+             --public-key "$EVIDENCE_PUBLIC_KEY" >> "$tf_log" 2>&1; then
+          echo "PASS: evidence verification (destroy JSON)" >> "$results_log"
+        else
+          echo "FAIL: evidence verification (destroy JSON)" >> "$results_log"
+          failed=true
         fi
       fi
-
-      # Cleanup infrastructure
-      echo "--- Cleanup ---"
-      terraform -chdir="$scenario_dir" destroy -auto-approve -var-file=../e2e.tfvars 2>&1 || true
+      if [[ -f "$scenario_log_dir/evidence-destroy-binary.json" ]]; then
+        if "$TFCLASSIFY_BIN" verify \
+             --evidence-file "$scenario_log_dir/evidence-destroy-binary.json" \
+             --public-key "$EVIDENCE_PUBLIC_KEY" >> "$tf_log" 2>&1; then
+          echo "PASS: evidence verification (destroy binary)" >> "$results_log"
+        else
+          echo "FAIL: evidence verification (destroy binary)" >> "$results_log"
+          failed=true
+        fi
+      fi
     fi
 
-    # Clean up generated plan files
-    cleanup_scenario "$scenario_dir"
+    # Cleanup infrastructure
+    terraform -chdir="$scenario_dir" destroy -auto-approve -var-file=../e2e.tfvars >> "$tf_log" 2>&1 || true
+  fi
 
-    if [[ "$failed" == true ]]; then
-      echo "FAIL" > "$RESULTS_DIR/$name.status"
-    else
-      echo "PASS" > "$RESULTS_DIR/$name.status"
-    fi
-  } > "$log_file" 2>&1
+  # Clean up generated plan files
+  cleanup_scenario "$scenario_dir"
+
+  if [[ "$failed" == true ]]; then
+    echo "FAIL" > "$scenario_log_dir/status"
+  else
+    echo "PASS" > "$scenario_log_dir/status"
+  fi
 }
+
+# --- Install plugins for released versions ---
+if [[ -n "$VERSION" ]]; then
+  mkdir -p "$PLUGIN_DIR"
+  for scenario_dir in "$E2E_DIR"/*/; do
+    config="$scenario_dir/.tfclassify.hcl"
+    if [[ -f "$config" ]] && grep -q 'plugin "' "$config"; then
+      name="$(basename "$scenario_dir")"
+      # Skip scenarios not in the test list (if filtered)
+      if [[ ${#TESTS[@]} -gt 0 ]] && ! in_array "$name" "${TESTS[@]}"; then
+        continue
+      fi
+      echo -e "  ${DIM}Installing plugins for $name...${NC}"
+      "$TFCLASSIFY_BIN" init -c "$config" 2>&1 | sed "s/^/    /"
+    fi
+  done
+  echo ""
+fi
 
 # --- Launch all scenarios in parallel ---
 PIDS=()
@@ -476,7 +515,7 @@ for entry in "${PID_SCENARIOS[@]}"; do
   if wait "$pid" 2>/dev/null; then
     : # process exited (status in file)
   fi
-  status_file="$RESULTS_DIR/$scenario.status"
+  status_file="$LOG_DIR/$scenario/status"
   if [[ -f "$status_file" && "$(cat "$status_file")" == "PASS" ]]; then
     echo -e "  ${GREEN}PASS${NC}  $scenario"
   else
@@ -490,7 +529,7 @@ PASSED=0
 FAILED=0
 ERRORS=()
 for scenario in "${SCENARIOS[@]}"; do
-  status_file="$RESULTS_DIR/$scenario.status"
+  status_file="$LOG_DIR/$scenario/status"
   if [[ -f "$status_file" && "$(cat "$status_file")" == "PASS" ]]; then
     PASSED=$((PASSED + 1))
   else
@@ -501,19 +540,25 @@ done
 
 echo -e "${BOLD}Results: ${GREEN}$PASSED passed${NC}, ${RED}$FAILED failed${NC} (${#SCENARIOS[@]} total)"
 
-# Print logs for failed scenarios
+# Print concise failure details + log paths
 if [[ ${#ERRORS[@]} -gt 0 ]]; then
   echo ""
-  echo -e "${BOLD}Failed scenario logs:${NC}"
   for scenario in "${ERRORS[@]}"; do
-    echo ""
-    echo -e "${RED}=== $scenario ===${NC}"
-    cat "$RESULTS_DIR/$scenario.log"
+    results_file="$LOG_DIR/$scenario/results.log"
+    echo -e "${RED}FAIL${NC}  ${BOLD}$scenario${NC}"
+    if [[ -f "$results_file" ]]; then
+      while IFS= read -r line; do
+        echo -e "        $line"
+      done < "$results_file"
+    else
+      echo -e "        (no results — failed before classification)"
+    fi
   done
+  echo ""
+  echo -e "${DIM}Logs: $LOG_DIR/<scenario>/{results.log,terraform.log}${NC}"
 fi
 
-# Cleanup temp files
-rm -rf "$RESULTS_DIR"
+# Cleanup evidence keys
 if [[ -n "$EVIDENCE_PRIVATE_KEY" ]]; then
   rm -f "$EVIDENCE_PRIVATE_KEY" "$EVIDENCE_PUBLIC_KEY"
 fi
