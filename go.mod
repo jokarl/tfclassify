@@ -5,7 +5,7 @@ go 1.25.7
 require (
 	github.com/gobwas/glob v0.2.3
 	github.com/hashicorp/go-plugin v1.7.0
-	github.com/hashicorp/go-version v1.7.0
+	github.com/hashicorp/go-version v1.8.0
 	github.com/hashicorp/hcl/v2 v2.24.0
 	github.com/hashicorp/terraform-json v0.27.2
 	github.com/jokarl/tfclassify/sdk v0.0.0
