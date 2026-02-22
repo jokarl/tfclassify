@@ -35,7 +35,7 @@ func TestDiscover_CurrentDir(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	configPath := filepath.Join(tmpDir, ConfigFileName)
 	if err := os.WriteFile(configPath, []byte("# test config"), 0644); err != nil {
@@ -47,7 +47,7 @@ func TestDiscover_CurrentDir(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to get cwd: %v", err)
 	}
-	defer os.Chdir(oldWd)
+	defer func() { _ = os.Chdir(oldWd) }()
 
 	if err := os.Chdir(tmpDir); err != nil {
 		t.Fatalf("failed to chdir: %v", err)
@@ -69,14 +69,14 @@ func TestDiscover_NotFound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Change to temp directory
 	oldWd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("failed to get cwd: %v", err)
 	}
-	defer os.Chdir(oldWd)
+	defer func() { _ = os.Chdir(oldWd) }()
 
 	if err := os.Chdir(tmpDir); err != nil {
 		t.Fatalf("failed to chdir: %v", err)
@@ -84,8 +84,10 @@ func TestDiscover_NotFound(t *testing.T) {
 
 	// Temporarily set HOME to the temp directory (so home directory lookup also fails)
 	oldHome := os.Getenv("HOME")
-	os.Setenv("HOME", tmpDir)
-	defer os.Setenv("HOME", oldHome)
+	if err := os.Setenv("HOME", tmpDir); err != nil {
+		t.Fatalf("failed to set HOME: %v", err)
+	}
+	defer func() { _ = os.Setenv("HOME", oldHome) }()
 
 	_, err = Discover("")
 	if err == nil {

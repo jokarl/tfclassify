@@ -252,78 +252,251 @@ func TestSensitiveAnalyzer_MultipleResources(t *testing.T) {
 	}
 }
 
+// Recursive sensitive detection tests
+
+func TestSensitiveAnalyzer_NestedSensitive(t *testing.T) {
+	a := &SensitiveAnalyzer{}
+	changes := []plan.ResourceChange{
+		{
+			Address: "azurerm_app_service.main",
+			Type:    "azurerm_app_service",
+			Actions: []string{"update"},
+			Before: map[string]interface{}{
+				"settings": map[string]interface{}{
+					"password": "old-secret",
+					"name":     "myapp",
+				},
+			},
+			After: map[string]interface{}{
+				"settings": map[string]interface{}{
+					"password": "new-secret",
+					"name":     "myapp",
+				},
+			},
+			BeforeSensitive: map[string]interface{}{
+				"settings": map[string]interface{}{
+					"password": true,
+				},
+			},
+			AfterSensitive: map[string]interface{}{
+				"settings": map[string]interface{}{
+					"password": true,
+				},
+			},
+		},
+	}
+
+	decisions := a.Analyze(changes)
+	if len(decisions) != 1 {
+		t.Fatalf("expected 1 decision, got %d", len(decisions))
+	}
+	rule := decisions[0].MatchedRules[0]
+	if !strings.Contains(rule, "settings.password") {
+		t.Errorf("expected MatchedRule to mention 'settings.password', got: %s", rule)
+	}
+}
+
+func TestSensitiveAnalyzer_DeeplyNestedSensitive(t *testing.T) {
+	a := &SensitiveAnalyzer{}
+	changes := []plan.ResourceChange{
+		{
+			Address: "azurerm_resource.deep",
+			Type:    "azurerm_resource",
+			Actions: []string{"update"},
+			Before: map[string]interface{}{
+				"level1": map[string]interface{}{
+					"level2": map[string]interface{}{
+						"secret_key": "old-key",
+					},
+				},
+			},
+			After: map[string]interface{}{
+				"level1": map[string]interface{}{
+					"level2": map[string]interface{}{
+						"secret_key": "new-key",
+					},
+				},
+			},
+			BeforeSensitive: map[string]interface{}{
+				"level1": map[string]interface{}{
+					"level2": map[string]interface{}{
+						"secret_key": true,
+					},
+				},
+			},
+			AfterSensitive: map[string]interface{}{
+				"level1": map[string]interface{}{
+					"level2": map[string]interface{}{
+						"secret_key": true,
+					},
+				},
+			},
+		},
+	}
+
+	decisions := a.Analyze(changes)
+	if len(decisions) != 1 {
+		t.Fatalf("expected 1 decision, got %d", len(decisions))
+	}
+	rule := decisions[0].MatchedRules[0]
+	if !strings.Contains(rule, "level1.level2.secret_key") {
+		t.Errorf("expected MatchedRule to mention 'level1.level2.secret_key', got: %s", rule)
+	}
+}
+
+func TestSensitiveAnalyzer_ListIndexedSensitive(t *testing.T) {
+	a := &SensitiveAnalyzer{}
+	changes := []plan.ResourceChange{
+		{
+			Address: "azurerm_resource.list",
+			Type:    "azurerm_resource",
+			Actions: []string{"update"},
+			Before: map[string]interface{}{
+				"config": []interface{}{
+					map[string]interface{}{"secret_key": "old-key", "name": "first"},
+				},
+			},
+			After: map[string]interface{}{
+				"config": []interface{}{
+					map[string]interface{}{"secret_key": "new-key", "name": "first"},
+				},
+			},
+			BeforeSensitive: map[string]interface{}{
+				"config": []interface{}{
+					map[string]interface{}{"secret_key": true},
+				},
+			},
+			AfterSensitive: map[string]interface{}{
+				"config": []interface{}{
+					map[string]interface{}{"secret_key": true},
+				},
+			},
+		},
+	}
+
+	decisions := a.Analyze(changes)
+	if len(decisions) != 1 {
+		t.Fatalf("expected 1 decision, got %d", len(decisions))
+	}
+	rule := decisions[0].MatchedRules[0]
+	if !strings.Contains(rule, "config.0.secret_key") {
+		t.Errorf("expected MatchedRule to mention 'config.0.secret_key', got: %s", rule)
+	}
+}
+
+func TestSensitiveAnalyzer_NestedUnchanged(t *testing.T) {
+	a := &SensitiveAnalyzer{}
+	changes := []plan.ResourceChange{
+		{
+			Address: "azurerm_resource.unchanged",
+			Type:    "azurerm_resource",
+			Actions: []string{"update"},
+			Before: map[string]interface{}{
+				"settings": map[string]interface{}{
+					"password": "same-pass",
+					"name":     "old-name",
+				},
+			},
+			After: map[string]interface{}{
+				"settings": map[string]interface{}{
+					"password": "same-pass",
+					"name":     "new-name",
+				},
+			},
+			BeforeSensitive: map[string]interface{}{
+				"settings": map[string]interface{}{
+					"password": true,
+				},
+			},
+			AfterSensitive: map[string]interface{}{
+				"settings": map[string]interface{}{
+					"password": true,
+				},
+			},
+		},
+	}
+
+	decisions := a.Analyze(changes)
+	if len(decisions) != 0 {
+		t.Errorf("expected 0 decisions for unchanged nested sensitive, got %d", len(decisions))
+	}
+}
+
+func TestSensitiveAnalyzer_MixedTopLevelAndNested(t *testing.T) {
+	a := &SensitiveAnalyzer{}
+	changes := []plan.ResourceChange{
+		{
+			Address: "azurerm_resource.mixed",
+			Type:    "azurerm_resource",
+			Actions: []string{"update"},
+			Before: map[string]interface{}{
+				"api_key": "old-key",
+				"settings": map[string]interface{}{
+					"password": "old-pass",
+				},
+			},
+			After: map[string]interface{}{
+				"api_key": "new-key",
+				"settings": map[string]interface{}{
+					"password": "new-pass",
+				},
+			},
+			BeforeSensitive: map[string]interface{}{
+				"api_key": true,
+				"settings": map[string]interface{}{
+					"password": true,
+				},
+			},
+			AfterSensitive: map[string]interface{}{
+				"api_key": true,
+				"settings": map[string]interface{}{
+					"password": true,
+				},
+			},
+		},
+	}
+
+	decisions := a.Analyze(changes)
+	if len(decisions) != 1 {
+		t.Fatalf("expected 1 decision, got %d", len(decisions))
+	}
+	rule := decisions[0].MatchedRules[0]
+	if !strings.Contains(rule, "api_key") {
+		t.Errorf("expected MatchedRule to mention 'api_key', got: %s", rule)
+	}
+	if !strings.Contains(rule, "settings.password") {
+		t.Errorf("expected MatchedRule to mention 'settings.password', got: %s", rule)
+	}
+}
+
 // Helper function tests
 
-func TestAsBoolMap_Nil(t *testing.T) {
-	if asBoolMap(nil) != nil {
-		t.Error("expected nil for nil input")
-	}
-}
-
-func TestAsBoolMap_NotMap(t *testing.T) {
-	if asBoolMap("not a map") != nil {
-		t.Error("expected nil for string input")
-	}
-	if asBoolMap([]string{"a"}) != nil {
-		t.Error("expected nil for slice input")
-	}
-	if asBoolMap(42) != nil {
-		t.Error("expected nil for int input")
-	}
-	if asBoolMap(true) != nil {
-		t.Error("expected nil for bool input")
-	}
-}
-
-func TestAsBoolMap_ValidMap(t *testing.T) {
-	input := map[string]interface{}{"password": true}
-	result := asBoolMap(input)
-	if result == nil {
-		t.Fatal("expected non-nil result")
-	}
-	if result["password"] != true {
-		t.Errorf("expected password=true, got %v", result["password"])
-	}
-}
-
-func TestHasAttributeChanged_BothNil(t *testing.T) {
-	if hasAttributeChanged("test", nil, nil) {
+func TestValueChanged_BothNil(t *testing.T) {
+	if valueChanged(nil, nil) {
 		t.Error("expected false when both are nil")
 	}
 }
 
-func TestHasAttributeChanged_Added(t *testing.T) {
-	if !hasAttributeChanged("password", map[string]interface{}{}, map[string]interface{}{"password": "new"}) {
-		t.Error("expected true when attribute is added")
+func TestValueChanged_Added(t *testing.T) {
+	if !valueChanged(nil, "new") {
+		t.Error("expected true when value is added")
 	}
 }
 
-func TestHasAttributeChanged_Removed(t *testing.T) {
-	if !hasAttributeChanged("password", map[string]interface{}{"password": "old"}, map[string]interface{}{}) {
-		t.Error("expected true when attribute is removed")
+func TestValueChanged_Removed(t *testing.T) {
+	if !valueChanged("old", nil) {
+		t.Error("expected true when value is removed")
 	}
 }
 
-func TestHasAttributeChanged_Changed(t *testing.T) {
-	if !hasAttributeChanged("password", map[string]interface{}{"password": "old"}, map[string]interface{}{"password": "new"}) {
+func TestValueChanged_Changed(t *testing.T) {
+	if !valueChanged("old", "new") {
 		t.Error("expected true when value changed")
 	}
 }
 
-func TestHasAttributeChanged_Unchanged(t *testing.T) {
-	if hasAttributeChanged("password", map[string]interface{}{"password": "same"}, map[string]interface{}{"password": "same"}) {
+func TestValueChanged_Unchanged(t *testing.T) {
+	if valueChanged("same", "same") {
 		t.Error("expected false when value unchanged")
-	}
-}
-
-func TestHasAttributeChanged_BeforeNilAfterPresent(t *testing.T) {
-	if !hasAttributeChanged("password", nil, map[string]interface{}{"password": "new"}) {
-		t.Error("expected true when before is nil and after has attribute")
-	}
-}
-
-func TestHasAttributeChanged_BeforePresentAfterNil(t *testing.T) {
-	if !hasAttributeChanged("password", map[string]interface{}{"password": "old"}, nil) {
-		t.Error("expected true when before has attribute and after is nil")
 	}
 }

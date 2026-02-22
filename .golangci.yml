@@ -1,0 +1,33 @@
+version: "2"
+
+run:
+  go: "1.25"
+
+linters:
+  default: standard
+  enable:
+    - bodyclose
+    - durationcheck
+    - errorlint
+    - misspell
+    - nilerr
+    - noctx
+    - unconvert
+    - unparam
+
+  settings:
+    errcheck:
+      check-type-assertions: true
+
+  exclusions:
+    rules:
+      # Test files: suppress linters that produce churn without catching bugs
+      - path: _test\.go
+        linters:
+          - errorlint
+          - noctx
+
+issues:
+  # Report ALL issues. Never silently cap output.
+  max-issues-per-linter: 0
+  max-same-issues: 0

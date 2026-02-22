@@ -33,9 +33,9 @@ on:
         description: Create a GitHub issue when the e2e test fails
 
 env:
-  ARM_CLIENT_ID: "415fa556-f0eb-4ed0-8eb0-9d7b66944996"
-  ARM_SUBSCRIPTION_ID: "0a271008-02cf-4a50-9bb3-afc7c4aed74c"
-  ARM_TENANT_ID: "9fc151d1-62b8-402f-b07e-91533ff07e0d"
+  ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+  ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
   ARM_USE_OIDC: "true"
   TFCLASSIFY_PLUGIN_DIR: /tmp/tfclassify-plugins
 

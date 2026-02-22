@@ -28,7 +28,7 @@ func TestLoad_WithDiscovery(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	configContent := `
 classification "standard" {
@@ -55,7 +55,7 @@ defaults {
 	if err != nil {
 		t.Fatalf("failed to get cwd: %v", err)
 	}
-	defer os.Chdir(oldWd)
+	defer func() { _ = os.Chdir(oldWd) }()
 
 	if err := os.Chdir(tmpDir); err != nil {
 		t.Fatalf("failed to chdir: %v", err)
@@ -80,21 +80,23 @@ func TestLoad_DiscoveryFails(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	oldWd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("failed to get cwd: %v", err)
 	}
-	defer os.Chdir(oldWd)
+	defer func() { _ = os.Chdir(oldWd) }()
 
 	if err := os.Chdir(tmpDir); err != nil {
 		t.Fatalf("failed to chdir: %v", err)
 	}
 
 	oldHome := os.Getenv("HOME")
-	os.Setenv("HOME", tmpDir)
-	defer os.Setenv("HOME", oldHome)
+	if err := os.Setenv("HOME", tmpDir); err != nil {
+		t.Fatalf("failed to set HOME: %v", err)
+	}
+	defer func() { _ = os.Setenv("HOME", oldHome) }()
 
 	_, err = Load("")
 	if err == nil {
@@ -121,7 +123,7 @@ func TestLoadFile_UnreadableFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	configPath := filepath.Join(tmpDir, "unreadable.hcl")
 	if err := os.WriteFile(configPath, []byte("content"), 0000); err != nil {
@@ -163,14 +165,14 @@ func TestDiscover_HomeDirectory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpHome)
+	defer func() { _ = os.RemoveAll(tmpHome) }()
 
 	// Create another temp dir to use as CWD (without config)
 	tmpCwd, err := os.MkdirTemp("", "tfclassify-cwd-test")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpCwd)
+	defer func() { _ = os.RemoveAll(tmpCwd) }()
 
 	// Put config in HOME
 	configPath := filepath.Join(tmpHome, ConfigFileName)
@@ -179,14 +181,21 @@ func TestDiscover_HomeDirectory(t *testing.T) {
 	}
 
 	// Change to CWD without config
-	oldWd, _ := os.Getwd()
-	defer os.Chdir(oldWd)
-	os.Chdir(tmpCwd)
+	oldWd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get cwd: %v", err)
+	}
+	defer func() { _ = os.Chdir(oldWd) }()
+	if err := os.Chdir(tmpCwd); err != nil {
+		t.Fatalf("failed to chdir: %v", err)
+	}
 
 	// Set HOME to our temp home
 	oldHome := os.Getenv("HOME")
-	os.Setenv("HOME", tmpHome)
-	defer os.Setenv("HOME", oldHome)
+	if err := os.Setenv("HOME", tmpHome); err != nil {
+		t.Fatalf("failed to set HOME: %v", err)
+	}
+	defer func() { _ = os.Setenv("HOME", oldHome) }()
 
 	path, err := Discover("")
 	if err != nil {

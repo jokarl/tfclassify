@@ -490,6 +490,61 @@ func TestValidate_SARIFLevel_Empty(t *testing.T) {
 	}
 }
 
+func TestValidate_DuplicatePrecedence(t *testing.T) {
+	cfg := &Config{
+		Classifications: []ClassificationConfig{
+			{
+				Name:        "critical",
+				Description: "Critical",
+				Rules:       []RuleConfig{{Resource: []string{"*_role_*"}}},
+			},
+			{
+				Name:        "standard",
+				Description: "Standard",
+				Rules:       []RuleConfig{{Resource: []string{"*"}}},
+			},
+		},
+		Precedence: []string{"critical", "standard", "critical"},
+		Defaults:   &DefaultsConfig{Unclassified: "standard", NoChanges: "standard"},
+	}
+
+	err := Validate(cfg)
+	if err == nil {
+		t.Fatal("expected error for duplicate precedence entry, got nil")
+	}
+
+	if !strings.Contains(err.Error(), "duplicate entry") {
+		t.Errorf("expected error about duplicate entry, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "critical") {
+		t.Errorf("expected error to mention 'critical', got: %v", err)
+	}
+}
+
+func TestValidate_DuplicatePrecedence_NoDuplicates(t *testing.T) {
+	cfg := &Config{
+		Classifications: []ClassificationConfig{
+			{
+				Name:        "critical",
+				Description: "Critical",
+				Rules:       []RuleConfig{{Resource: []string{"*_role_*"}}},
+			},
+			{
+				Name:        "standard",
+				Description: "Standard",
+				Rules:       []RuleConfig{{Resource: []string{"*"}}},
+			},
+		},
+		Precedence: []string{"critical", "standard"},
+		Defaults:   &DefaultsConfig{Unclassified: "standard", NoChanges: "standard"},
+	}
+
+	err := Validate(cfg)
+	if err != nil {
+		t.Errorf("unexpected error for unique precedence entries: %v", err)
+	}
+}
+
 func TestValidateWarnings_EmptyClassification_WithPlugin(t *testing.T) {
 	cfg := &Config{
 		Classifications: []ClassificationConfig{

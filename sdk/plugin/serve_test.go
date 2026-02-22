@@ -268,15 +268,27 @@ func TestPluginServiceServer_ApplyConfig(t *testing.T) {
 
 func TestProtoConversions(t *testing.T) {
 	// Test nil conversions
-	if ProtoToSDKResourceChange(nil) != nil {
+	result, err := ProtoToSDKResourceChange(nil)
+	if err != nil {
+		t.Fatalf("unexpected error for nil proto: %v", err)
+	}
+	if result != nil {
 		t.Error("expected nil for nil proto")
 	}
 
-	if SDKToProtoResourceChange(nil) != nil {
+	protoResult, err := SDKToProtoResourceChange(nil)
+	if err != nil {
+		t.Fatalf("unexpected error for nil sdk: %v", err)
+	}
+	if protoResult != nil {
 		t.Error("expected nil for nil sdk")
 	}
 
-	if SDKToProtoDecision(nil) != nil {
+	decisionResult, err := SDKToProtoDecision(nil)
+	if err != nil {
+		t.Fatalf("unexpected error for nil decision: %v", err)
+	}
+	if decisionResult != nil {
 		t.Error("expected nil for nil decision")
 	}
 
@@ -291,13 +303,19 @@ func TestProtoConversions(t *testing.T) {
 		After:        map[string]interface{}{"key": "value"},
 	}
 
-	protoChange := SDKToProtoResourceChange(sdkChange)
+	protoChange, err := SDKToProtoResourceChange(sdkChange)
+	if err != nil {
+		t.Fatalf("SDKToProtoResourceChange error: %v", err)
+	}
 	if protoChange.Address != "test.resource" {
 		t.Errorf("expected address 'test.resource', got %q", protoChange.Address)
 	}
 
 	// Convert back
-	converted := ProtoToSDKResourceChange(protoChange)
+	converted, err := ProtoToSDKResourceChange(protoChange)
+	if err != nil {
+		t.Fatalf("ProtoToSDKResourceChange error: %v", err)
+	}
 	if converted.Address != sdkChange.Address {
 		t.Errorf("round-trip failed: expected %q, got %q", sdkChange.Address, converted.Address)
 	}
@@ -310,7 +328,10 @@ func TestProtoConversions(t *testing.T) {
 		Metadata:       map[string]interface{}{"key": "value"},
 	}
 
-	protoDecision := SDKToProtoDecision(sdkDecision)
+	protoDecision, err := SDKToProtoDecision(sdkDecision)
+	if err != nil {
+		t.Fatalf("SDKToProtoDecision error: %v", err)
+	}
 	if protoDecision.Classification != "critical" {
 		t.Errorf("expected classification 'critical', got %q", protoDecision.Classification)
 	}

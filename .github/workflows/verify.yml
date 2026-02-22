@@ -3,6 +3,9 @@ name: Verify
 on:
   schedule:
     - cron: '0 2 * * *'
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
   workflow_dispatch:
 
 concurrency:
@@ -15,14 +18,15 @@ permissions:
   issues: write
 
 env:
-  ARM_CLIENT_ID: "415fa556-f0eb-4ed0-8eb0-9d7b66944996"
-  ARM_SUBSCRIPTION_ID: "0a271008-02cf-4a50-9bb3-afc7c4aed74c"
-  ARM_TENANT_ID: "9fc151d1-62b8-402f-b07e-91533ff07e0d"
+  ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+  ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
   ARM_USE_OIDC: "true"
   RESOURCE_GROUP: rg-lab-johan.karlsson
 
 jobs:
   cleanup:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Azure login
@@ -61,16 +65,33 @@ jobs:
       fail-fast: false
       matrix:
         use-case:
-          - role-assignment-privileged
+          - blast-radius
+          - cis-azure-foundations
+          - control-plane-patterns
+          - custom-role-cross-reference
+          - data-plane-detection
+          - evidence-signing
+          - keyvault-destructive
+          - modules-plugin
+          - modules-pluginless
           - nsg-open-inbound
-          - route-table
+          - role-assignment-privileged
           - role-assignment-reader
           - role-escalation-threshold
           - role-exclusion
-          - keyvault-destructive
+          - route-table
+        include:
+          - use-case: custom-role-cross-reference
+            plan-only: true
+          - use-case: evidence-signing
+            plan-only: true
+            evidence: true
     uses: ./.github/workflows/e2e.yml
     with:
       use-case: ${{ matrix.use-case }}
       binary-source: release
       plan-formats: json
+      plan-only: ${{ matrix.plan-only || false }}
+      evidence: ${{ matrix.evidence || false }}
       open-issue-on-failure: true
+    secrets: inherit

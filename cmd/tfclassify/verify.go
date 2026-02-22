@@ -27,8 +27,8 @@ using an Ed25519 public key. Exits 0 if valid, 1 if invalid.`,
 func init() {
 	verifyCmd.Flags().StringVarP(&verifyEvidenceFile, "evidence-file", "e", "", "Path to evidence artifact JSON (required)")
 	verifyCmd.Flags().StringVarP(&verifyPublicKey, "public-key", "k", "", "Path to Ed25519 PEM public key (required)")
-	verifyCmd.MarkFlagRequired("evidence-file")
-	verifyCmd.MarkFlagRequired("public-key")
+	_ = verifyCmd.MarkFlagRequired("evidence-file")
+	_ = verifyCmd.MarkFlagRequired("public-key")
 	rootCmd.AddCommand(verifyCmd)
 }
 

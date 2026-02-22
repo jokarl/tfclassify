@@ -69,6 +69,47 @@ func TestResourceChange_BeforeAfterTypes(t *testing.T) {
 	}
 }
 
+func TestDecision_Validate_Valid(t *testing.T) {
+	tests := []struct {
+		name     string
+		severity int
+	}{
+		{"zero", 0},
+		{"mid", 50},
+		{"max", 100},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			d := &Decision{Severity: tt.severity}
+			if err := d.Validate(); err != nil {
+				t.Errorf("unexpected error for severity %d: %v", tt.severity, err)
+			}
+		})
+	}
+}
+
+func TestDecision_Validate_Invalid(t *testing.T) {
+	tests := []struct {
+		name     string
+		severity int
+	}{
+		{"negative", -1},
+		{"too high", 101},
+		{"way too high", 999},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			d := &Decision{Severity: tt.severity}
+			err := d.Validate()
+			if err == nil {
+				t.Fatalf("expected error for severity %d, got nil", tt.severity)
+			}
+		})
+	}
+}
+
 func TestDecision_Metadata(t *testing.T) {
 	decision := Decision{
 		Classification: "critical",

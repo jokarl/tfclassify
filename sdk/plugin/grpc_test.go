@@ -193,8 +193,14 @@ func TestProtoConversions_RoundTrip_WithSensitiveFields(t *testing.T) {
 		AfterSensitive:  map[string]interface{}{"password": true, "master_password": true},
 	}
 
-	proto := SDKToProtoResourceChange(original)
-	converted := ProtoToSDKResourceChange(proto)
+	proto, err := SDKToProtoResourceChange(original)
+	if err != nil {
+		t.Fatalf("SDKToProtoResourceChange error: %v", err)
+	}
+	converted, err := ProtoToSDKResourceChange(proto)
+	if err != nil {
+		t.Fatalf("ProtoToSDKResourceChange error: %v", err)
+	}
 
 	if converted.Address != original.Address {
 		t.Errorf("address mismatch: %q vs %q", converted.Address, original.Address)
@@ -222,26 +228,18 @@ func TestProtoConversions_RoundTrip_WithSensitiveFields(t *testing.T) {
 	if converted.BeforeSensitive == nil {
 		t.Fatal("expected BeforeSensitive to be non-nil")
 	}
-	beforeSens, ok := converted.BeforeSensitive.(map[string]interface{})
-	if !ok {
-		t.Fatalf("expected BeforeSensitive to be map, got %T", converted.BeforeSensitive)
-	}
-	if beforeSens["password"] != true {
-		t.Errorf("expected BeforeSensitive.password to be true, got %v", beforeSens["password"])
+	if converted.BeforeSensitive["password"] != true {
+		t.Errorf("expected BeforeSensitive.password to be true, got %v", converted.BeforeSensitive["password"])
 	}
 
 	if converted.AfterSensitive == nil {
 		t.Fatal("expected AfterSensitive to be non-nil")
 	}
-	afterSens, ok := converted.AfterSensitive.(map[string]interface{})
-	if !ok {
-		t.Fatalf("expected AfterSensitive to be map, got %T", converted.AfterSensitive)
+	if converted.AfterSensitive["password"] != true {
+		t.Errorf("expected AfterSensitive.password to be true, got %v", converted.AfterSensitive["password"])
 	}
-	if afterSens["password"] != true {
-		t.Errorf("expected AfterSensitive.password to be true, got %v", afterSens["password"])
-	}
-	if afterSens["master_password"] != true {
-		t.Errorf("expected AfterSensitive.master_password to be true, got %v", afterSens["master_password"])
+	if converted.AfterSensitive["master_password"] != true {
+		t.Errorf("expected AfterSensitive.master_password to be true, got %v", converted.AfterSensitive["master_password"])
 	}
 }
 
@@ -256,7 +254,10 @@ func TestProtoConversions_Decision_WithMetadata(t *testing.T) {
 		},
 	}
 
-	proto := SDKToProtoDecision(original)
+	proto, err := SDKToProtoDecision(original)
+	if err != nil {
+		t.Fatalf("SDKToProtoDecision error: %v", err)
+	}
 
 	if proto.Classification != "critical" {
 		t.Errorf("classification mismatch: %q", proto.Classification)
@@ -277,7 +278,10 @@ func TestProtoConversions_Decision_NilMetadata(t *testing.T) {
 		Metadata:       nil,
 	}
 
-	proto := SDKToProtoDecision(original)
+	proto, err := SDKToProtoDecision(original)
+	if err != nil {
+		t.Fatalf("SDKToProtoDecision error: %v", err)
+	}
 
 	if proto.Metadata != nil {
 		t.Errorf("expected nil metadata, got %v", proto.Metadata)
@@ -291,7 +295,10 @@ func TestProtoConversions_ResourceChange_EmptyFields(t *testing.T) {
 		Actions: []string{"create"},
 	}
 
-	proto := SDKToProtoResourceChange(original)
+	proto, err := SDKToProtoResourceChange(original)
+	if err != nil {
+		t.Fatalf("SDKToProtoResourceChange error: %v", err)
+	}
 	if proto.Before != nil {
 		t.Errorf("expected nil Before, got %v", proto.Before)
 	}
@@ -302,7 +309,10 @@ func TestProtoConversions_ResourceChange_EmptyFields(t *testing.T) {
 		t.Errorf("expected nil BeforeSensitive, got %v", proto.BeforeSensitive)
 	}
 
-	converted := ProtoToSDKResourceChange(proto)
+	converted, err := ProtoToSDKResourceChange(proto)
+	if err != nil {
+		t.Fatalf("ProtoToSDKResourceChange error: %v", err)
+	}
 	if converted.Before != nil {
 		t.Errorf("expected nil Before after round-trip, got %v", converted.Before)
 	}
@@ -399,5 +409,109 @@ func TestNewPluginClient(t *testing.T) {
 	}
 	if client.broker != nil {
 		t.Error("expected nil broker")
+	}
+}
+
+func TestProtoToSDKResourceChange_MalformedJSON(t *testing.T) {
+	tests := []struct {
+		name  string
+		proto *pb.ResourceChange
+	}{
+		{
+			name: "malformed Before",
+			proto: &pb.ResourceChange{
+				Address: "test.resource",
+				Before:  []byte("{invalid json"),
+			},
+		},
+		{
+			name: "malformed After",
+			proto: &pb.ResourceChange{
+				Address: "test.resource",
+				After:   []byte("{invalid json"),
+			},
+		},
+		{
+			name: "malformed BeforeSensitive",
+			proto: &pb.ResourceChange{
+				Address:         "test.resource",
+				BeforeSensitive: []byte("{invalid json"),
+			},
+		},
+		{
+			name: "malformed AfterSensitive",
+			proto: &pb.ResourceChange{
+				Address:        "test.resource",
+				AfterSensitive: []byte("{invalid json"),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := ProtoToSDKResourceChange(tt.proto)
+			if err == nil {
+				t.Fatal("expected error for malformed JSON")
+			}
+			if result != nil {
+				t.Error("expected nil result on error")
+			}
+		})
+	}
+}
+
+func TestProtoToSDKDecision_MalformedMetadata(t *testing.T) {
+	proto := &pb.Decision{
+		Classification: "critical",
+		Reason:         "test",
+		Metadata:       []byte("{invalid json"),
+	}
+
+	result, err := ProtoToSDKDecision(proto)
+	if err == nil {
+		t.Fatal("expected error for malformed metadata")
+	}
+	if result != nil {
+		t.Error("expected nil result on error")
+	}
+}
+
+func TestProtoToSDKResourceChange_NilReturnsNil(t *testing.T) {
+	result, err := ProtoToSDKResourceChange(nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != nil {
+		t.Error("expected nil for nil input")
+	}
+}
+
+func TestSDKToProtoResourceChange_NilReturnsNil(t *testing.T) {
+	result, err := SDKToProtoResourceChange(nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != nil {
+		t.Error("expected nil for nil input")
+	}
+}
+
+func TestSDKToProtoDecision_NilReturnsNil(t *testing.T) {
+	result, err := SDKToProtoDecision(nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != nil {
+		t.Error("expected nil for nil input")
+	}
+}
+
+func TestProtoToSDKDecision_NilReturnsNil(t *testing.T) {
+	result, err := ProtoToSDKDecision(nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != nil {
+		t.Error("expected nil for nil input")
 	}
 }

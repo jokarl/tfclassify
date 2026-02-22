@@ -3,6 +3,7 @@ package plugin
 
 import (
 	"archive/zip"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -77,12 +78,12 @@ func InstallPlugins(cfg *config.Config, w io.Writer) error {
 
 	for _, p := range cfg.Plugins {
 		if p.Source == "" {
-			fmt.Fprintf(w, "  %s: builtin (skip)\n", p.Name)
+			_, _ = fmt.Fprintf(w, "  %s: builtin (skip)\n", p.Name)
 			continue
 		}
 
 		if !p.Enabled {
-			fmt.Fprintf(w, "  %s: disabled (skip)\n", p.Name)
+			_, _ = fmt.Fprintf(w, "  %s: disabled (skip)\n", p.Name)
 			continue
 		}
 
@@ -90,15 +91,15 @@ func InstallPlugins(cfg *config.Config, w io.Writer) error {
 		binaryPath := filepath.Join(pluginDir, binaryName)
 
 		if isInstalledAtVersion(binaryPath, p.Name, p.Version, manifest) {
-			fmt.Fprintf(w, "  %s: already installed (v%s)\n", p.Name, p.Version)
+			_, _ = fmt.Fprintf(w, "  %s: already installed (v%s)\n", p.Name, p.Version)
 			continue
 		}
 
 		// Check if a different version is installed
 		if installedVersion, exists := manifest.Plugins[p.Name]; exists {
-			fmt.Fprintf(w, "  %s: upgrading from v%s to v%s...\n", p.Name, installedVersion, p.Version)
+			_, _ = fmt.Fprintf(w, "  %s: upgrading from v%s to v%s...\n", p.Name, installedVersion, p.Version)
 		} else {
-			fmt.Fprintf(w, "  %s: installing v%s from %s...\n", p.Name, p.Version, p.Source)
+			_, _ = fmt.Fprintf(w, "  %s: installing v%s from %s...\n", p.Name, p.Version, p.Source)
 		}
 
 		if err := downloadAndInstall(p.Name, p.Source, p.Version, pluginDir); err != nil {
@@ -108,7 +109,7 @@ func InstallPlugins(cfg *config.Config, w io.Writer) error {
 		// Update manifest with new version
 		manifest.Plugins[p.Name] = p.Version
 		manifestChanged = true
-		fmt.Fprintf(w, "  %s: installed\n", p.Name)
+		_, _ = fmt.Fprintf(w, "  %s: installed\n", p.Name)
 	}
 
 	// Save manifest if changed
@@ -148,33 +149,107 @@ func resolveReleaseTag(name, repo, version string) string {
 	return PluginBinaryPrefix + name + "-v" + version
 }
 
+// githubRelease represents a GitHub release from the API.
+type githubRelease struct {
+	TagName string        `json:"tag_name"`
+	Assets  []githubAsset `json:"assets"`
+}
+
+// githubAsset represents an asset within a GitHub release.
+type githubAsset struct {
+	Name               string `json:"name"`
+	BrowserDownloadURL string `json:"browser_download_url"`
+}
+
+// httpClient is the HTTP client used for GitHub API and download requests.
+// It can be overridden in tests.
+var httpClient = &http.Client{}
+
+// githubAPIBase is the base URL for the GitHub API. Overridden in tests.
+var githubAPIBase = "https://api.github.com"
+
+// fetchRelease queries the GitHub Releases API for a specific tag and returns the release metadata.
+func fetchRelease(owner, repo, tag string) (*githubRelease, error) {
+	apiURL := fmt.Sprintf("%s/repos/%s/%s/releases/tags/%s", githubAPIBase, owner, repo, tag)
+
+	req, err := http.NewRequestWithContext(context.TODO(), "GET", apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Accept", "application/vnd.github+json")
+	if token := os.Getenv("GITHUB_TOKEN"); token != "" {
+		req.Header.Set("Authorization", "token "+token)
+	}
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query GitHub Releases API: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, fmt.Errorf("release %q not found in %s/%s", tag, owner, repo)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GitHub API returned status %d for release %q", resp.StatusCode, tag)
+	}
+
+	var release githubRelease
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		return nil, fmt.Errorf("failed to parse release response: %w", err)
+	}
+
+	return &release, nil
+}
+
+// findAssetURL searches a release's assets for the expected plugin zip and returns its download URL.
+func findAssetURL(release *githubRelease, assetName string) (string, error) {
+	for _, a := range release.Assets {
+		if a.Name == assetName {
+			return a.BrowserDownloadURL, nil
+		}
+	}
+
+	available := make([]string, 0, len(release.Assets))
+	for _, a := range release.Assets {
+		available = append(available, a.Name)
+	}
+	return "", fmt.Errorf("asset %q not found in release %q (available: %v)", assetName, release.TagName, available)
+}
+
 // downloadAndInstall downloads a plugin from GitHub releases and installs it.
 func downloadAndInstall(name, source, version, pluginDir string) error {
-	// Parse the source to get owner/repo
-	// Expected format: github.com/owner/repo
 	owner, repo, err := parseGitHubSource(source)
 	if err != nil {
 		return err
 	}
 
-	// Construct the release asset URL
 	tag := resolveReleaseTag(name, repo, version)
 	assetName := fmt.Sprintf("tfclassify-plugin-%s_%s_%s_%s.zip", name, version, runtime.GOOS, runtime.GOARCH)
-	assetURL := fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s", owner, repo, tag, assetName)
 
-	// Create plugin directory if it doesn't exist
+	// Query the GitHub Releases API for this tag
+	release, err := fetchRelease(owner, repo, tag)
+	if err != nil {
+		return fmt.Errorf("failed to find release: %w", err)
+	}
+
+	// Find the matching asset
+	assetURL, err := findAssetURL(release, assetName)
+	if err != nil {
+		return fmt.Errorf("failed to find plugin asset: %w", err)
+	}
+
 	if err := os.MkdirAll(pluginDir, 0755); err != nil {
 		return fmt.Errorf("failed to create plugin directory: %w", err)
 	}
 
-	// Download the asset
 	tempFile, err := downloadFile(assetURL)
 	if err != nil {
 		return fmt.Errorf("failed to download plugin: %w", err)
 	}
-	defer os.Remove(tempFile)
+	defer func() { _ = os.Remove(tempFile) }()
 
-	// Extract the binary from the zip
 	binaryName := PluginBinaryPrefix + name
 	if err := extractBinaryFromZip(tempFile, binaryName, pluginDir); err != nil {
 		return fmt.Errorf("failed to extract plugin: %w", err)
@@ -205,7 +280,7 @@ func parseGitHubSource(source string) (string, string, error) {
 
 // downloadFile downloads a file from a URL and returns the path to a temp file.
 func downloadFile(url string) (string, error) {
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequestWithContext(context.TODO(), "GET", url, nil)
 	if err != nil {
 		return "", err
 	}
@@ -217,12 +292,11 @@ func downloadFile(url string) (string, error) {
 
 	req.Header.Set("Accept", "application/octet-stream")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		// Read a limited amount of the response body for error context
@@ -240,10 +314,10 @@ func downloadFile(url string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer tempFile.Close()
+	defer func() { _ = tempFile.Close() }()
 
 	if _, err := io.Copy(tempFile, resp.Body); err != nil {
-		os.Remove(tempFile.Name())
+		_ = os.Remove(tempFile.Name())
 		return "", err
 	}
 
@@ -256,7 +330,7 @@ func extractBinaryFromZip(zipPath, binaryName, destDir string) error {
 	if err != nil {
 		return err
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	for _, file := range reader.File {
 		// Look for the plugin binary (may be at root or in a subdirectory)
@@ -266,14 +340,14 @@ func extractBinaryFromZip(zipPath, binaryName, destDir string) error {
 			if err != nil {
 				return err
 			}
-			defer rc.Close()
+			defer func() { _ = rc.Close() }()
 
 			destPath := filepath.Join(destDir, fileName)
 			dest, err := os.OpenFile(destPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
 			if err != nil {
 				return err
 			}
-			defer dest.Close()
+			defer func() { _ = dest.Close() }()
 
 			if _, err := io.Copy(dest, rc); err != nil {
 				return err

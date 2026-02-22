@@ -17,7 +17,7 @@ func buildBinary(t *testing.T) string {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	t.Cleanup(func() { os.RemoveAll(tmpDir) })
+	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
 
 	binaryPath := filepath.Join(tmpDir, "tfclassify")
 	cmd := exec.Command("go", "build", "-o", binaryPath, ".")
@@ -157,7 +157,7 @@ func TestCLI_TextOutput(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	configPath := writeTestConfig(t, tmpDir)
 	planPath := writeTestPlan(t, tmpDir)
@@ -183,7 +183,7 @@ func TestCLI_JSONOutput(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	configPath := writeTestConfig(t, tmpDir)
 	planPath := writeTestPlan(t, tmpDir)
@@ -217,7 +217,7 @@ func TestCLI_GitHubOutput(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	configPath := writeTestConfig(t, tmpDir)
 	planPath := writeTestPlan(t, tmpDir)
@@ -241,7 +241,7 @@ func TestCLI_VerboseOutput(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	configPath := writeTestConfig(t, tmpDir)
 	planPath := writeTestPlan(t, tmpDir)
@@ -263,7 +263,7 @@ func TestCLI_EmptyPlan(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	configPath := writeTestConfig(t, tmpDir)
 	planPath := writeEmptyPlan(t, tmpDir)
@@ -291,7 +291,7 @@ func TestCLI_NonexistentPlan(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	configPath := writeTestConfig(t, tmpDir)
 
@@ -315,7 +315,7 @@ func TestCLI_NonexistentConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	planPath := writeTestPlan(t, tmpDir)
 
@@ -371,7 +371,7 @@ func TestCLI_InitSubcommand_NoPlugins(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	configPath := writeTestConfig(t, tmpDir)
 
@@ -395,7 +395,7 @@ func TestCLI_ExitCodes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	configPath := writeTestConfig(t, tmpDir)
 
@@ -414,7 +414,7 @@ func TestCLI_DefaultExitCodeZeroOnSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	configPath := writeTestConfig(t, tmpDir)
 	planPath := writeTestPlan(t, tmpDir) // Plan with critical changes
@@ -445,7 +445,7 @@ func TestCLI_DetailedExitCodeFlag(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	configPath := writeTestConfig(t, tmpDir)
 	planPath := writeTestPlan(t, tmpDir) // Plan with critical changes
@@ -477,7 +477,11 @@ func TestCLI_DetailedExitCodeFlag(t *testing.T) {
 		t.Errorf("expected overall 'critical', got %v", result["overall"])
 	}
 	// The exit_code in JSON should always contain the precedence-derived code
-	if int(result["exit_code"].(float64)) != 2 {
+	exitCode, ok := result["exit_code"].(float64)
+	if !ok {
+		t.Fatalf("expected exit_code to be a number, got %T", result["exit_code"])
+	}
+	if int(exitCode) != 2 {
 		t.Errorf("expected exit_code 2 in JSON, got %v", result["exit_code"])
 	}
 }
@@ -489,7 +493,7 @@ func TestCLI_ErrorExitCodeUnaffectedByFlag(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	configPath := writeTestConfig(t, tmpDir)
 
@@ -523,7 +527,7 @@ func TestCLI_ValidateCmd_ValidConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	configPath := writeTestConfig(t, tmpDir)
 
@@ -546,7 +550,7 @@ func TestCLI_ValidateCmd_InvalidConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Write config with precedence referencing nonexistent classification
 	configContent := `
@@ -565,7 +569,9 @@ defaults {
 }
 `
 	configPath := filepath.Join(tmpDir, ".tfclassify.hcl")
-	os.WriteFile(configPath, []byte(configContent), 0644)
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("failed to write config: %v", err)
+	}
 
 	cmd := exec.Command(binary, "validate", "--config", configPath)
 	output, err := cmd.CombinedOutput()
@@ -594,7 +600,7 @@ func TestCLI_ValidateCmd_InvalidGlob(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	configContent := `
 classification "critical" {
@@ -619,7 +625,9 @@ defaults {
 }
 `
 	configPath := filepath.Join(tmpDir, ".tfclassify.hcl")
-	os.WriteFile(configPath, []byte(configContent), 0644)
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("failed to write config: %v", err)
+	}
 
 	cmd := exec.Command(binary, "validate", "--config", configPath)
 	output, err := cmd.CombinedOutput()
@@ -648,7 +656,7 @@ func TestCLI_ValidateCmd_WarningsExitZero(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Config with empty classification (warning-level issue)
 	configContent := `
@@ -671,7 +679,9 @@ defaults {
 }
 `
 	configPath := filepath.Join(tmpDir, ".tfclassify.hcl")
-	os.WriteFile(configPath, []byte(configContent), 0644)
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("failed to write config: %v", err)
+	}
 
 	cmd := exec.Command(binary, "validate", "--config", configPath)
 	output, err := cmd.CombinedOutput()
@@ -693,7 +703,7 @@ func TestCLI_ValidateCmd_NoConfigFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	cmd := exec.Command(binary, "validate", "--config", filepath.Join(tmpDir, "nonexistent.hcl"))
 	_, err = cmd.CombinedOutput()
@@ -718,13 +728,15 @@ func TestCLI_InvalidPlanJSON(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	configPath := writeTestConfig(t, tmpDir)
 
 	// Write invalid JSON
 	invalidPlanPath := filepath.Join(tmpDir, "invalid.json")
-	os.WriteFile(invalidPlanPath, []byte("this is not json"), 0644)
+	if err := os.WriteFile(invalidPlanPath, []byte("this is not json"), 0644); err != nil {
+		t.Fatalf("failed to write invalid plan: %v", err)
+	}
 
 	cmd := exec.Command(binary, "--plan", invalidPlanPath, "--config", configPath)
 	output, err := cmd.CombinedOutput()
@@ -746,7 +758,7 @@ func TestCLI_ExplainCmd_TextOutput(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	configPath := writeTestConfig(t, tmpDir)
 	planPath := writeTestPlan(t, tmpDir)
@@ -776,7 +788,7 @@ func TestCLI_ExplainCmd_JSONOutput(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	configPath := writeTestConfig(t, tmpDir)
 	planPath := writeTestPlan(t, tmpDir)
@@ -801,7 +813,10 @@ func TestCLI_ExplainCmd_JSONOutput(t *testing.T) {
 	}
 
 	// Check first resource has required fields
-	res := resources[0].(map[string]any)
+	res, ok := resources[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected resource to be a map, got %T", resources[0])
+	}
 	if res["address"] == nil {
 		t.Error("expected address field")
 	}
@@ -820,7 +835,7 @@ func TestCLI_ExplainCmd_ResourceFilter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	configPath := writeTestConfig(t, tmpDir)
 	planPath := writeTestPlan(t, tmpDir)
@@ -848,7 +863,7 @@ func TestCLI_ExplainCmd_ResourceFilter_Repeatable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	configPath := writeTestConfig(t, tmpDir)
 	planPath := writeTestPlan(t, tmpDir)

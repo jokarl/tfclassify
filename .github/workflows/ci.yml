@@ -27,6 +27,10 @@ on:
       - '.github/workflows/e2e.yml'
   workflow_dispatch:
 
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   id-token: write
   contents: read
@@ -50,6 +54,10 @@ jobs:
         with:
           go-version-file: go.mod
       - run: go test -race -coverprofile=coverage.out ./...
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: coverage.out
 
   vet:
     runs-on: ubuntu-latest
@@ -59,6 +67,38 @@ jobs:
         with:
           go-version-file: go.mod
       - run: go vet ./...
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: golangci/golangci-lint-action@v7
+
+  proto-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Install protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          version: '33.4'
+      - name: Install Go protoc plugins
+        run: |
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+      - name: Regenerate protobuf code
+        run: |
+          protoc --go_out=. --go_opt=module=github.com/jokarl/tfclassify \
+                 --go-grpc_out=. --go-grpc_opt=module=github.com/jokarl/tfclassify \
+                 proto/tfclassify.proto
+      - name: Check for differences
+        run: git diff --exit-code sdk/pb/
 
   vuln:
     runs-on: ubuntu-latest
@@ -71,7 +111,7 @@ jobs:
       - run: govulncheck ./...
 
   e2e:
-    needs: [build, test, vet, vuln]
+    needs: [build, test, vet, lint, proto-check, vuln]
     strategy:
       fail-fast: false
       matrix:
@@ -111,3 +151,4 @@ jobs:
       plan-formats: both
       plan-only: ${{ matrix.plan-only || false }}
       evidence: ${{ matrix.evidence || false }}
+    secrets: inherit

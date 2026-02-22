@@ -112,12 +112,8 @@ func TestParse_SensitiveValues(t *testing.T) {
 	}
 
 	// Check that sensitive markers are preserved
-	beforeSens, ok := rc.BeforeSensitive.(map[string]interface{})
-	if !ok {
-		t.Fatalf("expected BeforeSensitive to be map, got %T", rc.BeforeSensitive)
-	}
-	if beforeSens["value"] != true {
-		t.Errorf("expected BeforeSensitive[value] to be true, got %v", beforeSens["value"])
+	if rc.BeforeSensitive["value"] != true {
+		t.Errorf("expected BeforeSensitive[value] to be true, got %v", rc.BeforeSensitive["value"])
 	}
 }
 
@@ -237,7 +233,7 @@ func TestParse_FromReader(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to open test file: %v", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	result, err := Parse(f)
 	if err != nil {
@@ -264,10 +260,16 @@ func TestParseFile_JSONDetection(t *testing.T) {
 func TestFindTerraform_EnvVar(t *testing.T) {
 	// Test that TERRAFORM_PATH env var is checked
 	oldVal := os.Getenv("TERRAFORM_PATH")
-	defer os.Setenv("TERRAFORM_PATH", oldVal)
+	defer func() {
+		if err := os.Setenv("TERRAFORM_PATH", oldVal); err != nil {
+			t.Errorf("failed to restore TERRAFORM_PATH: %v", err)
+		}
+	}()
 
 	// Set to a non-existent path
-	os.Setenv("TERRAFORM_PATH", "/nonexistent/path/terraform")
+	if err := os.Setenv("TERRAFORM_PATH", "/nonexistent/path/terraform"); err != nil {
+		t.Fatalf("failed to set TERRAFORM_PATH: %v", err)
+	}
 
 	// Should fall back to PATH lookup
 	_, err := findTerraform()
@@ -427,7 +429,7 @@ func TestParseFile_BinaryPlanDetection(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Create a fake binary plan file (starts with PK)
 	binaryPlanPath := tmpDir + "/plan.tfplan"
@@ -438,8 +440,14 @@ func TestParseFile_BinaryPlanDetection(t *testing.T) {
 
 	// Clear TERRAFORM_PATH to ensure terraform won't be found
 	oldPath := os.Getenv("TERRAFORM_PATH")
-	os.Setenv("TERRAFORM_PATH", "/nonexistent/terraform")
-	defer os.Setenv("TERRAFORM_PATH", oldPath)
+	if err := os.Setenv("TERRAFORM_PATH", "/nonexistent/terraform"); err != nil {
+		t.Fatalf("failed to set TERRAFORM_PATH: %v", err)
+	}
+	defer func() {
+		if err := os.Setenv("TERRAFORM_PATH", oldPath); err != nil {
+			t.Errorf("failed to restore TERRAFORM_PATH: %v", err)
+		}
+	}()
 
 	// This should fail because terraform is not available
 	_, err = ParseFile(binaryPlanPath)
@@ -459,7 +467,7 @@ func TestParseFile_JSONWithLeadingWhitespace(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	jsonWithWhitespace := `
 {
@@ -488,7 +496,7 @@ func TestFindTerraform_ValidPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	terraformPath := tmpDir + "/terraform"
 	if err := os.WriteFile(terraformPath, []byte("#!/bin/sh\necho mock"), 0755); err != nil {
@@ -496,8 +504,14 @@ func TestFindTerraform_ValidPath(t *testing.T) {
 	}
 
 	oldPath := os.Getenv("TERRAFORM_PATH")
-	os.Setenv("TERRAFORM_PATH", terraformPath)
-	defer os.Setenv("TERRAFORM_PATH", oldPath)
+	if err := os.Setenv("TERRAFORM_PATH", terraformPath); err != nil {
+		t.Fatalf("failed to set TERRAFORM_PATH: %v", err)
+	}
+	defer func() {
+		if err := os.Setenv("TERRAFORM_PATH", oldPath); err != nil {
+			t.Errorf("failed to restore TERRAFORM_PATH: %v", err)
+		}
+	}()
 
 	path, err := findTerraform()
 	if err != nil {
@@ -571,8 +585,14 @@ func TestParse_MinimalValidPlan(t *testing.T) {
 func TestParseBinaryPlan_NoTerraform(t *testing.T) {
 	// Clear TERRAFORM_PATH to ensure terraform won't be found
 	oldPath := os.Getenv("TERRAFORM_PATH")
-	os.Setenv("TERRAFORM_PATH", "/nonexistent/terraform")
-	defer os.Setenv("TERRAFORM_PATH", oldPath)
+	if err := os.Setenv("TERRAFORM_PATH", "/nonexistent/terraform"); err != nil {
+		t.Fatalf("failed to set TERRAFORM_PATH: %v", err)
+	}
+	defer func() {
+		if err := os.Setenv("TERRAFORM_PATH", oldPath); err != nil {
+			t.Errorf("failed to restore TERRAFORM_PATH: %v", err)
+		}
+	}()
 
 	// Try to parse a "binary" plan
 	_, err := parseBinaryPlan("/nonexistent/plan.tfplan")

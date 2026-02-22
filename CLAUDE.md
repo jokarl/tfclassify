@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+**Always use the `golang-pro` skill when writing Go code.** Invoke it before implementing any Go changes to get expert-level guidance on concurrency, gRPC, and idiomatic patterns.
+
 ## Build & Test Commands
 
 ```bash
@@ -18,11 +20,18 @@ make clean                    # Remove build artifacts
 
 Go workspace mode means all commands run across all three modules from the repo root.
 
-**Before committing**, run vulnerability check:
+**Before pushing**, every CI check must pass locally first. Running locally is cheaper than wasting GitHub Actions minutes. The required checks are:
+
 ```bash
-govulncheck ./...
+make test            # All tests must pass
+make vet             # No static analysis issues
+make lint            # golangci-lint — zero violations allowed
+govulncheck ./...    # No reachable vulnerabilities
 ```
-CI enforces this — the `vuln` job fails the PR if `govulncheck` finds reachable vulnerabilities. Fix by bumping the Go version in `go.work` and all three `go.mod` files, or by upgrading affected dependencies.
+
+Do NOT push until all four commands succeed. If any check fails, fix the issue and re-run before pushing.
+
+CI enforces these — the `vuln` job fails the PR if `govulncheck` finds reachable vulnerabilities. Fix by bumping the Go version in `go.work` and all three `go.mod` files, or by upgrading affected dependencies. The `lint` job fails the PR if `golangci-lint` finds any violation.
 
 **Run a single test:**
 ```bash

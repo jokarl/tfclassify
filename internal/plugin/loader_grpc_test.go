@@ -13,12 +13,7 @@ func TestRunPluginAnalysis_ClientNotFound(t *testing.T) {
 	cfg := &config.Config{}
 	host := NewHost(cfg)
 
-	plugin := &DiscoveredPlugin{
-		Name: "missing",
-		Path: "/nonexistent/plugin",
-	}
-
-	err := host.runPluginAnalysis(context.Background(), "missing", plugin, "", nil)
+	err := host.runPluginAnalysis(context.Background(), "missing", "", nil)
 	if err == nil {
 		t.Fatal("expected error when plugin client not found")
 	}
@@ -77,13 +72,13 @@ func TestRunner_ConcurrentAccess(t *testing.T) {
 	}
 
 	for i := 0; i < 10; i++ {
-		go func(idx int) {
+		go func() {
 			defer func() { done <- struct{}{} }()
 			analyzer := &mockAnalyzer{name: "concurrent"}
 			change := &sdk.ResourceChange{Address: "test.resource", Type: "test_type"}
 			decision := &sdk.Decision{Classification: "standard", Reason: "concurrent test"}
 			_ = runner.EmitDecision(analyzer, change, decision)
-		}(i)
+		}()
 	}
 
 	// Wait for all goroutines

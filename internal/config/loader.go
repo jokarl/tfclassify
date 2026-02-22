@@ -50,7 +50,7 @@ func Parse(src []byte, filename string) (*Config, error) {
 	}
 
 	// Parse plugin-named blocks inside classification blocks
-	if err := parseClassificationPluginBlocks(&cfg, file.Body, filename); err != nil {
+	if err := parseClassificationPluginBlocks(&cfg, file.Body); err != nil {
 		return nil, err
 	}
 
@@ -63,7 +63,7 @@ func Parse(src []byte, filename string) (*Config, error) {
 
 // parseClassificationPluginBlocks parses plugin-named blocks (e.g., azurerm {})
 // inside classification blocks and populates PluginAnalyzerConfigs.
-func parseClassificationPluginBlocks(cfg *Config, body hcl.Body, filename string) error {
+func parseClassificationPluginBlocks(cfg *Config, body hcl.Body) error {
 	// Get the list of enabled plugin names
 	enabledPlugins := make(map[string]bool)
 	for _, p := range cfg.Plugins {

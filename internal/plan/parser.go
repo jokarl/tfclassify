@@ -3,7 +3,9 @@ package plan
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -32,12 +34,12 @@ func ParseFile(path string) (*ParseResult, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open plan file: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	// Read first few bytes to detect format
 	header := make([]byte, 4)
 	n, err := f.Read(header)
-	if err != nil && err != io.EOF {
+	if err != nil && !errors.Is(err, io.EOF) {
 		return nil, fmt.Errorf("failed to read plan header: %w", err)
 	}
 
@@ -71,14 +73,14 @@ func parseBinaryPlan(path string) (*ParseResult, error) {
 
 	// Run terraform show -json from the plan file's directory so that
 	// terraform can find the .terraform/ provider plugins created by init.
-	cmd := exec.Command(terraformPath, "show", "-json", filepath.Base(absPath))
+	cmd := exec.CommandContext(context.TODO(), terraformPath, "show", "-json", filepath.Base(absPath))
 	cmd.Dir = filepath.Dir(absPath)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("failed to convert binary plan: %s (stderr: %s)", err, stderr.String())
+		return nil, fmt.Errorf("failed to convert binary plan: %w (stderr: %s)", err, stderr.String())
 	}
 
 	return Parse(bytes.NewReader(stdout.Bytes()))
@@ -181,8 +183,8 @@ func extractResourceChanges(plan *tfjson.Plan) []ResourceChange {
 			change.Actions = actionsToStrings(rc.Change.Actions)
 			change.Before = convertToMap(rc.Change.Before)
 			change.After = convertToMap(rc.Change.After)
-			change.BeforeSensitive = rc.Change.BeforeSensitive
-			change.AfterSensitive = rc.Change.AfterSensitive
+			change.BeforeSensitive = convertToMap(rc.Change.BeforeSensitive)
+			change.AfterSensitive = convertToMap(rc.Change.AfterSensitive)
 		}
 
 		changes = append(changes, change)

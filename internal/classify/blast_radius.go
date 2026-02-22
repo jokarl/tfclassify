@@ -108,19 +108,34 @@ func (a *BlastRadiusAnalyzer) Analyze(changes []plan.ResourceChange) []ResourceD
 		return nil
 	}
 
-	// Emit a decision for every resource for each triggered classification
+	// Emit a decision for every changed resource for each triggered classification.
+	// No-op resources are excluded — they didn't change and shouldn't receive
+	// a blast radius classification.
 	var decisions []ResourceDecision
 	for _, t := range triggered {
 		for _, change := range changes {
+			if isNoOp(change.Actions) {
+				continue
+			}
 			decisions = append(decisions, ResourceDecision{
-				Address:      change.Address,
-				ResourceType: change.Type,
-				Actions:      change.Actions,
+				Address:        change.Address,
+				ResourceType:   change.Type,
+				Actions:        change.Actions,
 				Classification: t.classification,
-				MatchedRules: t.reasons,
+				MatchedRules:   t.reasons,
 			})
 		}
 	}
 
 	return decisions
+}
+
+// isNoOp returns true if the resource's actions consist only of "no-op".
+func isNoOp(actions []string) bool {
+	for _, a := range actions {
+		if a != "no-op" {
+			return false
+		}
+	}
+	return true
 }

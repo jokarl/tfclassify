@@ -2,12 +2,12 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
-
-	"time"
 
 	"github.com/jokarl/tfclassify/internal/classify"
 	"github.com/jokarl/tfclassify/internal/config"
@@ -105,7 +105,8 @@ func init() {
 	rootCmd.Flags().BoolVarP(&detailedExitCode, "detailed-exitcode", "d", false, "Use classification-based exit codes (0=auto, 1+=higher precedence)")
 	rootCmd.Flags().StringVar(&evidenceFile, "evidence-file", "", "Write evidence artifact to file")
 
-	rootCmd.MarkFlagRequired("plan")
+	// MarkFlagRequired only errors if flag doesn't exist; safe to ignore for known flags
+	_ = rootCmd.MarkFlagRequired("plan")
 
 	// Init command flags
 	initCmd.Flags().StringVarP(&configPath, "config", "c", "", "Path to configuration file")
@@ -118,7 +119,7 @@ func init() {
 	explainCmd.Flags().StringVarP(&configPath, "config", "c", "", "Path to configuration file")
 	explainCmd.Flags().StringVarP(&outputFmt, "output", "o", "text", "Output format: json, text")
 	explainCmd.Flags().StringArrayVarP(&resourceFilters, "resource", "r", nil, "Resource address to explain (repeatable)")
-	explainCmd.MarkFlagRequired("plan")
+	_ = explainCmd.MarkFlagRequired("plan")
 
 	// Add subcommands
 	rootCmd.AddCommand(initCmd)
@@ -167,7 +168,8 @@ func run(cmd *cobra.Command, args []string) error {
 		defer host.Shutdown()
 
 		if err := host.DiscoverAndStart(selfPath); err != nil {
-			if missingErr, ok := err.(*plugin.PluginNotInstalledError); ok {
+			var missingErr *plugin.PluginNotInstalledError
+			if errors.As(err, &missingErr) {
 				return fmt.Errorf("plugin %q is enabled but not installed.\nRun \"tfclassify init\" to install plugins declared in your configuration", missingErr.PluginName)
 			}
 			if verbose {
@@ -323,7 +325,8 @@ func runExplain(cmd *cobra.Command, args []string) error {
 		defer host.Shutdown()
 
 		if err := host.DiscoverAndStart(selfPath); err != nil {
-			if _, ok := err.(*plugin.PluginNotInstalledError); ok {
+			var missingErr *plugin.PluginNotInstalledError
+			if errors.As(err, &missingErr) {
 				fmt.Fprintf(os.Stderr, "Warning: %v\nPlugin decisions will not appear in trace.\n", err)
 			} else {
 				fmt.Fprintf(os.Stderr, "Warning: plugin discovery failed: %v\n", err)

@@ -12,7 +12,7 @@ func TestParseBinaryPlan_WithMockTerraform(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Create a mock terraform script
 	mockTerraform := tmpDir + "/terraform"
@@ -52,8 +52,10 @@ PLAN_JSON
 
 	// Set TERRAFORM_PATH to our mock
 	oldPath := os.Getenv("TERRAFORM_PATH")
-	os.Setenv("TERRAFORM_PATH", mockTerraform)
-	defer os.Setenv("TERRAFORM_PATH", oldPath)
+	if err := os.Setenv("TERRAFORM_PATH", mockTerraform); err != nil {
+		t.Fatalf("failed to setenv: %v", err)
+	}
+	defer func() { _ = os.Setenv("TERRAFORM_PATH", oldPath) }()
 
 	result, err := ParseFile(fakePlanPath)
 	if err != nil {
@@ -80,7 +82,7 @@ func TestParseBinaryPlan_TerraformOutputError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	mockTerraform := tmpDir + "/terraform"
 	mockScript := `#!/bin/sh
@@ -97,8 +99,10 @@ exit 1
 	}
 
 	oldPath := os.Getenv("TERRAFORM_PATH")
-	os.Setenv("TERRAFORM_PATH", mockTerraform)
-	defer os.Setenv("TERRAFORM_PATH", oldPath)
+	if err := os.Setenv("TERRAFORM_PATH", mockTerraform); err != nil {
+		t.Fatalf("failed to setenv: %v", err)
+	}
+	defer func() { _ = os.Setenv("TERRAFORM_PATH", oldPath) }()
 
 	_, err = ParseFile(fakePlanPath)
 	if err == nil {
@@ -116,7 +120,7 @@ func TestParseBinaryPlan_TerraformOutputsInvalidJSON(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	mockTerraform := tmpDir + "/terraform"
 	mockScript := `#!/bin/sh
@@ -132,8 +136,10 @@ echo "this is not valid JSON"
 	}
 
 	oldPath := os.Getenv("TERRAFORM_PATH")
-	os.Setenv("TERRAFORM_PATH", mockTerraform)
-	defer os.Setenv("TERRAFORM_PATH", oldPath)
+	if err := os.Setenv("TERRAFORM_PATH", mockTerraform); err != nil {
+		t.Fatalf("failed to setenv: %v", err)
+	}
+	defer func() { _ = os.Setenv("TERRAFORM_PATH", oldPath) }()
 
 	_, err = ParseFile(fakePlanPath)
 	if err == nil {
@@ -147,7 +153,7 @@ func TestFindTerraform_FallbackToTofu(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Create a mock tofu binary
 	tofuPath := tmpDir + "/tofu"
@@ -157,13 +163,17 @@ func TestFindTerraform_FallbackToTofu(t *testing.T) {
 
 	// Clear TERRAFORM_PATH
 	oldTfPath := os.Getenv("TERRAFORM_PATH")
-	os.Setenv("TERRAFORM_PATH", "")
-	defer os.Setenv("TERRAFORM_PATH", oldTfPath)
+	if err := os.Setenv("TERRAFORM_PATH", ""); err != nil {
+		t.Fatalf("failed to set TERRAFORM_PATH: %v", err)
+	}
+	defer func() { _ = os.Setenv("TERRAFORM_PATH", oldTfPath) }()
 
 	// Set PATH to only include our temp directory (so system terraform isn't found)
 	oldSystemPath := os.Getenv("PATH")
-	os.Setenv("PATH", tmpDir)
-	defer os.Setenv("PATH", oldSystemPath)
+	if err := os.Setenv("PATH", tmpDir); err != nil {
+		t.Fatalf("failed to set PATH: %v", err)
+	}
+	defer func() { _ = os.Setenv("PATH", oldSystemPath) }()
 
 	path, err := findTerraform()
 	if err != nil {
@@ -184,7 +194,7 @@ func TestParseBinaryPlan_MultipleResourceChanges(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	mockTerraform := tmpDir + "/terraform"
 	mockScript := `#!/bin/sh
@@ -235,8 +245,10 @@ PLAN_JSON
 	}
 
 	oldPath := os.Getenv("TERRAFORM_PATH")
-	os.Setenv("TERRAFORM_PATH", mockTerraform)
-	defer os.Setenv("TERRAFORM_PATH", oldPath)
+	if err := os.Setenv("TERRAFORM_PATH", mockTerraform); err != nil {
+		t.Fatalf("failed to setenv: %v", err)
+	}
+	defer func() { _ = os.Setenv("TERRAFORM_PATH", oldPath) }()
 
 	result, err := ParseFile(fakePlanPath)
 	if err != nil {

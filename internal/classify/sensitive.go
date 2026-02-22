@@ -38,70 +38,102 @@ func (a *SensitiveAnalyzer) Analyze(changes []plan.ResourceChange) []ResourceDec
 	return decisions
 }
 
-// findSensitiveChanges walks the sensitive markers and returns attribute names
-// that have sensitive values that changed.
+// findSensitiveChanges walks the sensitive markers recursively and returns
+// dot-delimited attribute paths that have sensitive values that changed.
+// Terraform's BeforeSensitive/AfterSensitive mirrors the structure of
+// Before/After: true at a leaf means sensitive, nested maps/slices indicate
+// nested sensitive attributes.
 func findSensitiveChanges(change plan.ResourceChange) []string {
-	beforeSens := asBoolMap(change.BeforeSensitive)
-	afterSens := asBoolMap(change.AfterSensitive)
-
-	// Use a set to avoid duplicates efficiently
 	seen := make(map[string]struct{})
 	var sensitiveAttrs []string
 
-	// Find all sensitive attributes from before
-	for attr, val := range beforeSens {
-		if val == true {
-			if hasAttributeChanged(attr, change.Before, change.After) {
-				seen[attr] = struct{}{}
-				sensitiveAttrs = append(sensitiveAttrs, attr)
-			}
-		}
-	}
+	// Walk before-sensitive markers
+	collectSensitivePaths(change.BeforeSensitive, change.Before, change.After, "", seen, &sensitiveAttrs)
 
-	// Find sensitive attributes that are newly sensitive in after
-	for attr, val := range afterSens {
-		if val == true && beforeSens[attr] != true {
-			if _, exists := seen[attr]; !exists {
-				if hasAttributeChanged(attr, change.Before, change.After) {
-					sensitiveAttrs = append(sensitiveAttrs, attr)
-				}
-			}
-		}
-	}
+	// Walk after-sensitive markers (picks up newly-sensitive attributes)
+	collectSensitivePaths(change.AfterSensitive, change.Before, change.After, "", seen, &sensitiveAttrs)
 
 	return sensitiveAttrs
 }
 
-// asBoolMap converts an interface{} to map[string]interface{} for walking.
-func asBoolMap(v interface{}) map[string]interface{} {
-	if v == nil {
-		return nil
+// collectSensitivePaths recursively walks a sensitive marker tree and appends
+// changed sensitive attribute paths to the result slice.
+func collectSensitivePaths(
+	sensMarker interface{},
+	before, after interface{},
+	prefix string,
+	seen map[string]struct{},
+	result *[]string,
+) {
+	if sensMarker == nil {
+		return
 	}
-	if m, ok := v.(map[string]interface{}); ok {
-		return m
+
+	switch marker := sensMarker.(type) {
+	case bool:
+		// Leaf: this attribute is sensitive if marker is true
+		if !marker {
+			return
+		}
+		path := prefix
+		if path == "" {
+			return // shouldn't happen — top-level true without a key
+		}
+		if _, exists := seen[path]; exists {
+			return
+		}
+		if valueChanged(before, after) {
+			seen[path] = struct{}{}
+			*result = append(*result, path)
+		}
+
+	case map[string]interface{}:
+		// Nested object: recurse into each key
+		beforeMap, _ := before.(map[string]interface{})
+		afterMap, _ := after.(map[string]interface{})
+		for key, childMarker := range marker {
+			childPath := key
+			if prefix != "" {
+				childPath = prefix + "." + key
+			}
+			var childBefore, childAfter interface{}
+			if beforeMap != nil {
+				childBefore = beforeMap[key]
+			}
+			if afterMap != nil {
+				childAfter = afterMap[key]
+			}
+			collectSensitivePaths(childMarker, childBefore, childAfter, childPath, seen, result)
+		}
+
+	case []interface{}:
+		// List: recurse into each indexed element
+		beforeSlice, _ := before.([]interface{})
+		afterSlice, _ := after.([]interface{})
+		for i, childMarker := range marker {
+			childPath := fmt.Sprintf("%d", i)
+			if prefix != "" {
+				childPath = prefix + "." + childPath
+			}
+			var childBefore, childAfter interface{}
+			if i < len(beforeSlice) {
+				childBefore = beforeSlice[i]
+			}
+			if i < len(afterSlice) {
+				childAfter = afterSlice[i]
+			}
+			collectSensitivePaths(childMarker, childBefore, childAfter, childPath, seen, result)
+		}
 	}
-	return nil
 }
 
-// hasAttributeChanged checks if an attribute value changed between before and after.
-func hasAttributeChanged(attr string, before, after map[string]interface{}) bool {
+// valueChanged checks if two arbitrary values differ.
+func valueChanged(before, after interface{}) bool {
 	if before == nil && after == nil {
 		return false
 	}
-
-	beforeVal, beforeOk := before[attr]
-	afterVal, afterOk := after[attr]
-
-	// Attribute added
-	if !beforeOk && afterOk {
+	if before == nil || after == nil {
 		return true
 	}
-
-	// Attribute removed
-	if beforeOk && !afterOk {
-		return true
-	}
-
-	// Attribute changed
-	return !reflect.DeepEqual(beforeVal, afterVal)
+	return !reflect.DeepEqual(before, after)
 }

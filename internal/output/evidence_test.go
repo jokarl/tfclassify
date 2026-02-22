@@ -321,7 +321,9 @@ func TestVerifyEvidence_WrongKey(t *testing.T) {
 	pub2PKIX, _ := x509.MarshalPKIXPublicKey(pub2)
 	pub2PEM := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pub2PKIX})
 	wrongKeyPath := filepath.Join(dir, "wrong_public.pem")
-	os.WriteFile(wrongKeyPath, pub2PEM, 0644)
+	if err := os.WriteFile(wrongKeyPath, pub2PEM, 0644); err != nil {
+		t.Fatalf("writing wrong public key: %v", err)
+	}
 
 	if err := VerifyEvidence(data, wrongKeyPath); err == nil {
 		t.Error("expected verification to fail with wrong key")

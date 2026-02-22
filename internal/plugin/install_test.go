@@ -121,8 +121,8 @@ func TestIsInstalledAtVersion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp file: %v", err)
 	}
-	tmpFile.Close()
-	defer os.Remove(tmpFile.Name())
+	_ = tmpFile.Close()
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 	// Create manifest with the plugin version
 	manifest := &Manifest{
@@ -158,7 +158,7 @@ func TestInstallPlugins_AlreadyInstalled(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Create a fake plugin binary
 	pluginPath := filepath.Join(tmpDir, "tfclassify-plugin-test")
@@ -174,8 +174,10 @@ func TestInstallPlugins_AlreadyInstalled(t *testing.T) {
 
 	// Set TFCLASSIFY_PLUGIN_DIR env var
 	oldEnv := os.Getenv("TFCLASSIFY_PLUGIN_DIR")
-	os.Setenv("TFCLASSIFY_PLUGIN_DIR", tmpDir)
-	defer os.Setenv("TFCLASSIFY_PLUGIN_DIR", oldEnv)
+	if err := os.Setenv("TFCLASSIFY_PLUGIN_DIR", tmpDir); err != nil {
+		t.Fatalf("failed to set env: %v", err)
+	}
+	defer func() { _ = os.Setenv("TFCLASSIFY_PLUGIN_DIR", oldEnv) }()
 
 	cfg := &config.Config{
 		Plugins: []config.PluginConfig{
@@ -202,8 +204,10 @@ func TestInstallPlugins_AlreadyInstalled(t *testing.T) {
 func TestDefaultPluginDir(t *testing.T) {
 	// Test with env var set
 	oldEnv := os.Getenv("TFCLASSIFY_PLUGIN_DIR")
-	os.Setenv("TFCLASSIFY_PLUGIN_DIR", "/custom/plugin/dir")
-	defer os.Setenv("TFCLASSIFY_PLUGIN_DIR", oldEnv)
+	if err := os.Setenv("TFCLASSIFY_PLUGIN_DIR", "/custom/plugin/dir"); err != nil {
+		t.Fatalf("failed to set env: %v", err)
+	}
+	defer func() { _ = os.Setenv("TFCLASSIFY_PLUGIN_DIR", oldEnv) }()
 
 	result := DefaultPluginDir()
 	if result != "/custom/plugin/dir" {
@@ -211,7 +215,7 @@ func TestDefaultPluginDir(t *testing.T) {
 	}
 
 	// Test without env var
-	os.Unsetenv("TFCLASSIFY_PLUGIN_DIR")
+	_ = os.Unsetenv("TFCLASSIFY_PLUGIN_DIR")
 	result = DefaultPluginDir()
 	cwd, _ := os.Getwd()
 	expected := filepath.Join(cwd, ".tfclassify", "plugins")
@@ -226,12 +230,14 @@ func TestExtractBinaryFromZip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Create a zip file with a test binary
 	zipPath := filepath.Join(tmpDir, "test.zip")
 	destDir := filepath.Join(tmpDir, "dest")
-	os.MkdirAll(destDir, 0755)
+	if err := os.MkdirAll(destDir, 0755); err != nil {
+		t.Fatalf("failed to create dest dir: %v", err)
+	}
 
 	zipFile, err := os.Create(zipPath)
 	if err != nil {
@@ -250,8 +256,8 @@ func TestExtractBinaryFromZip(t *testing.T) {
 		t.Fatalf("failed to write to zip: %v", err)
 	}
 
-	zipWriter.Close()
-	zipFile.Close()
+	_ = zipWriter.Close()
+	_ = zipFile.Close()
 
 	// Test extraction
 	err = extractBinaryFromZip(zipPath, "tfclassify-plugin-test", destDir)
@@ -280,12 +286,14 @@ func TestExtractBinaryFromZip_BinaryNotFound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Create a zip file without the expected binary
 	zipPath := filepath.Join(tmpDir, "test.zip")
 	destDir := filepath.Join(tmpDir, "dest")
-	os.MkdirAll(destDir, 0755)
+	if err := os.MkdirAll(destDir, 0755); err != nil {
+		t.Fatalf("failed to create dest dir: %v", err)
+	}
 
 	zipFile, err := os.Create(zipPath)
 	if err != nil {
@@ -299,10 +307,10 @@ func TestExtractBinaryFromZip_BinaryNotFound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create file in zip: %v", err)
 	}
-	writer.Write([]byte("content"))
+	_, _ = writer.Write([]byte("content"))
 
-	zipWriter.Close()
-	zipFile.Close()
+	_ = zipWriter.Close()
+	_ = zipFile.Close()
 
 	// Test extraction - should fail
 	err = extractBinaryFromZip(zipPath, "tfclassify-plugin-missing", destDir)
@@ -316,14 +324,18 @@ func TestExtractBinaryFromZip_InvalidZip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Create an invalid zip file
 	invalidZipPath := filepath.Join(tmpDir, "invalid.zip")
-	os.WriteFile(invalidZipPath, []byte("not a zip file"), 0644)
+	if err := os.WriteFile(invalidZipPath, []byte("not a zip file"), 0644); err != nil {
+		t.Fatalf("failed to write invalid zip: %v", err)
+	}
 
 	destDir := filepath.Join(tmpDir, "dest")
-	os.MkdirAll(destDir, 0755)
+	if err := os.MkdirAll(destDir, 0755); err != nil {
+		t.Fatalf("failed to create dest dir: %v", err)
+	}
 
 	err = extractBinaryFromZip(invalidZipPath, "tfclassify-plugin-test", destDir)
 	if err == nil {
@@ -336,12 +348,14 @@ func TestExtractBinaryFromZip_BinaryInSubdirectory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Create a zip file with binary in subdirectory
 	zipPath := filepath.Join(tmpDir, "test.zip")
 	destDir := filepath.Join(tmpDir, "dest")
-	os.MkdirAll(destDir, 0755)
+	if err := os.MkdirAll(destDir, 0755); err != nil {
+		t.Fatalf("failed to create dest dir: %v", err)
+	}
 
 	zipFile, err := os.Create(zipPath)
 	if err != nil {
@@ -360,8 +374,8 @@ func TestExtractBinaryFromZip_BinaryInSubdirectory(t *testing.T) {
 		t.Fatalf("failed to write to zip: %v", err)
 	}
 
-	zipWriter.Close()
-	zipFile.Close()
+	_ = zipWriter.Close()
+	_ = zipFile.Close()
 
 	// Test extraction - should work because we use filepath.Base
 	err = extractBinaryFromZip(zipPath, "tfclassify-plugin-test", destDir)
@@ -381,12 +395,14 @@ func TestExtractBinaryFromZip_WindowsExe(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Create a zip file with .exe extension
 	zipPath := filepath.Join(tmpDir, "test.zip")
 	destDir := filepath.Join(tmpDir, "dest")
-	os.MkdirAll(destDir, 0755)
+	if err := os.MkdirAll(destDir, 0755); err != nil {
+		t.Fatalf("failed to create dest dir: %v", err)
+	}
 
 	zipFile, err := os.Create(zipPath)
 	if err != nil {
@@ -405,8 +421,8 @@ func TestExtractBinaryFromZip_WindowsExe(t *testing.T) {
 		t.Fatalf("failed to write to zip: %v", err)
 	}
 
-	zipWriter.Close()
-	zipFile.Close()
+	_ = zipWriter.Close()
+	_ = zipFile.Close()
 
 	// Test extraction - should find .exe variant
 	err = extractBinaryFromZip(zipPath, "tfclassify-plugin-test", destDir)
@@ -427,11 +443,13 @@ func TestDiscoverPlugins_ExternalPluginNotInstalled(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	oldEnv := os.Getenv("TFCLASSIFY_PLUGIN_DIR")
-	os.Setenv("TFCLASSIFY_PLUGIN_DIR", tmpDir)
-	defer os.Setenv("TFCLASSIFY_PLUGIN_DIR", oldEnv)
+	if err := os.Setenv("TFCLASSIFY_PLUGIN_DIR", tmpDir); err != nil {
+		t.Fatalf("failed to set env: %v", err)
+	}
+	defer func() { _ = os.Setenv("TFCLASSIFY_PLUGIN_DIR", oldEnv) }()
 
 	cfg := &config.Config{
 		Plugins: []config.PluginConfig{
@@ -471,7 +489,7 @@ func TestDiscoverPlugins_LocalDir(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Resolve symlinks (macOS /var -> /private/var) so paths match os.Getwd()
 	tmpDir, err = filepath.EvalSymlinks(tmpDir)
@@ -493,13 +511,18 @@ func TestDiscoverPlugins_LocalDir(t *testing.T) {
 
 	// Clear env var so it falls back to local dir
 	oldEnv := os.Getenv("TFCLASSIFY_PLUGIN_DIR")
-	os.Unsetenv("TFCLASSIFY_PLUGIN_DIR")
-	defer os.Setenv("TFCLASSIFY_PLUGIN_DIR", oldEnv)
+	_ = os.Unsetenv("TFCLASSIFY_PLUGIN_DIR")
+	defer func() { _ = os.Setenv("TFCLASSIFY_PLUGIN_DIR", oldEnv) }()
 
 	// Change to temp directory
-	oldWd, _ := os.Getwd()
-	os.Chdir(tmpDir)
-	defer os.Chdir(oldWd)
+	oldWd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get cwd: %v", err)
+	}
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("failed to chdir: %v", err)
+	}
+	defer func() { _ = os.Chdir(oldWd) }()
 
 	cfg := &config.Config{
 		Plugins: []config.PluginConfig{
@@ -533,8 +556,10 @@ func TestSearchPaths_Order(t *testing.T) {
 
 	// When env var is set, it should be first
 	oldEnv := os.Getenv("TFCLASSIFY_PLUGIN_DIR")
-	os.Setenv("TFCLASSIFY_PLUGIN_DIR", "/custom/path")
-	defer os.Setenv("TFCLASSIFY_PLUGIN_DIR", oldEnv)
+	if err := os.Setenv("TFCLASSIFY_PLUGIN_DIR", "/custom/path"); err != nil {
+		t.Fatalf("failed to set env: %v", err)
+	}
+	defer func() { _ = os.Setenv("TFCLASSIFY_PLUGIN_DIR", oldEnv) }()
 
 	paths = searchPaths()
 	if len(paths) < 1 || paths[0] != "/custom/path" {
@@ -545,8 +570,8 @@ func TestSearchPaths_Order(t *testing.T) {
 func TestDefaultPluginDir_NoEnv(t *testing.T) {
 	// Clear env var
 	oldEnv := os.Getenv("TFCLASSIFY_PLUGIN_DIR")
-	os.Unsetenv("TFCLASSIFY_PLUGIN_DIR")
-	defer os.Setenv("TFCLASSIFY_PLUGIN_DIR", oldEnv)
+	_ = os.Unsetenv("TFCLASSIFY_PLUGIN_DIR")
+	defer func() { _ = os.Setenv("TFCLASSIFY_PLUGIN_DIR", oldEnv) }()
 
 	dir := DefaultPluginDir()
 
@@ -561,7 +586,7 @@ func TestDownloadFile_Success(t *testing.T) {
 	binaryContent := []byte("#!/bin/sh\necho test binary")
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write(binaryContent)
+		_, _ = w.Write(binaryContent)
 	}))
 	defer server.Close()
 
@@ -570,7 +595,7 @@ func TestDownloadFile_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	defer os.Remove(tempPath)
+	defer func() { _ = os.Remove(tempPath) }()
 
 	// Verify the content
 	content, err := os.ReadFile(tempPath)
@@ -585,7 +610,7 @@ func TestDownloadFile_Success(t *testing.T) {
 func TestDownloadFile_NotFound(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte("Not Found"))
+		_, _ = w.Write([]byte("Not Found"))
 	}))
 	defer server.Close()
 
@@ -618,20 +643,22 @@ func TestDownloadFile_WithGitHubToken(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		receivedAuth = r.Header.Get("Authorization")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("content"))
+		_, _ = w.Write([]byte("content"))
 	}))
 	defer server.Close()
 
 	// Set GITHUB_TOKEN
 	oldToken := os.Getenv("GITHUB_TOKEN")
-	os.Setenv("GITHUB_TOKEN", "test-token-12345")
-	defer os.Setenv("GITHUB_TOKEN", oldToken)
+	if err := os.Setenv("GITHUB_TOKEN", "test-token-12345"); err != nil {
+		t.Fatalf("failed to set env: %v", err)
+	}
+	defer func() { _ = os.Setenv("GITHUB_TOKEN", oldToken) }()
 
 	tempPath, err := downloadFile(server.URL)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	defer os.Remove(tempPath)
+	defer func() { _ = os.Remove(tempPath) }()
 
 	if receivedAuth != "token test-token-12345" {
 		t.Errorf("expected auth header 'token test-token-12345', got %q", receivedAuth)
@@ -649,35 +676,251 @@ func TestDownloadAndInstall_InvalidSource(t *testing.T) {
 	}
 }
 
-func TestDownloadAndInstall_DownloadFailure(t *testing.T) {
-	// Use a source that will fail to download (invalid URL scheme)
-	tmpDir, err := os.MkdirTemp("", "tfclassify-install-test")
+func TestFetchRelease_Success(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/repos/owner/repo/releases/tags/v1.0.0" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		if r.Header.Get("Accept") != "application/vnd.github+json" {
+			t.Errorf("expected Accept header, got %q", r.Header.Get("Accept"))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprint(w, `{
+			"tag_name": "v1.0.0",
+			"assets": [
+				{"name": "plugin_1.0.0_linux_amd64.zip", "browser_download_url": "https://example.com/plugin.zip"},
+				{"name": "checksums.txt", "browser_download_url": "https://example.com/checksums.txt"}
+			]
+		}`)
+	}))
+	defer server.Close()
+
+	origBase := githubAPIBase
+	githubAPIBase = server.URL
+	defer func() { githubAPIBase = origBase }()
+
+	release, err := fetchRelease("owner", "repo", "v1.0.0")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if release.TagName != "v1.0.0" {
+		t.Errorf("expected tag v1.0.0, got %s", release.TagName)
+	}
+	if len(release.Assets) != 2 {
+		t.Errorf("expected 2 assets, got %d", len(release.Assets))
+	}
+}
+
+func TestFetchRelease_NotFound(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	origBase := githubAPIBase
+	githubAPIBase = server.URL
+	defer func() { githubAPIBase = origBase }()
+
+	_, err := fetchRelease("nobody", "nonexistent", "v99.99.99")
+	if err == nil {
+		t.Fatal("expected error for missing release")
+	}
+	if !strings.Contains(err.Error(), "not found") {
+		t.Errorf("expected error to mention 'not found', got: %v", err)
+	}
+}
+
+func TestFetchRelease_WithGitHubToken(t *testing.T) {
+	var receivedAuth string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedAuth = r.Header.Get("Authorization")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprint(w, `{"tag_name": "v1.0.0", "assets": []}`)
+	}))
+	defer server.Close()
+
+	origBase := githubAPIBase
+	githubAPIBase = server.URL
+	defer func() { githubAPIBase = origBase }()
+
+	oldToken := os.Getenv("GITHUB_TOKEN")
+	if err := os.Setenv("GITHUB_TOKEN", "test-api-token"); err != nil {
+		t.Fatalf("failed to set env: %v", err)
+	}
+	defer func() { _ = os.Setenv("GITHUB_TOKEN", oldToken) }()
+
+	_, err := fetchRelease("owner", "repo", "v1.0.0")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if receivedAuth != "token test-api-token" {
+		t.Errorf("expected auth header 'token test-api-token', got %q", receivedAuth)
+	}
+}
+
+func TestFetchRelease_ServerError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	origBase := githubAPIBase
+	githubAPIBase = server.URL
+	defer func() { githubAPIBase = origBase }()
+
+	_, err := fetchRelease("owner", "repo", "v1.0.0")
+	if err == nil {
+		t.Fatal("expected error for server error")
+	}
+	if !strings.Contains(err.Error(), "500") {
+		t.Errorf("expected error to mention 500, got: %v", err)
+	}
+}
+
+func TestFindAssetURL_Found(t *testing.T) {
+	release := &githubRelease{
+		TagName: "v1.0.0",
+		Assets: []githubAsset{
+			{Name: "plugin_1.0.0_linux_amd64.zip", BrowserDownloadURL: "https://example.com/linux.zip"},
+			{Name: "plugin_1.0.0_darwin_arm64.zip", BrowserDownloadURL: "https://example.com/darwin.zip"},
+		},
+	}
+
+	url, err := findAssetURL(release, "plugin_1.0.0_darwin_arm64.zip")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if url != "https://example.com/darwin.zip" {
+		t.Errorf("expected darwin URL, got %s", url)
+	}
+}
+
+func TestFindAssetURL_NotFound(t *testing.T) {
+	release := &githubRelease{
+		TagName: "v1.0.0",
+		Assets: []githubAsset{
+			{Name: "plugin_1.0.0_linux_amd64.zip", BrowserDownloadURL: "https://example.com/linux.zip"},
+		},
+	}
+
+	_, err := findAssetURL(release, "plugin_1.0.0_windows_amd64.zip")
+	if err == nil {
+		t.Fatal("expected error for missing asset")
+	}
+	if !strings.Contains(err.Error(), "not found") {
+		t.Errorf("expected 'not found' in error, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "plugin_1.0.0_linux_amd64.zip") {
+		t.Errorf("expected available assets listed in error, got: %v", err)
+	}
+}
+
+func TestDownloadAndInstall_EndToEnd(t *testing.T) {
+	// Create a zip containing a fake plugin binary
+	binaryContent := []byte("#!/bin/sh\necho hello")
+	assetName := fmt.Sprintf("tfclassify-plugin-test_1.0.0_%s_%s.zip", runtime.GOOS, runtime.GOARCH)
+
+	var zipBuf bytes.Buffer
+	zw := zip.NewWriter(&zipBuf)
+	w, _ := zw.Create("tfclassify-plugin-test")
+	_, _ = w.Write(binaryContent)
+	_ = zw.Close()
+	zipBytes := zipBuf.Bytes()
+
+	// Mock server handles both API and download requests
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasPrefix(r.URL.Path, "/repos/"):
+			// GitHub Releases API
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = fmt.Fprintf(w, `{
+				"tag_name": "v1.0.0",
+				"assets": [{
+					"name": %q,
+					"browser_download_url": "%s/download/%s"
+				}]
+			}`, assetName, "PLACEHOLDER", assetName)
+		case strings.HasPrefix(r.URL.Path, "/download/"):
+			// Asset download
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(zipBytes)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	// Patch the API response to include the real server URL for download
+	server2 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasPrefix(r.URL.Path, "/repos/"):
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = fmt.Fprintf(w, `{
+				"tag_name": "v1.0.0",
+				"assets": [{
+					"name": %q,
+					"browser_download_url": "%s/download/%s"
+				}]
+			}`, assetName, server.URL, assetName)
+		case strings.HasPrefix(r.URL.Path, "/download/"):
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(zipBytes)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server2.Close()
+
+	origBase := githubAPIBase
+	githubAPIBase = server2.URL
+	defer func() { githubAPIBase = origBase }()
+
+	tmpDir, err := os.MkdirTemp("", "tfclassify-e2e-install")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
-	// This will try to download from GitHub and fail (expected)
-	err = downloadAndInstall("nonexistent", "github.com/nobody/nonexistent-plugin", "99.99.99", tmpDir)
-	if err == nil {
-		t.Fatal("expected error for failed download")
+	err = downloadAndInstall("test", "github.com/owner/tfclassify-plugin-test", "1.0.0", tmpDir)
+	if err != nil {
+		t.Fatalf("downloadAndInstall failed: %v", err)
 	}
-	if !strings.Contains(err.Error(), "failed to download") {
-		t.Errorf("expected error to mention 'failed to download', got: %v", err)
+
+	// Verify the binary was extracted
+	extractedPath := filepath.Join(tmpDir, "tfclassify-plugin-test")
+	content, err := os.ReadFile(extractedPath)
+	if err != nil {
+		t.Fatalf("failed to read extracted binary: %v", err)
+	}
+	if !bytes.Equal(content, binaryContent) {
+		t.Errorf("binary content mismatch: got %q, want %q", content, binaryContent)
 	}
 }
 
 func TestInstallPlugins_DownloadFailure(t *testing.T) {
-	// Create temp directory
+	// Mock server returns 404 for any release lookup
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	origBase := githubAPIBase
+	githubAPIBase = server.URL
+	defer func() { githubAPIBase = origBase }()
+
 	tmpDir, err := os.MkdirTemp("", "tfclassify-install-fail")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	oldEnv := os.Getenv("TFCLASSIFY_PLUGIN_DIR")
-	os.Setenv("TFCLASSIFY_PLUGIN_DIR", tmpDir)
-	defer os.Setenv("TFCLASSIFY_PLUGIN_DIR", oldEnv)
+	if err := os.Setenv("TFCLASSIFY_PLUGIN_DIR", tmpDir); err != nil {
+		t.Fatalf("failed to set env: %v", err)
+	}
+	defer func() { _ = os.Setenv("TFCLASSIFY_PLUGIN_DIR", oldEnv) }()
 
 	cfg := &config.Config{
 		Plugins: []config.PluginConfig{
@@ -706,11 +949,13 @@ func TestInstallPlugins_MultiplePlugins(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Pre-install one plugin
 	pluginPath := filepath.Join(tmpDir, "tfclassify-plugin-existing")
-	os.WriteFile(pluginPath, []byte("#!/bin/sh\n"), 0755)
+	if err := os.WriteFile(pluginPath, []byte("#!/bin/sh\n"), 0755); err != nil {
+		t.Fatalf("failed to write plugin: %v", err)
+	}
 
 	// Create a manifest with the plugin at the correct version
 	manifest := &Manifest{Plugins: map[string]string{"existing": "1.0.0"}}
@@ -719,8 +964,10 @@ func TestInstallPlugins_MultiplePlugins(t *testing.T) {
 	}
 
 	oldEnv := os.Getenv("TFCLASSIFY_PLUGIN_DIR")
-	os.Setenv("TFCLASSIFY_PLUGIN_DIR", tmpDir)
-	defer os.Setenv("TFCLASSIFY_PLUGIN_DIR", oldEnv)
+	if err := os.Setenv("TFCLASSIFY_PLUGIN_DIR", tmpDir); err != nil {
+		t.Fatalf("failed to set env: %v", err)
+	}
+	defer func() { _ = os.Setenv("TFCLASSIFY_PLUGIN_DIR", oldEnv) }()
 
 	cfg := &config.Config{
 		Plugins: []config.PluginConfig{
@@ -775,7 +1022,7 @@ func TestManifest_LoadSave(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Test loading non-existent manifest returns empty manifest
 	manifest, err := loadManifest(tmpDir)
@@ -812,11 +1059,13 @@ func TestManifest_LoadInvalid(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Write invalid JSON
 	manifestPath := filepath.Join(tmpDir, ManifestFileName)
-	os.WriteFile(manifestPath, []byte("not valid json"), 0644)
+	if err := os.WriteFile(manifestPath, []byte("not valid json"), 0644); err != nil {
+		t.Fatalf("failed to write invalid manifest: %v", err)
+	}
 
 	_, err = loadManifest(tmpDir)
 	if err == nil {
@@ -829,7 +1078,7 @@ func TestManifest_SaveCreatesDir(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Try to save to a non-existent subdirectory
 	subDir := filepath.Join(tmpDir, "newdir", "plugins")
@@ -845,42 +1094,59 @@ func TestManifest_SaveCreatesDir(t *testing.T) {
 }
 
 func TestInstallPlugins_VersionUpgrade(t *testing.T) {
-	// Create a test HTTP server that serves a valid zip
 	binaryContent := []byte("#!/bin/sh\necho upgraded")
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Create a zip file response
-		var buf bytes.Buffer
-		zipWriter := zip.NewWriter(&buf)
-		writer, _ := zipWriter.Create("tfclassify-plugin-test")
-		writer.Write(binaryContent)
-		zipWriter.Close()
+	assetName := fmt.Sprintf("tfclassify-plugin-test_2.0.0_%s_%s.zip", runtime.GOOS, runtime.GOARCH)
 
-		w.WriteHeader(http.StatusOK)
-		w.Write(buf.Bytes())
+	var zipBuf bytes.Buffer
+	zw := zip.NewWriter(&zipBuf)
+	w, _ := zw.Create("tfclassify-plugin-test")
+	_, _ = w.Write(binaryContent)
+	_ = zw.Close()
+	zipBytes := zipBuf.Bytes()
+
+	// Mock server serves both API and download
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasPrefix(r.URL.Path, "/repos/"):
+			rw.Header().Set("Content-Type", "application/json")
+			// The download URL points back to this same server
+			downloadURL := fmt.Sprintf("http://%s/download/%s", r.Host, assetName)
+			_, _ = fmt.Fprintf(rw, `{"tag_name":"tfclassify-plugin-test-v2.0.0","assets":[{"name":%q,"browser_download_url":%q}]}`, assetName, downloadURL)
+		case strings.HasPrefix(r.URL.Path, "/download/"):
+			rw.WriteHeader(http.StatusOK)
+			_, _ = rw.Write(zipBytes)
+		default:
+			rw.WriteHeader(http.StatusNotFound)
+		}
 	}))
 	defer server.Close()
 
-	// We can't easily test the full upgrade flow since downloadAndInstall uses
-	// hardcoded GitHub URLs, but we can test the manifest upgrade message
+	origBase := githubAPIBase
+	githubAPIBase = server.URL
+	defer func() { githubAPIBase = origBase }()
+
 	tmpDir, err := os.MkdirTemp("", "tfclassify-upgrade")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Pre-install plugin at old version
 	pluginPath := filepath.Join(tmpDir, "tfclassify-plugin-test")
-	os.WriteFile(pluginPath, []byte("#!/bin/sh\n"), 0755)
+	if err := os.WriteFile(pluginPath, []byte("#!/bin/sh\n"), 0755); err != nil {
+		t.Fatalf("failed to write plugin: %v", err)
+	}
 
-	// Create manifest at old version
 	manifest := &Manifest{Plugins: map[string]string{"test": "1.0.0"}}
 	if err := saveManifest(tmpDir, manifest); err != nil {
 		t.Fatalf("failed to save manifest: %v", err)
 	}
 
 	oldEnv := os.Getenv("TFCLASSIFY_PLUGIN_DIR")
-	os.Setenv("TFCLASSIFY_PLUGIN_DIR", tmpDir)
-	defer os.Setenv("TFCLASSIFY_PLUGIN_DIR", oldEnv)
+	if err := os.Setenv("TFCLASSIFY_PLUGIN_DIR", tmpDir); err != nil {
+		t.Fatalf("failed to set env: %v", err)
+	}
+	defer func() { _ = os.Setenv("TFCLASSIFY_PLUGIN_DIR", oldEnv) }()
 
 	cfg := &config.Config{
 		Plugins: []config.PluginConfig{
@@ -888,19 +1154,41 @@ func TestInstallPlugins_VersionUpgrade(t *testing.T) {
 				Name:    "test",
 				Enabled: true,
 				Source:  "github.com/test/repo",
-				Version: "2.0.0", // Different version
+				Version: "2.0.0",
 			},
 		},
 	}
 
 	var buf bytes.Buffer
 	err = InstallPlugins(cfg, &buf)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
-	// This will fail because we can't actually download from GitHub,
-	// but we can verify that it attempted an upgrade
 	output := buf.String()
 	if !strings.Contains(output, "upgrading from v1.0.0 to v2.0.0") {
 		t.Errorf("expected upgrade message, got: %s", output)
+	}
+	if !strings.Contains(output, "installed") {
+		t.Errorf("expected installed message, got: %s", output)
+	}
+
+	// Verify the binary was upgraded
+	content, err := os.ReadFile(pluginPath)
+	if err != nil {
+		t.Fatalf("failed to read plugin binary: %v", err)
+	}
+	if !bytes.Equal(content, binaryContent) {
+		t.Errorf("binary content mismatch after upgrade")
+	}
+
+	// Verify manifest was updated
+	updatedManifest, err := loadManifest(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to load manifest: %v", err)
+	}
+	if updatedManifest.Plugins["test"] != "2.0.0" {
+		t.Errorf("expected manifest version 2.0.0, got %s", updatedManifest.Plugins["test"])
 	}
 }
 
@@ -1009,11 +1297,13 @@ func TestManifest_NilPluginsMap(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Write manifest with null plugins
 	manifestPath := filepath.Join(tmpDir, ManifestFileName)
-	os.WriteFile(manifestPath, []byte(`{"plugins": null}`), 0644)
+	if err := os.WriteFile(manifestPath, []byte(`{"plugins": null}`), 0644); err != nil {
+		t.Fatalf("failed to write manifest: %v", err)
+	}
 
 	manifest, err := loadManifest(tmpDir)
 	if err != nil {

@@ -49,13 +49,20 @@ func Validate(cfg *Config) error {
 	return nil
 }
 
-// validatePrecedence checks that all precedence entries reference defined classifications.
+// validatePrecedence checks that all precedence entries reference defined classifications
+// and that no name appears more than once.
 func validatePrecedence(cfg *Config, classificationNames map[string]bool) error {
 	if len(cfg.Precedence) == 0 {
 		return fmt.Errorf("precedence must not be empty")
 	}
 
+	seen := make(map[string]bool, len(cfg.Precedence))
 	for _, name := range cfg.Precedence {
+		if seen[name] {
+			return fmt.Errorf("duplicate entry %q in precedence list", name)
+		}
+		seen[name] = true
+
 		if !classificationNames[name] {
 			return fmt.Errorf("precedence references undefined classification %q", name)
 		}
@@ -218,7 +225,7 @@ func WarnRedundantNotResource(cfg *Config, w io.Writer) {
 		for ruleIdx, rule := range classification.Rules {
 			// Check if this not_resource list is fully covered by higher-precedence patterns
 			if len(rule.NotResource) > 0 && allPatternsKnown(rule.NotResource, higherPatterns) {
-				fmt.Fprintf(w, "Warning: classification %q rule %d uses not_resource with patterns "+
+				_, _ = fmt.Fprintf(w, "Warning: classification %q rule %d uses not_resource with patterns "+
 					"already covered by higher-precedence rules. Consider using resource = [\"*\"] instead.\n",
 					classificationName, ruleIdx+1)
 			}

@@ -38,7 +38,10 @@ func TestProtoConversions_SDKToProto_WithSensitiveFields(t *testing.T) {
 		AfterSensitive:  map[string]interface{}{"password": true, "api_key": true},
 	}
 
-	proto := sdkplugin.SDKToProtoResourceChange(sdkChange)
+	proto, err := sdkplugin.SDKToProtoResourceChange(sdkChange)
+	if err != nil {
+		t.Fatalf("SDKToProtoResourceChange: %v", err)
+	}
 
 	if proto.BeforeSensitive == nil {
 		t.Fatal("expected BeforeSensitive to be non-nil")
@@ -48,24 +51,19 @@ func TestProtoConversions_SDKToProto_WithSensitiveFields(t *testing.T) {
 	}
 
 	// Round-trip and verify
-	converted := sdkplugin.ProtoToSDKResourceChange(proto)
+	converted, err := sdkplugin.ProtoToSDKResourceChange(proto)
+	if err != nil {
+		t.Fatalf("ProtoToSDKResourceChange: %v", err)
+	}
 	if converted.BeforeSensitive == nil {
 		t.Fatal("expected BeforeSensitive to survive round-trip")
 	}
-	beforeSens, ok := converted.BeforeSensitive.(map[string]interface{})
-	if !ok {
-		t.Fatalf("expected map type, got %T", converted.BeforeSensitive)
-	}
-	if beforeSens["password"] != true {
-		t.Errorf("expected password to be true, got %v", beforeSens["password"])
+	if converted.BeforeSensitive["password"] != true {
+		t.Errorf("expected password to be true, got %v", converted.BeforeSensitive["password"])
 	}
 
-	afterSens, ok := converted.AfterSensitive.(map[string]interface{})
-	if !ok {
-		t.Fatalf("expected map type, got %T", converted.AfterSensitive)
-	}
-	if afterSens["api_key"] != true {
-		t.Errorf("expected api_key to be true, got %v", afterSens["api_key"])
+	if converted.AfterSensitive["api_key"] != true {
+		t.Errorf("expected api_key to be true, got %v", converted.AfterSensitive["api_key"])
 	}
 }
 
@@ -79,7 +77,10 @@ func TestProtoConversions_ProtoToSDK_WithAllSensitiveFields(t *testing.T) {
 		AfterSensitive:  []byte(`{"secret":true,"token":true}`),
 	}
 
-	converted := sdkplugin.ProtoToSDKResourceChange(proto)
+	converted, err := sdkplugin.ProtoToSDKResourceChange(proto)
+	if err != nil {
+		t.Fatalf("ProtoToSDKResourceChange: %v", err)
+	}
 
 	if converted.Before == nil || converted.Before["key"] != "old" {
 		t.Errorf("Before round-trip failed: %v", converted.Before)
@@ -94,12 +95,8 @@ func TestProtoConversions_ProtoToSDK_WithAllSensitiveFields(t *testing.T) {
 		t.Fatal("AfterSensitive should not be nil")
 	}
 
-	afterSens, ok := converted.AfterSensitive.(map[string]interface{})
-	if !ok {
-		t.Fatalf("expected map type, got %T", converted.AfterSensitive)
-	}
-	if afterSens["token"] != true {
-		t.Errorf("expected token to be true, got %v", afterSens["token"])
+	if converted.AfterSensitive["token"] != true {
+		t.Errorf("expected token to be true, got %v", converted.AfterSensitive["token"])
 	}
 }
 
@@ -111,7 +108,10 @@ func TestProtoConversions_Decision_WithAllFields(t *testing.T) {
 		Metadata:       []byte(`{"role":"Owner","scope":"/subscriptions/abc"}`),
 	}
 
-	converted := sdkplugin.ProtoToSDKDecision(proto)
+	converted, err := sdkplugin.ProtoToSDKDecision(proto)
+	if err != nil {
+		t.Fatalf("ProtoToSDKDecision: %v", err)
+	}
 
 	if converted.Classification != "critical" {
 		t.Errorf("classification mismatch: %q", converted.Classification)
