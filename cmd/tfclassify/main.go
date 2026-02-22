@@ -100,7 +100,7 @@ func init() {
 	// Root command flags
 	rootCmd.Flags().StringVarP(&planPath, "plan", "p", "", "Path to Terraform plan file (JSON or binary)")
 	rootCmd.Flags().StringVarP(&configPath, "config", "c", "", "Path to configuration file")
-	rootCmd.Flags().StringVarP(&outputFmt, "output", "o", "text", "Output format: json, text, github")
+	rootCmd.Flags().StringVarP(&outputFmt, "output", "o", "text", "Output format: json, text, github, sarif")
 	rootCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose output")
 	rootCmd.Flags().BoolVarP(&detailedExitCode, "detailed-exitcode", "d", false, "Use classification-based exit codes (0=auto, 1+=higher precedence)")
 	rootCmd.Flags().StringVar(&evidenceFile, "evidence-file", "", "Write evidence artifact to file")
@@ -187,7 +187,10 @@ func run(cmd *cobra.Command, args []string) error {
 
 	// Format and output results
 	format := output.Format(outputFmt)
-	formatter := output.NewFormatter(os.Stdout, format, verbose)
+	formatter := output.NewFormatter(os.Stdout, format, verbose,
+		output.WithVersion(Version),
+		output.WithSARIFLevels(buildSARIFLevels(cfg)),
+	)
 	if err := formatter.Format(result); err != nil {
 		return fmt.Errorf("failed to format output: %w", err)
 	}
@@ -387,4 +390,35 @@ func hasExternalPlugins(cfg *config.Config) bool {
 		}
 	}
 	return false
+}
+
+// buildSARIFLevels constructs a classification-name → SARIF level map from config.
+// Uses explicit sarif_level when configured, otherwise defaults to "error" for the
+// highest-precedence classification and "warning" for all others.
+// The no_changes default classification gets "none".
+func buildSARIFLevels(cfg *config.Config) map[string]string {
+	levels := make(map[string]string, len(cfg.Classifications))
+
+	// Set defaults based on precedence order
+	for i, name := range cfg.Precedence {
+		if i == 0 {
+			levels[name] = "error"
+		} else {
+			levels[name] = "warning"
+		}
+	}
+
+	// Override with no_changes default → "none"
+	if cfg.Defaults != nil && cfg.Defaults.NoChanges != "" {
+		levels[cfg.Defaults.NoChanges] = "none"
+	}
+
+	// Apply explicit sarif_level overrides
+	for _, c := range cfg.Classifications {
+		if c.SARIFLevel != "" {
+			levels[c.Name] = c.SARIFLevel
+		}
+	}
+
+	return levels
 }

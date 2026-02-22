@@ -56,6 +56,7 @@ type PluginBodyConfig struct {
 type ClassificationConfig struct {
 	Name        string       `hcl:"name,label"`
 	Description string       `hcl:"description"`
+	SARIFLevel  string       `hcl:"sarif_level,optional"`
 	Rules       []RuleConfig `hcl:"rule,block"`
 
 	// BlastRadius holds the optional blast radius thresholds for this classification.

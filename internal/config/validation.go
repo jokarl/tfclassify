@@ -42,6 +42,10 @@ func Validate(cfg *Config) error {
 		return err
 	}
 
+	if err := validateSARIFLevels(cfg); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -164,6 +168,25 @@ func validateBlastRadius(cfg *Config) error {
 		if br.MaxChanges != nil && *br.MaxChanges <= 0 {
 			return fmt.Errorf("classification %q: blast_radius.max_changes must be a positive integer, got %d",
 				c.Name, *br.MaxChanges)
+		}
+	}
+	return nil
+}
+
+// validSARIFLevels is the set of recognized SARIF severity levels.
+var validSARIFLevels = map[string]bool{
+	"error":   true,
+	"warning": true,
+	"note":    true,
+	"none":    true,
+}
+
+// validateSARIFLevels checks that sarif_level values on classification blocks are valid.
+func validateSARIFLevels(cfg *Config) error {
+	for _, c := range cfg.Classifications {
+		if c.SARIFLevel != "" && !validSARIFLevels[c.SARIFLevel] {
+			return fmt.Errorf("classification %q: invalid sarif_level %q (valid: error, warning, note, none)",
+				c.Name, c.SARIFLevel)
 		}
 	}
 	return nil

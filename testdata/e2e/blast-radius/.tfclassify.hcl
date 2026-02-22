@@ -1,5 +1,6 @@
 classification "critical" {
   description = "Blast radius exceeded"
+  sarif_level = "error"
 
   blast_radius {
     max_changes = 3
@@ -8,6 +9,7 @@ classification "critical" {
 
 classification "standard" {
   description = "Standard change"
+  sarif_level = "warning"
 
   rule {
     resource = ["*"]
@@ -16,6 +18,7 @@ classification "standard" {
 
 classification "auto" {
   description = "Auto-approved"
+  sarif_level = "none"
 
   rule {
     resource = ["*"]
