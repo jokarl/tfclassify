@@ -71,7 +71,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - uses: golangci/golangci-lint-action@v6
+      - uses: golangci/golangci-lint-action@v7
 
   proto-check:
     runs-on: ubuntu-latest
@@ -82,6 +82,8 @@ jobs:
           go-version-file: go.mod
       - name: Install protoc
         uses: arduino/setup-protoc@v3
+        with:
+          version: '33.4'
       - name: Install Go protoc plugins
         run: |
           go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
