@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/jokarl/tfclassify/compare/tfclassify-plugin-azurerm-v0.2.1...tfclassify-plugin-azurerm-v0.2.2) (2026-02-23)
+
+
+### Bug Fixes
+
+* refresh Azure role data and action registry ([#51](https://github.com/jokarl/tfclassify/issues/51)) ([a132079](https://github.com/jokarl/tfclassify/commit/a132079321681dcb00d7fed24d7fe6e32c10f952))
+
 ## [0.2.1](https://github.com/jokarl/tfclassify/compare/tfclassify-plugin-azurerm-v0.2.0...tfclassify-plugin-azurerm-v0.2.1) (2026-02-18)
 
 
