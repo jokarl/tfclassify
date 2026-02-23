@@ -4,15 +4,27 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    commit-message:
+      prefix: "deps"
+      include: "scope"
   - package-ecosystem: gomod
     directory: /sdk
     schedule:
       interval: weekly
+    commit-message:
+      prefix: "deps"
+      include: "scope"
   - package-ecosystem: gomod
     directory: /plugins/azurerm
     schedule:
       interval: weekly
+    commit-message:
+      prefix: "deps"
+      include: "scope"
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    commit-message:
+      prefix: "ci"
+      include: "scope"
