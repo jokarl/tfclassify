@@ -11,6 +11,8 @@ on:
       - 'go.work.sum'
       - 'proto/**'
       - 'testdata/e2e/**'
+      - 'plugins/azurerm/roledata/**'
+      - 'plugins/azurerm/actiondata/**'
       - '.github/workflows/ci.yml'
       - '.github/workflows/e2e.yml'
   push:
@@ -23,6 +25,8 @@ on:
       - 'go.work.sum'
       - 'proto/**'
       - 'testdata/e2e/**'
+      - 'plugins/azurerm/roledata/**'
+      - 'plugins/azurerm/actiondata/**'
       - '.github/workflows/ci.yml'
       - '.github/workflows/e2e.yml'
   workflow_dispatch:
