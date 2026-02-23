@@ -1,8 +1,13 @@
 {
-  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/refs/heads/main/schemas/config.json",
   "bump-minor-pre-major": true,
   "include-component-in-tag": true,
   "release-type": "go",
+  "changelog-sections": [
+    {"type": "feat", "section": "Features"},
+    {"type": "fix", "section": "Bug Fixes"},
+    {"type": "deps", "section": "Dependencies"}
+  ],
   "packages": {
     ".": {
       "component": "tfclassify"
