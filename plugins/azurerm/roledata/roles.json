@@ -4258,6 +4258,92 @@
     ]
   },
   {
+    "id": "20cf746c-c765-402a-885e-c389c64478ce",
+    "roleName": "Azure Kubernetes Fleet Manager ABAC Custom Resources Reader",
+    "description": "Allows read-only access to view Kubernetes custom resources on Azure Kubernetes Fleet Manager fleets. This role enables viewing custom resources without the ability to create, modify, or delete them. Applying this role at cluster scope will give read access to custom resources across all namespaces. More information on supported attributes for Attribute-Based Access Control (ABAC) conditions can be found under documentation at aka.ms/aks/abac/custom-resources/docs",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.Resources/subscriptions/operationresults/read",
+          "Microsoft.Resources/subscriptions/read",
+          "Microsoft.Resources/subscriptions/resourceGroups/read",
+          "Microsoft.ContainerService/fleets/read",
+          "Microsoft.ContainerService/fleets/listCredentials/action"
+        ],
+        "notActions": [],
+        "dataActions": [
+          "Microsoft.ContainerService/fleets/customresources/read"
+        ],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "e1663658-d5f7-4383-9afb-af9fdc9c5eae",
+    "roleName": "Azure Kubernetes Fleet Manager ABAC Custom Resources Reader for Member Clusters",
+    "description": "Allows read-only access to view Kubernetes custom resources on Azure Kubernetes Fleet Manager member clusters. This role enables viewing custom resources without the ability to create, modify, or delete them. Applying this role at cluster scope will give read access to custom resources across all namespaces. More information on supported attributes for Attribute-Based Access Control (ABAC) conditions can be found under documentation at aka.ms/aks/abac/custom-resources/docs",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.Resources/subscriptions/operationresults/read",
+          "Microsoft.Resources/subscriptions/read",
+          "Microsoft.Resources/subscriptions/resourceGroups/read"
+        ],
+        "notActions": [],
+        "dataActions": [
+          "Microsoft.ContainerService/fleets/members/customresources/read"
+        ],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "ff8eb232-5069-437e-94e5-31112ef30539",
+    "roleName": "Azure Kubernetes Fleet Manager ABAC Custom Resources Writer",
+    "description": "Allows write and delete access to manage Kubernetes custom resources on Azure Kubernetes Fleet Manager fleets. This role enables creating, modifying, and deleting custom resources. Applying this role at cluster scope will give access to custom resources across all namespaces. More information on supported attributes for Attribute-Based Access Control (ABAC) conditions can be found under documentation at aka.ms/aks/abac/custom-resources/docs",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.Resources/subscriptions/operationresults/read",
+          "Microsoft.Resources/subscriptions/read",
+          "Microsoft.Resources/subscriptions/resourceGroups/read",
+          "Microsoft.ContainerService/fleets/read",
+          "Microsoft.ContainerService/fleets/listCredentials/action"
+        ],
+        "notActions": [],
+        "dataActions": [
+          "Microsoft.ContainerService/fleets/customresources/write",
+          "Microsoft.ContainerService/fleets/customresources/delete"
+        ],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "673366d4-9664-4020-b03b-b0093366bff9",
+    "roleName": "Azure Kubernetes Fleet Manager ABAC Custom Resources Writer for Member Clusters",
+    "description": "Allows write and delete access to manage Kubernetes custom resources on Azure Kubernetes Fleet Manager member clusters. This role enables creating, modifying, and deleting custom resources. Applying this role at cluster scope will give access to custom resources across all namespaces. More information on supported attributes for Attribute-Based Access Control (ABAC) conditions can be found under documentation at aka.ms/aks/abac/custom-resources/docs",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.Resources/subscriptions/operationresults/read",
+          "Microsoft.Resources/subscriptions/read",
+          "Microsoft.Resources/subscriptions/resourceGroups/read"
+        ],
+        "notActions": [],
+        "dataActions": [
+          "Microsoft.ContainerService/fleets/members/customresources/write",
+          "Microsoft.ContainerService/fleets/members/customresources/delete"
+        ],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
     "id": "63bb64ad-9799-4770-b5c3-24ed299a07bf",
     "roleName": "Azure Kubernetes Fleet Manager Contributor Role",
     "description": "Grants read/write access to Azure resources provided by Azure Kubernetes Fleet Manager, including fleets, fleet members, fleet update strategies, fleet update runs, etc.",
@@ -9904,6 +9990,7 @@
           "Microsoft.Mission/communities/delete",
           "Microsoft.Mission/communities/setMaintenanceMode/action",
           "Microsoft.Mission/communities/communityendpoints/connect/action",
+          "Microsoft.Mission/communities/dedicatedHubs/connect/action",
           "Microsoft.Mission/virtualEnclaves/read",
           "Microsoft.Mission/virtualEnclaves/write",
           "Microsoft.Mission/virtualEnclaves/delete",
@@ -9927,6 +10014,9 @@
           "Microsoft.Mission/communities/transitHubs/read",
           "Microsoft.Mission/communities/transitHubs/write",
           "Microsoft.Mission/communities/transitHubs/delete",
+          "Microsoft.Mission/communities/dedicatedHubs/read",
+          "Microsoft.Mission/communities/dedicatedHubs/write",
+          "Microsoft.Mission/communities/dedicatedHubs/delete",
           "Microsoft.Mission/enclaveConnections/read",
           "Microsoft.Mission/virtualEnclaves/enclaveEndpoints/read",
           "Microsoft.Mission/approvals/read",
@@ -11610,6 +11700,7 @@
           "Microsoft.ContainerService/managedClusters/trustedAccessRoleBindings/write",
           "Microsoft.ContainerService/managedClusters/write",
           "Microsoft.Security/pricings/securityoperators/read",
+          "Microsoft.Security/securityOperators/read",
           "Microsoft.OperationalInsights/workspaces/write",
           "Microsoft.OperationalInsights/workspaces/read",
           "Microsoft.OperationalInsights/workspaces/listKeys/action",
@@ -11825,6 +11916,31 @@
           "microsoft.web/sites/slots/publish/action",
           "microsoft.web/sites/config/list/action",
           "microsoft.web/sites/slots/config/list/action"
+        ],
+        "notActions": [],
+        "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "78b19ac9-582c-44d8-9e11-733ae424ad83",
+    "roleName": "Defender Servers P1",
+    "description": "Defender Servers P1",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.OperationalInsights/workspaces/read",
+          "Microsoft.OperationsManagement/solutions/read",
+          "Microsoft.Compute/virtualMachines/read",
+          "Microsoft.HybridCompute/machines/read",
+          "Microsoft.Compute/virtualMachines/extensions/read",
+          "Microsoft.Compute/virtualMachines/extensions/write",
+          "Microsoft.HybridCompute/machines/extensions/write",
+          "Microsoft.HybridCompute/machines/extensions/delete",
+          "Microsoft.HybridCompute/machines/extensions/read",
+          "Microsoft.Compute/virtualMachines/extensions/delete"
         ],
         "notActions": [],
         "dataActions": [],
@@ -12904,6 +13020,34 @@
         "dataActions": [
           "Microsoft.DeviceUpdate/accounts/instances/updates/read"
         ],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "f82fbe13-0f98-4809-af81-b82c343db82f",
+    "roleName": "Device Update Contributor",
+    "description": "Gives you full access to manage Device Update accounts, instances, and private endpoint connections",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.Authorization/*/read",
+          "Microsoft.Resources/deployments/*",
+          "Microsoft.Resources/subscriptions/resourceGroups/read",
+          "Microsoft.Insights/alertRules/*",
+          "Microsoft.DeviceUpdate/accounts/read",
+          "Microsoft.DeviceUpdate/accounts/write",
+          "Microsoft.DeviceUpdate/accounts/delete",
+          "Microsoft.DeviceUpdate/accounts/instances/read",
+          "Microsoft.DeviceUpdate/accounts/instances/write",
+          "Microsoft.DeviceUpdate/accounts/instances/delete",
+          "Microsoft.DeviceUpdate/accounts/privateEndpointConnections/read",
+          "Microsoft.DeviceUpdate/accounts/privateEndpointConnections/write",
+          "Microsoft.DeviceUpdate/accounts/privateEndpointConnections/delete"
+        ],
+        "notActions": [],
+        "dataActions": [],
         "notDataActions": []
       }
     ]
@@ -16777,7 +16921,14 @@
           "Microsoft.Network/virtualWans/read",
           "Microsoft.Network/virtualWans/virtualHubs/read",
           "Microsoft.Network/networkSecurityGroups/read",
-          "Microsoft.Network/networkSecurityGroups/join/action"
+          "Microsoft.Network/networkSecurityGroups/join/action",
+          "PaloAltoNetworks.Cloudngfw/localRulestacks/fqdnlists/read",
+          "PaloAltoNetworks.Cloudngfw/localRulestacks/localRules/read",
+          "PaloAltoNetworks.Cloudngfw/localRulestacks/listFirewalls/action",
+          "PaloAltoNetworks.Cloudngfw/createProductSerialNumber/action",
+          "PaloAltoNetworks.Cloudngfw/listCloudManagerTenants/action",
+          "PaloAltoNetworks.Cloudngfw/listProductSerialNumberStatus/action",
+          "PaloAltoNetworks.Cloudngfw/listSupportInfo/action"
         ],
         "notActions": [],
         "dataActions": [],
@@ -16799,7 +16950,11 @@
           "Microsoft.ResourceHealth/availabilityStatuses/read",
           "Microsoft.Resources/deployments/*",
           "Microsoft.Insights/alertRules/*",
-          "Microsoft.Support/*"
+          "Microsoft.Support/*",
+          "PaloAltoNetworks.Cloudngfw/firewalls/read",
+          "PaloAltoNetworks.Cloudngfw/createProductSerialNumber/action",
+          "PaloAltoNetworks.Cloudngfw/listProductSerialNumberStatus/action",
+          "PaloAltoNetworks.Cloudngfw/listSupportInfo/action"
         ],
         "notActions": [],
         "dataActions": [],
@@ -19237,7 +19392,11 @@
           "Microsoft.SoftwarePlan/softwareSubscriptions/productKeys/showFullKey/action",
           "Microsoft.SoftwarePlan/softwareSubscriptions/productDownloadOptions/read",
           "Microsoft.SoftwarePlan/softwareSubscriptions/productDownloadOptions/generateDownloadLinks/action",
-          "Microsoft.SoftwarePlan/validateSoftwareSubscriptionCreate/action"
+          "Microsoft.SoftwarePlan/validateSoftwareSubscriptionCreate/action",
+          "Microsoft.Hardware/register/action",
+          "Microsoft.Hardware/orderPreview/action",
+          "Microsoft.Hardware/orders/read",
+          "Microsoft.Hardware/orders/write"
         ],
         "notActions": [],
         "dataActions": [],
