@@ -6505,6 +6505,12 @@
       "Microsoft.GuestConfiguration/operations/read",
       "Microsoft.GuestConfiguration/register/action"
     ],
+    "microsoft.hardware": [
+      "Microsoft.Hardware/orderPreview/action",
+      "Microsoft.Hardware/orders/read",
+      "Microsoft.Hardware/orders/write",
+      "Microsoft.Hardware/register/action"
+    ],
     "microsoft.hdinsight": [
       "MICROSOFT.HDINSIGHT/CLUSTERS/APPLICATIONS/DELETE",
       "MICROSOFT.HDINSIGHT/CLUSTERS/APPLICATIONS/READ",
@@ -8811,6 +8817,10 @@
       "Microsoft.Mission/communities/communityEndpoints/read",
       "Microsoft.Mission/communities/communityEndpoints/write",
       "Microsoft.Mission/communities/communityendpoints/connect/action",
+      "Microsoft.Mission/communities/dedicatedHubs/connect/action",
+      "Microsoft.Mission/communities/dedicatedHubs/delete",
+      "Microsoft.Mission/communities/dedicatedHubs/read",
+      "Microsoft.Mission/communities/dedicatedHubs/write",
       "Microsoft.Mission/communities/delete",
       "Microsoft.Mission/communities/read",
       "Microsoft.Mission/communities/setMaintenanceMode/action",
@@ -15046,7 +15056,15 @@
     ],
     "paloaltonetworks.cloudngfw": [
       "PaloAltoNetworks.Cloudngfw/Locations/operationStatuses/read",
+      "PaloAltoNetworks.Cloudngfw/createProductSerialNumber/action",
+      "PaloAltoNetworks.Cloudngfw/firewalls/read",
       "PaloAltoNetworks.Cloudngfw/globalRulestacks/read",
+      "PaloAltoNetworks.Cloudngfw/listCloudManagerTenants/action",
+      "PaloAltoNetworks.Cloudngfw/listProductSerialNumberStatus/action",
+      "PaloAltoNetworks.Cloudngfw/listSupportInfo/action",
+      "PaloAltoNetworks.Cloudngfw/localRulestacks/fqdnlists/read",
+      "PaloAltoNetworks.Cloudngfw/localRulestacks/listFirewalls/action",
+      "PaloAltoNetworks.Cloudngfw/localRulestacks/localRules/read",
       "PaloAltoNetworks.Cloudngfw/localRulestacks/read"
     ],
     "pinecone.vectordb": [
@@ -16592,6 +16610,9 @@
       "Microsoft.ContainerService/fleets/configmaps/read",
       "Microsoft.ContainerService/fleets/configmaps/write",
       "Microsoft.ContainerService/fleets/coordination",
+      "Microsoft.ContainerService/fleets/customresources/delete",
+      "Microsoft.ContainerService/fleets/customresources/read",
+      "Microsoft.ContainerService/fleets/customresources/write",
       "Microsoft.ContainerService/fleets/endpoints/delete",
       "Microsoft.ContainerService/fleets/endpoints/read",
       "Microsoft.ContainerService/fleets/endpoints/write",
