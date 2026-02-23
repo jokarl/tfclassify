@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.5.2](https://github.com/jokarl/tfclassify/compare/tfclassify-v0.5.1...tfclassify-v0.5.2) (2026-02-23)
+
+
+### Bug Fixes
+
+* refresh Azure role data and action registry ([#51](https://github.com/jokarl/tfclassify/issues/51)) ([a132079](https://github.com/jokarl/tfclassify/commit/a132079321681dcb00d7fed24d7fe6e32c10f952))
+
+
+### Dependencies
+
+* **gomod:** bump github.com/hashicorp/go-version from 1.7.0 to 1.8.0 ([#46](https://github.com/jokarl/tfclassify/issues/46)) ([cf733d8](https://github.com/jokarl/tfclassify/commit/cf733d8befa100cc505c6b1cd10c87c77f0f7049))
+* **gomod:** bump github.com/zclconf/go-cty from 1.16.4 to 1.17.0 ([#47](https://github.com/jokarl/tfclassify/issues/47)) ([477cf04](https://github.com/jokarl/tfclassify/commit/477cf046f86391a9d9319de81ecbaf5106fdcc2b))
+
 ## [0.5.1](https://github.com/jokarl/tfclassify/compare/tfclassify-v0.5.0...tfclassify-v0.5.1) (2026-02-22)
 
 
