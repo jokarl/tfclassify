@@ -79,7 +79,7 @@ jobs:
           go-version-file: go.mod
       - name: Create local goreleaser tag
         run: git tag "v${{ needs.resolve.outputs.cli_version || needs.release-please.outputs.cli_version }}"
-      - uses: goreleaser/goreleaser-action@v6
+      - uses: goreleaser/goreleaser-action@v7
         with:
           args: release --clean
         env:
@@ -122,7 +122,7 @@ jobs:
           go-version-file: go.mod
       - name: Create local goreleaser tag
         run: git tag "v${{ needs.resolve.outputs.plugin_version || needs.release-please.outputs.plugin_version }}"
-      - uses: goreleaser/goreleaser-action@v6
+      - uses: goreleaser/goreleaser-action@v7
         with:
           workdir: plugins/azurerm
           args: release --clean
