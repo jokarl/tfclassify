@@ -128,6 +128,7 @@ func collectSensitivePaths(
 }
 
 // valueChanged checks if two arbitrary values differ.
+// Uses type-specific comparison for JSON types to avoid reflect.DeepEqual overhead.
 func valueChanged(before, after interface{}) bool {
 	if before == nil && after == nil {
 		return false
@@ -135,5 +136,22 @@ func valueChanged(before, after interface{}) bool {
 	if before == nil || after == nil {
 		return true
 	}
+
+	switch b := before.(type) {
+	case string:
+		if a, ok := after.(string); ok {
+			return b != a
+		}
+	case float64:
+		if a, ok := after.(float64); ok {
+			return b != a
+		}
+	case bool:
+		if a, ok := after.(bool); ok {
+			return b != a
+		}
+	}
+
+	// Fall back to reflect.DeepEqual for maps, slices, and mismatched types
 	return !reflect.DeepEqual(before, after)
 }

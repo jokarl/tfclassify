@@ -13,8 +13,6 @@ import (
 // This matches the JSON structure sent from the host.
 type PluginAnalyzerConfig struct {
 	PrivilegeEscalation *PrivilegeEscalationAnalyzerConfig `json:"PrivilegeEscalation,omitempty"`
-	NetworkExposure     *NetworkExposureAnalyzerConfig     `json:"NetworkExposure,omitempty"`
-	KeyVaultAccess      *KeyVaultAccessAnalyzerConfig      `json:"KeyVaultAccess,omitempty"`
 }
 
 // PrivilegeEscalationAnalyzerConfig holds per-classification configuration for the privilege analyzer.
@@ -30,16 +28,6 @@ type PrivilegeEscalationAnalyzerConfig struct {
 	// FlagUnknownRoles controls whether unresolvable roles emit decisions (CR-0028).
 	// Default: true (nil means true).
 	FlagUnknownRoles *bool `json:"flag_unknown_roles,omitempty"`
-}
-
-// NetworkExposureAnalyzerConfig holds per-classification configuration for the network analyzer.
-type NetworkExposureAnalyzerConfig struct {
-	PermissiveSources []string `json:"permissive_sources,omitempty"`
-}
-
-// KeyVaultAccessAnalyzerConfig holds per-classification configuration for the keyvault analyzer.
-type KeyVaultAccessAnalyzerConfig struct {
-	DestructivePermissions []string `json:"destructive_permissions,omitempty"`
 }
 
 // roleSource indicates where a role was resolved from.

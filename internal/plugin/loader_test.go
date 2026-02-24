@@ -1,6 +1,7 @@
 package plugin
 
 import (
+	"context"
 	"testing"
 
 	"github.com/gobwas/glob"
@@ -390,7 +391,7 @@ func TestHost_DiscoverAndStart_NoPlugins(t *testing.T) {
 	}
 
 	host := NewHost(cfg)
-	err := host.DiscoverAndStart("/usr/bin/tfclassify")
+	err := host.DiscoverAndStart(context.Background(), "/usr/bin/tfclassify")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -408,7 +409,7 @@ func TestHost_DiscoverAndStart_SourcelessPluginNotFound(t *testing.T) {
 	}
 
 	host := NewHost(cfg)
-	err := host.DiscoverAndStart("/usr/bin/tfclassify")
+	err := host.DiscoverAndStart(context.Background(), "/usr/bin/tfclassify")
 	if err == nil {
 		t.Fatal("expected error for enabled plugin with no binary")
 	}
@@ -425,7 +426,7 @@ func TestHost_DiscoverAndStart_DisabledPlugins(t *testing.T) {
 	}
 
 	host := NewHost(cfg)
-	err := host.DiscoverAndStart("/usr/bin/tfclassify")
+	err := host.DiscoverAndStart(context.Background(), "/usr/bin/tfclassify")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

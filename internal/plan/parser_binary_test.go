@@ -1,6 +1,7 @@
 package plan
 
 import (
+	"context"
 	"os"
 	"strings"
 	"testing"
@@ -57,7 +58,7 @@ PLAN_JSON
 	}
 	defer func() { _ = os.Setenv("TERRAFORM_PATH", oldPath) }()
 
-	result, err := ParseFile(fakePlanPath)
+	result, err := ParseFile(context.Background(), fakePlanPath)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -104,7 +105,7 @@ exit 1
 	}
 	defer func() { _ = os.Setenv("TERRAFORM_PATH", oldPath) }()
 
-	_, err = ParseFile(fakePlanPath)
+	_, err = ParseFile(context.Background(), fakePlanPath)
 	if err == nil {
 		t.Fatal("expected error when terraform fails")
 	}
@@ -141,7 +142,7 @@ echo "this is not valid JSON"
 	}
 	defer func() { _ = os.Setenv("TERRAFORM_PATH", oldPath) }()
 
-	_, err = ParseFile(fakePlanPath)
+	_, err = ParseFile(context.Background(), fakePlanPath)
 	if err == nil {
 		t.Fatal("expected error when terraform outputs invalid JSON")
 	}
@@ -250,7 +251,7 @@ PLAN_JSON
 	}
 	defer func() { _ = os.Setenv("TERRAFORM_PATH", oldPath) }()
 
-	result, err := ParseFile(fakePlanPath)
+	result, err := ParseFile(context.Background(), fakePlanPath)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

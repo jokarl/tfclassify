@@ -374,7 +374,7 @@ func warnEmptyClassifications(cfg *Config) []Warning {
 // hasPluginAnalyzers returns true if the classification has any plugin analyzer config.
 func hasPluginAnalyzers(c ClassificationConfig) bool {
 	for _, pac := range c.PluginAnalyzerConfigs {
-		if pac != nil && (pac.PrivilegeEscalation != nil || pac.NetworkExposure != nil || pac.KeyVaultAccess != nil) {
+		if pac != nil && pac.PrivilegeEscalation != nil {
 			return true
 		}
 	}

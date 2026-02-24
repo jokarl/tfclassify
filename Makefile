@@ -1,4 +1,4 @@
-.PHONY: build build-all test vet lint clean generate-roles generate-actions generate-actions-offline proto
+.PHONY: build build-all test vet lint ci clean generate-roles generate-actions generate-actions-offline proto
 
 # Build the CLI binary
 build:
@@ -19,6 +19,10 @@ vet:
 # Run linter across workspace
 lint:
 	golangci-lint run ./...
+
+# Run all CI checks locally before pushing
+ci: build-all test vet lint
+	govulncheck ./...
 
 # Regenerate Azure built-in role data from AzAdvertizer CSV
 generate-roles:

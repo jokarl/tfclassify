@@ -134,18 +134,6 @@ func parseClassificationPluginBlocks(cfg *Config, body hcl.Body) error {
 						return fmt.Errorf("classification %q, %s: %w", classification.Name, pluginName, err)
 					}
 					analyzerConfig.PrivilegeEscalation = config
-				case "network_exposure":
-					config := &NetworkExposureConfig{}
-					if err := parseNetworkExposureConfig(analyzerBlock, config); err != nil {
-						return fmt.Errorf("classification %q, %s: %w", classification.Name, pluginName, err)
-					}
-					analyzerConfig.NetworkExposure = config
-				case "keyvault_access":
-					config := &KeyVaultAccessConfig{}
-					if err := parseKeyVaultAccessConfig(analyzerBlock, config); err != nil {
-						return fmt.Errorf("classification %q, %s: %w", classification.Name, pluginName, err)
-					}
-					analyzerConfig.KeyVaultAccess = config
 				default:
 					return fmt.Errorf("classification %q, %s: unknown analyzer %q", classification.Name, pluginName, analyzerBlock.Type)
 				}
@@ -208,39 +196,6 @@ func parsePrivilegeEscalationConfig(block *hclsyntax.Block, config *PrivilegeEsc
 	return nil
 }
 
-// parseNetworkExposureConfig parses attributes from a network_exposure block.
-func parseNetworkExposureConfig(block *hclsyntax.Block, config *NetworkExposureConfig) error {
-	for name, attr := range block.Body.Attributes {
-		switch name {
-		case "permissive_sources":
-			val, diags := attr.Expr.Value(nil)
-			if diags.HasErrors() {
-				return fmt.Errorf("network_exposure.permissive_sources: %v", diags.Error())
-			}
-			config.PermissiveSources = toStringSlice(val)
-		default:
-			return fmt.Errorf("network_exposure: unknown attribute %q", name)
-		}
-	}
-	return nil
-}
-
-// parseKeyVaultAccessConfig parses attributes from a keyvault_access block.
-func parseKeyVaultAccessConfig(block *hclsyntax.Block, config *KeyVaultAccessConfig) error {
-	for name, attr := range block.Body.Attributes {
-		switch name {
-		case "destructive_permissions":
-			val, diags := attr.Expr.Value(nil)
-			if diags.HasErrors() {
-				return fmt.Errorf("keyvault_access.destructive_permissions: %v", diags.Error())
-			}
-			config.DestructivePermissions = toStringSlice(val)
-		default:
-			return fmt.Errorf("keyvault_access: unknown attribute %q", name)
-		}
-	}
-	return nil
-}
 
 // parseBlastRadiusConfig parses attributes from a blast_radius block.
 func parseBlastRadiusConfig(block *hclsyntax.Block, config *BlastRadiusConfig) error {

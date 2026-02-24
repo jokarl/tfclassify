@@ -140,7 +140,7 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	// Parse plan
-	planResult, err := plan.ParseFile(planPath)
+	planResult, err := plan.ParseFile(cmd.Context(), planPath)
 	if err != nil {
 		return fmt.Errorf("failed to parse plan: %w", err)
 	}
@@ -167,7 +167,7 @@ func run(cmd *cobra.Command, args []string) error {
 		host := plugin.NewHost(cfg)
 		defer host.Shutdown()
 
-		if err := host.DiscoverAndStart(selfPath); err != nil {
+		if err := host.DiscoverAndStart(cmd.Context(), selfPath); err != nil {
 			var missingErr *plugin.PluginNotInstalledError
 			if errors.As(err, &missingErr) {
 				return fmt.Errorf("plugin %q is enabled but not installed.\nRun \"tfclassify init\" to install plugins declared in your configuration", missingErr.PluginName)
@@ -297,7 +297,7 @@ func runExplain(cmd *cobra.Command, args []string) error {
 	}
 
 	// Parse plan
-	planResult, err := plan.ParseFile(planPath)
+	planResult, err := plan.ParseFile(cmd.Context(), planPath)
 	if err != nil {
 		return fmt.Errorf("failed to parse plan: %w", err)
 	}
@@ -324,7 +324,7 @@ func runExplain(cmd *cobra.Command, args []string) error {
 		host := plugin.NewHost(cfg)
 		defer host.Shutdown()
 
-		if err := host.DiscoverAndStart(selfPath); err != nil {
+		if err := host.DiscoverAndStart(cmd.Context(), selfPath); err != nil {
 			var missingErr *plugin.PluginNotInstalledError
 			if errors.As(err, &missingErr) {
 				fmt.Fprintf(os.Stderr, "Warning: %v\nPlugin decisions will not appear in trace.\n", err)
@@ -382,7 +382,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Println("Installing plugins...")
-	return plugin.InstallPlugins(cfg, os.Stdout)
+	return plugin.InstallPlugins(cmd.Context(), cfg, os.Stdout)
 }
 
 // hasExternalPlugins returns true if the config has any enabled external plugins (with a source).

@@ -14,12 +14,13 @@ type Result struct {
 
 // ResourceDecision represents the classification decision for a single resource.
 type ResourceDecision struct {
-	Address                   string   // resource address
-	ResourceType              string   // resource type
-	Actions                   []string // actions being performed
-	Classification            string   // the classification assigned
-	ClassificationDescription string   // description of the classification level
-	MatchedRules              []string // descriptions of which rules matched
+	Address                   string                 // resource address
+	ResourceType              string                 // resource type
+	Actions                   []string               // actions being performed
+	Classification            string                 // the classification assigned
+	ClassificationDescription string                 // description of the classification level
+	MatchedRules              []string               // descriptions of which rules matched
+	Metadata                  map[string]interface{} // plugin-provided metadata (optional)
 }
 
 // ExplainResult contains full trace data for explain output.

@@ -16,16 +16,8 @@ type AzurermPluginSet struct {
 
 // PluginConfig holds the configuration for the azurerm plugin.
 type PluginConfig struct {
-	// PermissiveSources are network sources that trigger network exposure detection.
-	PermissiveSources []string
-
-	// DestructiveKVPermissions are key vault permissions that trigger destructive access detection.
-	DestructiveKVPermissions []string
-
 	// Enabled flags for each analyzer
 	PrivilegeEnabled bool
-	NetworkEnabled   bool
-	KeyVaultEnabled  bool
 
 	// RoleDatabase is the built-in Azure role database for role permission lookup.
 	// If nil, DefaultRoleDatabase() is used.
@@ -39,18 +31,7 @@ type PluginConfig struct {
 // DefaultConfig returns the default configuration.
 func DefaultConfig() *PluginConfig {
 	return &PluginConfig{
-		PermissiveSources: []string{
-			"*",
-			"0.0.0.0/0",
-			"Internet",
-		},
-		DestructiveKVPermissions: []string{
-			"delete",
-			"purge",
-		},
 		PrivilegeEnabled:          true,
-		NetworkEnabled:            true,
-		KeyVaultEnabled:           true,
 		RoleDatabase:              DefaultRoleDatabase(),
 		CrossReferenceCustomRoles: true,
 	}
@@ -72,8 +53,6 @@ func NewAzurermPluginSetWithConfig(config *PluginConfig) *AzurermPluginSet {
 		Version: Version,
 		Analyzers: []sdk.Analyzer{
 			NewPrivilegeEscalationAnalyzer(ps.config),
-			NewNetworkExposureAnalyzer(ps.config),
-			NewKeyVaultAccessAnalyzer(ps.config),
 		},
 	}
 

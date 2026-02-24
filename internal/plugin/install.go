@@ -65,7 +65,7 @@ func saveManifest(pluginDir string, m *Manifest) error {
 
 // InstallPlugins downloads and installs external plugins declared in the config.
 // Builtin plugins (no source) and disabled plugins are skipped.
-func InstallPlugins(cfg *config.Config, w io.Writer) error {
+func InstallPlugins(ctx context.Context, cfg *config.Config, w io.Writer) error {
 	pluginDir := DefaultPluginDir()
 
 	// Load existing manifest
@@ -102,7 +102,7 @@ func InstallPlugins(cfg *config.Config, w io.Writer) error {
 			_, _ = fmt.Fprintf(w, "  %s: installing v%s from %s...\n", p.Name, p.Version, p.Source)
 		}
 
-		if err := downloadAndInstall(p.Name, p.Source, p.Version, pluginDir); err != nil {
+		if err := downloadAndInstall(ctx, p.Name, p.Source, p.Version, pluginDir); err != nil {
 			return fmt.Errorf("failed to install plugin %q: %w", p.Name, err)
 		}
 
@@ -169,10 +169,10 @@ var httpClient = &http.Client{}
 var githubAPIBase = "https://api.github.com"
 
 // fetchRelease queries the GitHub Releases API for a specific tag and returns the release metadata.
-func fetchRelease(owner, repo, tag string) (*githubRelease, error) {
+func fetchRelease(ctx context.Context, owner, repo, tag string) (*githubRelease, error) {
 	apiURL := fmt.Sprintf("%s/repos/%s/%s/releases/tags/%s", githubAPIBase, owner, repo, tag)
 
-	req, err := http.NewRequestWithContext(context.TODO(), "GET", apiURL, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", apiURL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -219,7 +219,7 @@ func findAssetURL(release *githubRelease, assetName string) (string, error) {
 }
 
 // downloadAndInstall downloads a plugin from GitHub releases and installs it.
-func downloadAndInstall(name, source, version, pluginDir string) error {
+func downloadAndInstall(ctx context.Context, name, source, version, pluginDir string) error {
 	owner, repo, err := parseGitHubSource(source)
 	if err != nil {
 		return err
@@ -229,7 +229,7 @@ func downloadAndInstall(name, source, version, pluginDir string) error {
 	assetName := fmt.Sprintf("tfclassify-plugin-%s_%s_%s_%s.zip", name, version, runtime.GOOS, runtime.GOARCH)
 
 	// Query the GitHub Releases API for this tag
-	release, err := fetchRelease(owner, repo, tag)
+	release, err := fetchRelease(ctx, owner, repo, tag)
 	if err != nil {
 		return fmt.Errorf("failed to find release: %w", err)
 	}
@@ -244,7 +244,7 @@ func downloadAndInstall(name, source, version, pluginDir string) error {
 		return fmt.Errorf("failed to create plugin directory: %w", err)
 	}
 
-	tempFile, err := downloadFile(assetURL)
+	tempFile, err := downloadFile(ctx, assetURL)
 	if err != nil {
 		return fmt.Errorf("failed to download plugin: %w", err)
 	}
@@ -279,8 +279,8 @@ func parseGitHubSource(source string) (string, string, error) {
 }
 
 // downloadFile downloads a file from a URL and returns the path to a temp file.
-func downloadFile(url string) (string, error) {
-	req, err := http.NewRequestWithContext(context.TODO(), "GET", url, nil)
+func downloadFile(ctx context.Context, url string) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return "", err
 	}

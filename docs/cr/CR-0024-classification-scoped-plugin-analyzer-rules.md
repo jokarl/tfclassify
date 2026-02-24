@@ -643,6 +643,12 @@ govulncheck ./...
 * E2E tests depend on CR-0022 nightly verification infrastructure
 * The azurerm plugin must be rebuilt and re-released after implementation
 
+## Historical Note (2026-02-23)
+
+The `network_exposure` and `keyvault_access` analyzer configurations referenced throughout this CR were removed as part of a post-critique quality improvement. These analyzers were shallow attribute checks that did not meet the project's Analyzer Depth Principle. The classification-scoped plugin configuration mechanism implemented by this CR remains in full effect for the `privilege_escalation` analyzer — including `score_threshold`, role filtering, and per-classification thresholds.
+
+E2E scenarios `nsg-open-inbound` and `keyvault-destructive` were removed. The `cis-azure-foundations` scenario was simplified to cover only CIS-1 (privilege escalation). The `role-assignment-privileged` scenario remains unchanged.
+
 ## Related Items
 
 * CR-0006: gRPC Protocol and Plugin Host — established the protocol being extended

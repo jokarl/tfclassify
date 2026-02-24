@@ -32,7 +32,7 @@ Tags are provider-specific (Azure uses `tags`, GCP uses `labels`) and structural
 
 ## Current State
 
-The azurerm plugin has three analyzers: `PrivilegeEscalationAnalyzer`, `NetworkExposureAnalyzer`, `KeyVaultAccessAnalyzer`. All implement `ClassificationAwareAnalyzer` for per-classification config. They follow a consistent pattern:
+The azurerm plugin has one analyzer: `PrivilegeEscalationAnalyzer`. It implements `ClassificationAwareAnalyzer` for per-classification config, following this pattern:
 
 1. Receive `analyzerConfigJSON` from the host via `AnalyzeWithClassification()`
 2. Unmarshal into `PluginAnalyzerConfig` struct

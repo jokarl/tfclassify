@@ -3,12 +3,8 @@ package main
 
 import "github.com/jokarl/tfclassify/sdk"
 
-// Compile-time interface assertions to verify our analyzers implement the sdk.Analyzer interface.
-var (
-	_ sdk.Analyzer = (*PrivilegeEscalationAnalyzer)(nil)
-	_ sdk.Analyzer = (*NetworkExposureAnalyzer)(nil)
-	_ sdk.Analyzer = (*KeyVaultAccessAnalyzer)(nil)
-)
+// Compile-time interface assertion to verify our analyzer implements the sdk.Analyzer interface.
+var _ sdk.Analyzer = (*PrivilegeEscalationAnalyzer)(nil)
 
 // toSet converts a slice to a set (map with bool values).
 func toSet(slice []string) map[string]bool {
