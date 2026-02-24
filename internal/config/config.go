@@ -77,12 +77,6 @@ type ClassificationConfig struct {
 type PluginAnalyzerConfig struct {
 	// PrivilegeEscalation holds configuration for the privilege-escalation analyzer.
 	PrivilegeEscalation *PrivilegeEscalationConfig `hcl:"privilege_escalation,block"`
-
-	// NetworkExposure holds configuration for the network-exposure analyzer.
-	NetworkExposure *NetworkExposureConfig `hcl:"network_exposure,block"`
-
-	// KeyVaultAccess holds configuration for the keyvault-access analyzer.
-	KeyVaultAccess *KeyVaultAccessConfig `hcl:"keyvault_access,block"`
 }
 
 // PrivilegeEscalationConfig holds configuration for the privilege_escalation analyzer.
@@ -118,20 +112,6 @@ type PrivilegeEscalationConfig struct {
 	// emit a decision with diagnostic metadata. Default: true.
 	// CR-0028: Pattern-Based Control-Plane Detection
 	FlagUnknownRoles *bool `hcl:"flag_unknown_roles,optional" json:"flag_unknown_roles,omitempty"`
-}
-
-// NetworkExposureConfig holds configuration for the network_exposure analyzer.
-type NetworkExposureConfig struct {
-	// PermissiveSources overrides the default permissive source detection.
-	// Default: ["*", "0.0.0.0/0", "Internet"]
-	PermissiveSources []string `hcl:"permissive_sources,optional" json:"permissive_sources,omitempty"`
-}
-
-// KeyVaultAccessConfig holds configuration for the keyvault_access analyzer.
-type KeyVaultAccessConfig struct {
-	// DestructivePermissions overrides the default destructive permission list.
-	// Default: ["delete", "purge"]
-	DestructivePermissions []string `hcl:"destructive_permissions,optional" json:"destructive_permissions,omitempty"`
 }
 
 // ToJSON serializes the analyzer config for gRPC transport.

@@ -159,7 +159,6 @@ func (c *Classifier) explainResource(change plan.ResourceChange) ResourceExplana
 	bestClassification := ""
 	bestPrecedence := -1
 	bestSource := ""
-	bestRule := ""
 
 	for _, classificationName := range c.config.Precedence {
 		rules := c.matchers[classificationName]
@@ -185,7 +184,6 @@ func (c *Classifier) explainResource(change plan.ResourceChange) ResourceExplana
 					bestClassification = classificationName
 					bestPrecedence = precedence
 					bestSource = "core-rule"
-					bestRule = rule.ruleDescription
 				}
 			} else {
 				entry.Result = TraceSkip
@@ -204,7 +202,6 @@ func (c *Classifier) explainResource(change plan.ResourceChange) ResourceExplana
 	if bestClassification != "" {
 		explanation.FinalClassification = bestClassification
 		explanation.FinalSource = bestSource
-		_ = bestRule // used for winner reason
 	} else {
 		explanation.FinalClassification = c.config.Defaults.Unclassified
 		explanation.FinalSource = "default"

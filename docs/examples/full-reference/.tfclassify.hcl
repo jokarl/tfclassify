@@ -144,19 +144,6 @@ classification "critical" {
       # flag_unknown_roles = true
     }
 
-    # Network exposure detection — flags NSG rules that allow inbound traffic
-    # from overly broad sources. Any rule with a source matching one of these
-    # values is considered too permissive and triggers this classification.
-    network_exposure {
-      permissive_sources = ["*", "0.0.0.0/0", "Internet"]
-    }
-
-    # Key vault destructive permission detection
-    keyvault_access {
-      # Override the default list of permissions considered destructive.
-      # Default: ["delete", "purge"] (matched case-insensitively).
-      # destructive_permissions = ["delete", "purge", "recover"]
-    }
   }
 }
 
@@ -208,11 +195,6 @@ classification "high" {
       # Pattern-based data-plane detection for write/delete operations.
       data_actions = ["*/write", "*/delete"]
     }
-    # Empty block = enable with defaults.
-    # Defaults: permissive_sources = ["*", "0.0.0.0/0", "Internet"]
-    network_exposure {}
-    # Defaults: destructive_permissions = ["delete", "purge"]
-    keyvault_access {}
   }
 }
 

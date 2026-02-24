@@ -446,7 +446,6 @@ classification "critical" {
     privilege_escalation {
       actions = ["Microsoft.Authorization/*"]   # Control-plane patterns
     }
-    keyvault_access {}                          # Detect destructive permissions
   }
 }
 ```
@@ -521,13 +520,13 @@ Builtin analyzers are always enabled and require no configuration, except `blast
 
 ### Layer 3: Deep Inspection Plugins
 
-Provider-specific analysis via external plugins. Plugins run as separate processes communicating over gRPC ([hashicorp/go-plugin](https://github.com/hashicorp/go-plugin)). They inspect actual resource attribute values — role permissions, network CIDRs, access grants — using pattern-based detection configured per-classification.
+Provider-specific analysis via external plugins. Plugins run as separate processes communicating over gRPC ([hashicorp/go-plugin](https://github.com/hashicorp/go-plugin)). They inspect actual resource attribute values — such as role permissions and effective actions — using pattern-based detection configured per-classification.
 
 **Available plugins:**
 
 | Plugin | Documentation | Detects |
 |--------|--------------|---------|
-| [azurerm](plugins/azurerm/) | [plugins/azurerm/README.md](plugins/azurerm/README.md) | Privilege escalation, network exposure, destructive key vault permissions |
+| [azurerm](plugins/azurerm/) | [plugins/azurerm/README.md](plugins/azurerm/README.md) | Privilege escalation |
 
 **Plugin discovery:** plugins are discovered as `tfclassify-plugin-{name}` binaries in:
 
@@ -563,7 +562,6 @@ The [e2e test scenarios](testdata/e2e/) serve as a progressive learning path fro
 | Plugin deep inspection | [role-assignment-privileged](testdata/e2e/role-assignment-privileged/) | Permission-based detection via azurerm plugin |
 | Graduated thresholds | [role-escalation-threshold](testdata/e2e/role-escalation-threshold/) | Different action patterns per classification level |
 | Role exclusions | [role-exclusion](testdata/e2e/role-exclusion/) | `exclude` list bypasses plugin detection |
-| Attribute inspection | [keyvault-destructive](testdata/e2e/keyvault-destructive/) | Deep inspection of permission arrays |
 | Module support | [modules-pluginless](testdata/e2e/modules-pluginless/) | Resources inside Terraform modules |
 | CIS benchmark mapping | [cis-azure-foundations](testdata/e2e/cis-azure-foundations/) | Classifications named after CIS controls |
 
@@ -589,18 +587,6 @@ These scenarios demonstrate real-world classification behavior across all three 
 | [role-exclusion](testdata/e2e/role-exclusion/) | `exclude = ["AcrPush"]` on both critical and standard | AcrPush role is excluded from privilege escalation detection in all classifications. Falls through to core rule `standard` on create, `critical` on destroy (glob `*_role_*` + `delete`). |
 | [custom-role-cross-reference](testdata/e2e/custom-role-cross-reference/) | `actions = ["Microsoft.Authorization/*"]` on critical | Custom role with `Microsoft.Authorization/roleAssignments/write`. Plugin cross-references the role definition from the plan to resolve effective actions, matching the critical pattern. |
 
-### Deep Inspection: Network Exposure
-
-| Scenario | Config | What It Tests |
-|----------|--------|---------------|
-| [nsg-open-inbound](testdata/e2e/nsg-open-inbound/) | `network_exposure {}` on critical | NSG rule allowing `*` inbound from `*`. Plugin detects permissive source address on create → `critical`. Delete of security group/rule also matches core rule → `critical` on destroy. |
-
-### Deep Inspection: Key Vault
-
-| Scenario | Config | What It Tests |
-|----------|--------|---------------|
-| [keyvault-destructive](testdata/e2e/keyvault-destructive/) | `keyvault_access {}` on critical | Key vault access policy granting `Delete` and `Purge` secret permissions. Plugin detects destructive permissions and emits `critical`. Demonstrates attribute-level deep inspection of permission arrays. |
-
 ### Deep Inspection: Data-Plane and Control-Plane Patterns
 
 | Scenario | Config | What It Tests |
@@ -619,7 +605,7 @@ These scenarios demonstrate real-world classification behavior across all three 
 
 | Scenario | Config | What It Tests |
 |----------|--------|---------------|
-| [cis-azure-foundations](testdata/e2e/cis-azure-foundations/) | `network_exposure`, `privilege_escalation`, `keyvault_access` across three CIS-named classifications | Classifications named after CIS Azure Foundations Benchmark sections. Demonstrates mapping CIS 6.1/6.2 (restrict Internet access), CIS 1.23 (no privileged role assignments), and CIS 8.5 (key vault recoverability) to tfclassify analyzers. No special compliance feature needed — classification and rule names carry the CIS references directly. |
+| [cis-azure-foundations](testdata/e2e/cis-azure-foundations/) | `privilege_escalation` across CIS-named classifications | Classifications named after CIS Azure Foundations Benchmark sections. Demonstrates mapping CIS 1.23 (no privileged role assignments) to tfclassify analyzers. No special compliance feature needed — classification and rule names carry the CIS references directly. |
 
 ### How E2E Tests Run
 

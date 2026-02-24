@@ -17,7 +17,6 @@ import (
 	"github.com/jokarl/tfclassify/sdk"
 	"github.com/jokarl/tfclassify/sdk/pb"
 	sdkplugin "github.com/jokarl/tfclassify/sdk/plugin"
-	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 )
 
@@ -47,7 +46,7 @@ func NewHost(cfg *config.Config) *Host {
 }
 
 // DiscoverAndStart discovers and starts all enabled plugins.
-func (h *Host) DiscoverAndStart(selfPath string) error {
+func (h *Host) DiscoverAndStart(ctx context.Context, selfPath string) error {
 	discovered, err := DiscoverPlugins(h.cfg, selfPath)
 	if err != nil {
 		return err
@@ -55,7 +54,7 @@ func (h *Host) DiscoverAndStart(selfPath string) error {
 	h.plugins = discovered
 
 	for name, plugin := range h.plugins {
-		h.startPlugin(name, plugin)
+		h.startPlugin(ctx, name, plugin)
 		if err := h.verifyAndConfigurePlugin(name); err != nil {
 			return fmt.Errorf("plugin %q: %w", name, err)
 		}
@@ -122,8 +121,8 @@ func (h *Host) verifyAndConfigurePlugin(name string) error {
 }
 
 // startPlugin starts a single plugin process.
-func (h *Host) startPlugin(name string, plugin *DiscoveredPlugin) {
-	cmd := exec.CommandContext(context.TODO(), plugin.Path)
+func (h *Host) startPlugin(ctx context.Context, name string, plugin *DiscoveredPlugin) {
+	cmd := exec.CommandContext(ctx, plugin.Path)
 
 	client := goplugin.NewClient(&goplugin.ClientConfig{
 		HandshakeConfig: sdkplugin.HandshakeConfig,
@@ -176,11 +175,13 @@ func (h *Host) RunAnalysis(changes []plan.ResourceChange) ([]classify.ResourceDe
 
 	// Run plugins concurrently — each plugin's classifications run sequentially
 	// within that plugin, but different plugins run in parallel.
-	g, _ := errgroup.WithContext(context.Background())
+	var wg sync.WaitGroup
 	for name := range h.plugins {
 		configs := classificationConfigs[name]
 
-		g.Go(func() error {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
 			// If no classification-scoped configs, run with empty classification
 			if len(configs) == 0 {
 				ctx, cancel := context.WithTimeout(context.Background(), timeout)
@@ -189,7 +190,7 @@ func (h *Host) RunAnalysis(changes []plan.ResourceChange) ([]classify.ResourceDe
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "Warning: plugin %q failed: %v\n", name, err)
 				}
-				return nil
+				return
 			}
 
 			// Run analysis for each classification that has config for this plugin
@@ -202,10 +203,9 @@ func (h *Host) RunAnalysis(changes []plan.ResourceChange) ([]classify.ResourceDe
 						name, cfg.classificationName, err)
 				}
 			}
-			return nil
-		})
+		}()
 	}
-	_ = g.Wait()
+	wg.Wait()
 
 	return h.decisions, nil
 }
@@ -352,6 +352,7 @@ func (r *Runner) EmitDecision(analyzer sdk.Analyzer, change *sdk.ResourceChange,
 		Actions:        change.Actions,
 		Classification: decision.Classification,
 		MatchedRules:   []string{fmt.Sprintf("plugin: %s - %s", analyzer.Name(), decision.Reason)},
+		Metadata:       decision.Metadata,
 	})
 
 	return nil

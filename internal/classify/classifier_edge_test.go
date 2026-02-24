@@ -215,7 +215,7 @@ func TestAddPluginDecisions_UpgradeAllowed(t *testing.T) {
 			ResourceType:   "azurerm_virtual_network",
 			Actions:        []string{"update"},
 			Classification: "critical",
-			MatchedRules:   []string{"plugin: network exposure detected"},
+			MatchedRules:   []string{"plugin: privilege-escalation - role grants wildcard access"},
 		},
 	}
 

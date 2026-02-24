@@ -3,6 +3,7 @@ package plugin
 import (
 	"archive/zip"
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -28,7 +29,7 @@ func TestInstallPlugins_BuiltinSkipped(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	err := InstallPlugins(cfg, &buf)
+	err := InstallPlugins(context.Background(), cfg, &buf)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -51,7 +52,7 @@ func TestInstallPlugins_DisabledSkipped(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	err := InstallPlugins(cfg, &buf)
+	err := InstallPlugins(context.Background(), cfg, &buf)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -191,7 +192,7 @@ func TestInstallPlugins_AlreadyInstalled(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	err = InstallPlugins(cfg, &buf)
+	err = InstallPlugins(context.Background(), cfg, &buf)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -591,7 +592,7 @@ func TestDownloadFile_Success(t *testing.T) {
 	defer server.Close()
 
 	// Download the file
-	tempPath, err := downloadFile(server.URL)
+	tempPath, err := downloadFile(context.Background(), server.URL)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -614,7 +615,7 @@ func TestDownloadFile_NotFound(t *testing.T) {
 	}))
 	defer server.Close()
 
-	_, err := downloadFile(server.URL)
+	_, err := downloadFile(context.Background(), server.URL)
 	if err == nil {
 		t.Fatal("expected error for 404 response")
 	}
@@ -629,7 +630,7 @@ func TestDownloadFile_ServerError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	_, err := downloadFile(server.URL)
+	_, err := downloadFile(context.Background(), server.URL)
 	if err == nil {
 		t.Fatal("expected error for 500 response")
 	}
@@ -654,7 +655,7 @@ func TestDownloadFile_WithGitHubToken(t *testing.T) {
 	}
 	defer func() { _ = os.Setenv("GITHUB_TOKEN", oldToken) }()
 
-	tempPath, err := downloadFile(server.URL)
+	tempPath, err := downloadFile(context.Background(), server.URL)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -667,7 +668,7 @@ func TestDownloadFile_WithGitHubToken(t *testing.T) {
 
 func TestDownloadAndInstall_InvalidSource(t *testing.T) {
 	// Test with invalid source format
-	err := downloadAndInstall("test", "invalid-source", "1.0.0", "/tmp")
+	err := downloadAndInstall(context.Background(), "test", "invalid-source", "1.0.0", "/tmp")
 	if err == nil {
 		t.Fatal("expected error for invalid source")
 	}
@@ -701,7 +702,7 @@ func TestFetchRelease_Success(t *testing.T) {
 	githubAPIBase = server.URL
 	defer func() { githubAPIBase = origBase }()
 
-	release, err := fetchRelease("owner", "repo", "v1.0.0")
+	release, err := fetchRelease(context.Background(), "owner", "repo", "v1.0.0")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -723,7 +724,7 @@ func TestFetchRelease_NotFound(t *testing.T) {
 	githubAPIBase = server.URL
 	defer func() { githubAPIBase = origBase }()
 
-	_, err := fetchRelease("nobody", "nonexistent", "v99.99.99")
+	_, err := fetchRelease(context.Background(), "nobody", "nonexistent", "v99.99.99")
 	if err == nil {
 		t.Fatal("expected error for missing release")
 	}
@@ -751,7 +752,7 @@ func TestFetchRelease_WithGitHubToken(t *testing.T) {
 	}
 	defer func() { _ = os.Setenv("GITHUB_TOKEN", oldToken) }()
 
-	_, err := fetchRelease("owner", "repo", "v1.0.0")
+	_, err := fetchRelease(context.Background(), "owner", "repo", "v1.0.0")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -770,7 +771,7 @@ func TestFetchRelease_ServerError(t *testing.T) {
 	githubAPIBase = server.URL
 	defer func() { githubAPIBase = origBase }()
 
-	_, err := fetchRelease("owner", "repo", "v1.0.0")
+	_, err := fetchRelease(context.Background(), "owner", "repo", "v1.0.0")
 	if err == nil {
 		t.Fatal("expected error for server error")
 	}
@@ -883,7 +884,7 @@ func TestDownloadAndInstall_EndToEnd(t *testing.T) {
 	}
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
-	err = downloadAndInstall("test", "github.com/owner/tfclassify-plugin-test", "1.0.0", tmpDir)
+	err = downloadAndInstall(context.Background(), "test", "github.com/owner/tfclassify-plugin-test", "1.0.0", tmpDir)
 	if err != nil {
 		t.Fatalf("downloadAndInstall failed: %v", err)
 	}
@@ -934,7 +935,7 @@ func TestInstallPlugins_DownloadFailure(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	err = InstallPlugins(cfg, &buf)
+	err = InstallPlugins(context.Background(), cfg, &buf)
 	if err == nil {
 		t.Fatal("expected error for failed plugin install")
 	}
@@ -978,7 +979,7 @@ func TestInstallPlugins_MultiplePlugins(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	err = InstallPlugins(cfg, &buf)
+	err = InstallPlugins(context.Background(), cfg, &buf)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1160,7 +1161,7 @@ func TestInstallPlugins_VersionUpgrade(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	err = InstallPlugins(cfg, &buf)
+	err = InstallPlugins(context.Background(), cfg, &buf)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

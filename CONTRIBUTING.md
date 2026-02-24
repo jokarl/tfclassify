@@ -55,7 +55,7 @@ go test ./plugins/azurerm/ -run TestPrivilege
 E2E scenarios live in `testdata/e2e/`. Each has `main.tf`, `.tfclassify.hcl`, and `expected.json`. Use the runner script with `--build` to compile from source:
 
 ```bash
-bash testdata/e2e/run.sh --build --plan-only -t blast-radius -t nsg-open-inbound
+bash testdata/e2e/run.sh --build --plan-only -t blast-radius -t role-assignment-privileged
 ```
 
 Add `--plan-only` to skip apply/destroy for faster iteration. Use `-t NAME` (repeatable) to run specific scenarios.

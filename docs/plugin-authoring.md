@@ -314,9 +314,9 @@ decision := &sdk.Decision{
 
     // Additional context (optional)
     Metadata: map[string]interface{}{
-        "analyzer": "network-exposure",
-        "source":   "*",
-        "rule":     "allow-all-inbound",
+        "analyzer": "privilege-escalation",
+        "role":     "Owner",
+        "trigger":  "control-plane",
     },
 }
 

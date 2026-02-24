@@ -17,12 +17,6 @@ classification "critical" {
       actions = ["Microsoft.Authorization/*"]
       exclude = ["AcrPush", "AcrPull"]
     }
-
-    network_exposure {
-      permissive_sources = ["*", "0.0.0.0/0", "Internet"]
-    }
-
-    keyvault_access {}
   }
 }
 

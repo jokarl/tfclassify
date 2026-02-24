@@ -248,19 +248,6 @@ func TestLoad_ClassificationScopedPluginConfig(t *testing.T) {
 		t.Errorf("expected first Exclude role 'AcrPush', got %q", azurermCfg.PrivilegeEscalation.Exclude[0])
 	}
 
-	// Test network_exposure config
-	if azurermCfg.NetworkExposure == nil {
-		t.Fatal("expected NetworkExposure config")
-	}
-	if len(azurermCfg.NetworkExposure.PermissiveSources) != 3 {
-		t.Errorf("expected 3 PermissiveSources, got %d", len(azurermCfg.NetworkExposure.PermissiveSources))
-	}
-
-	// Test keyvault_access config (empty block)
-	if azurermCfg.KeyVaultAccess == nil {
-		t.Fatal("expected KeyVaultAccess config (even if empty)")
-	}
-
 	// Test high classification has partial plugin config
 	high := cfg.Classifications[1]
 	if high.Name != "high" {

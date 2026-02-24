@@ -1,13 +1,14 @@
 package plan
 
 import (
+	"context"
 	"os"
 	"strings"
 	"testing"
 )
 
 func TestParse_ValidPlan(t *testing.T) {
-	result, err := ParseFile("testdata/valid_plan.json")
+	result, err := ParseFile(context.Background(), "testdata/valid_plan.json")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -52,7 +53,7 @@ func TestParse_ValidPlan(t *testing.T) {
 }
 
 func TestParse_EmptyPlan(t *testing.T) {
-	result, err := ParseFile("testdata/empty_plan.json")
+	result, err := ParseFile(context.Background(), "testdata/empty_plan.json")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -79,7 +80,7 @@ func TestParse_MalformedJSON(t *testing.T) {
 }
 
 func TestParse_UnsupportedVersion(t *testing.T) {
-	_, err := ParseFile("testdata/unsupported_version.json")
+	_, err := ParseFile(context.Background(), "testdata/unsupported_version.json")
 	if err == nil {
 		t.Error("expected error for unsupported version, got nil")
 	}
@@ -94,7 +95,7 @@ func TestParse_UnsupportedVersion(t *testing.T) {
 }
 
 func TestParse_SensitiveValues(t *testing.T) {
-	result, err := ParseFile("testdata/sensitive_values.json")
+	result, err := ParseFile(context.Background(), "testdata/sensitive_values.json")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -118,7 +119,7 @@ func TestParse_SensitiveValues(t *testing.T) {
 }
 
 func TestParse_DataSource(t *testing.T) {
-	result, err := ParseFile("testdata/data_source.json")
+	result, err := ParseFile(context.Background(), "testdata/data_source.json")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -137,7 +138,7 @@ func TestParse_DataSource(t *testing.T) {
 }
 
 func TestParse_Actions(t *testing.T) {
-	result, err := ParseFile("testdata/all_actions.json")
+	result, err := ParseFile(context.Background(), "testdata/all_actions.json")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -174,7 +175,7 @@ func TestParse_Actions(t *testing.T) {
 }
 
 func TestParseFile_FileNotFound(t *testing.T) {
-	_, err := ParseFile("testdata/nonexistent.json")
+	_, err := ParseFile(context.Background(), "testdata/nonexistent.json")
 	if err == nil {
 		t.Error("expected error for non-existent file, got nil")
 	}
@@ -185,7 +186,7 @@ func TestParseFile_FileNotFound(t *testing.T) {
 }
 
 func TestParse_PreservesBeforeAfter(t *testing.T) {
-	result, err := ParseFile("testdata/nested_values.json")
+	result, err := ParseFile(context.Background(), "testdata/nested_values.json")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -247,7 +248,7 @@ func TestParse_FromReader(t *testing.T) {
 
 func TestParseFile_JSONDetection(t *testing.T) {
 	// JSON files should be detected and parsed correctly
-	result, err := ParseFile("testdata/valid_plan.json")
+	result, err := ParseFile(context.Background(), "testdata/valid_plan.json")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -414,7 +415,7 @@ func TestExtractResourceChanges_NilChanges(t *testing.T) {
 func TestParseFile_SeekError(t *testing.T) {
 	// This is difficult to test without mocking, but we can at least verify
 	// normal files work correctly through the seek
-	result, err := ParseFile("testdata/valid_plan.json")
+	result, err := ParseFile(context.Background(), "testdata/valid_plan.json")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -450,7 +451,7 @@ func TestParseFile_BinaryPlanDetection(t *testing.T) {
 	}()
 
 	// This should fail because terraform is not available
-	_, err = ParseFile(binaryPlanPath)
+	_, err = ParseFile(context.Background(), binaryPlanPath)
 	if err == nil {
 		t.Fatal("expected error for binary plan when terraform not available")
 	}
@@ -480,7 +481,7 @@ func TestParseFile_JSONWithLeadingWhitespace(t *testing.T) {
 		t.Fatalf("failed to write file: %v", err)
 	}
 
-	result, err := ParseFile(wsPath)
+	result, err := ParseFile(context.Background(), wsPath)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -595,7 +596,7 @@ func TestParseBinaryPlan_NoTerraform(t *testing.T) {
 	}()
 
 	// Try to parse a "binary" plan
-	_, err := parseBinaryPlan("/nonexistent/plan.tfplan")
+	_, err := parseBinaryPlan(context.Background(), "/nonexistent/plan.tfplan")
 	if err == nil {
 		t.Fatal("expected error when terraform not available")
 	}

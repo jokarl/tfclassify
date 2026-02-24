@@ -121,12 +121,10 @@ jobs:
       matrix:
         use-case:
           - role-assignment-privileged
-          - nsg-open-inbound
           - route-table
           - role-assignment-reader
           - role-escalation-threshold
           - role-exclusion
-          - keyvault-destructive
           - data-plane-detection
           - control-plane-patterns
           - custom-role-cross-reference

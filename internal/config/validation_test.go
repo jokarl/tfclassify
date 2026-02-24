@@ -552,7 +552,7 @@ func TestValidateWarnings_EmptyClassification_WithPlugin(t *testing.T) {
 				Name:  "critical",
 				Rules: nil,
 				PluginAnalyzerConfigs: map[string]*PluginAnalyzerConfig{
-					"azurerm": {NetworkExposure: &NetworkExposureConfig{}},
+					"azurerm": {PrivilegeEscalation: &PrivilegeEscalationConfig{}},
 				},
 			},
 		},

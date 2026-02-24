@@ -1,14 +1,12 @@
 # tfclassify Azure Plugin
 
-Deep inspection plugin for Azure Resource Manager (azurerm) resources. Analyzes actual resource attribute values -- role permissions, network sources, key vault grants -- using pattern-based detection to classify changes beyond what resource-type matching can detect.
+Deep inspection plugin for Azure Resource Manager (azurerm) resources. Analyzes actual resource attribute values -- role permissions and effective action sets -- using pattern-based detection to classify changes beyond what resource-type matching can detect.
 
 ## Table of Contents
 
 - [Overview](#overview)
 - [Analyzers](#analyzers)
   - [Privilege Escalation](#privilege-escalation)
-  - [Network Exposure](#network-exposure)
-  - [Key Vault Access](#key-vault-access)
 - [Configuration](#configuration)
   - [Enabling the Plugin](#enabling-the-plugin)
   - [Classification-Scoped Plugin Configuration](#classification-scoped-plugin-configuration)
@@ -21,13 +19,11 @@ Deep inspection plugin for Azure Resource Manager (azurerm) resources. Analyzes 
 
 ## Overview
 
-The azurerm plugin provides three analyzers that inspect Azure-specific resource attributes:
+The azurerm plugin provides one analyzer that inspects Azure-specific resource attributes:
 
 | Analyzer | Resource Type | Detects |
 |----------|--------------|---------|
 | `privilege-escalation` | `azurerm_role_assignment` | Role changes matching configured action patterns |
-| `network-exposure` | `azurerm_network_security_rule` | Inbound rules with overly permissive sources |
-| `key-vault-access` | `azurerm_key_vault_access_policy` | Access policies granting destructive permissions |
 
 Plugin decisions are merged with core classification rules via the host's precedence system. A plugin can escalate a resource's classification but never lower it.
 
@@ -59,34 +55,6 @@ role "Storage Blob Data Owner" grants data-plane access matching configured patt
 unknown role "Custom Role" flagged (role permissions could not be resolved)
 ```
 
-### Network Exposure
-
-Detects overly permissive network security rules that allow inbound traffic from broad sources.
-
-**Resource pattern:** `azurerm_network_security_rule`
-
-**What it detects:**
-- Inbound allow rules where `source_address_prefix` is `*`, `0.0.0.0/0`, or `Internet`
-- Also checks `source_address_prefixes` (the array variant)
-
-**Conditions (all must be true):**
-- `direction` is `Inbound`
-- `access` is `Allow`
-- Source matches one of the configured permissive sources
-
-### Key Vault Access
-
-Detects when key vault access policies grant destructive permissions.
-
-**Resource pattern:** `azurerm_key_vault_access_policy`
-
-**What it detects:**
-- `delete` or `purge` in any of these permission fields:
-  - `secret_permissions`
-  - `key_permissions`
-  - `certificate_permissions`
-  - `storage_permissions`
-
 ## Configuration
 
 ### Enabling the Plugin
@@ -117,7 +85,7 @@ tfclassify init
 
 Plugin configuration is defined **per-classification** inside classification blocks. This allows different action patterns and settings for each classification level.
 
-Inside each classification block, add an `azurerm {}` block with sub-blocks for each analyzer:
+Inside each classification block, add an `azurerm {}` block with a `privilege_escalation {}` sub-block:
 
 ```hcl
 classification "critical" {
@@ -139,19 +107,11 @@ classification "critical" {
       scopes       = ["subscription", "management_group"] # Only at broad scopes
       flag_unknown_roles = true                           # Flag unresolvable roles
     }
-
-    # Network exposure analyzer (empty = use defaults)
-    network_exposure {}
-
-    # Key vault access analyzer
-    keyvault_access {}
   }
 }
 ```
 
-#### Analyzer Sub-blocks
-
-Each analyzer has its own sub-block with specific options:
+#### Analyzer Sub-block
 
 **`privilege_escalation {}`**
 
@@ -164,21 +124,11 @@ Each analyzer has its own sub-block with specific options:
 | `scopes` | list(string) | `[]` | Scope levels to match: `"management_group"`, `"subscription"`, `"resource_group"`, `"resource"`. Empty matches any scope. |
 | `flag_unknown_roles` | bool | `true` | Emit decisions for roles whose permissions cannot be resolved, with diagnostic metadata |
 
-**`network_exposure {}`**
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `permissive_sources` | list(string) | `["*", "0.0.0.0/0", "Internet"]` | Network sources that trigger detection |
-
-**`keyvault_access {}`**
-
-Uses default settings. Include an empty block to enable the analyzer for the classification.
-
 #### Behavior Notes
 
 - If no `azurerm {}` block is present in a classification, the plugin does not emit decisions for resources matching that classification
-- An analyzer sub-block (e.g., `privilege_escalation {}`) enables that analyzer for the classification
-- Empty sub-blocks use default settings
+- The `privilege_escalation {}` sub-block enables the analyzer for the classification
+- An empty sub-block uses default settings
 - Use different `actions`/`data_actions` patterns per classification for graduated detection (e.g., wildcard patterns for "critical", specific write patterns for "standard")
 
 #### Programmatic Options
@@ -187,8 +137,6 @@ The following options are available via `PluginConfig` but are not exposed throu
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `PermissiveSources` | `[]string` | `["*", "0.0.0.0/0", "Internet"]` | Network sources that trigger network exposure detection |
-| `DestructiveKVPermissions` | `[]string` | `["delete", "purge"]` | Key vault permissions considered destructive |
 | `CrossReferenceCustomRoles` | `bool` | `true` | Look up `azurerm_role_definition` resources in the plan for custom role pattern matching |
 
 ### Full Configuration Example
@@ -229,8 +177,6 @@ classification "critical" {
     privilege_escalation {
       actions = ["*", "Microsoft.Authorization/*"]
     }
-    network_exposure {}
-    keyvault_access {}
   }
 }
 
@@ -243,24 +189,12 @@ classification "high" {
     actions     = ["create", "update"]
   }
 
-  rule {
-    description = "Network security changes"
-    resource    = ["*_security_rule", "*_firewall_*"]
-  }
-
-  rule {
-    description = "Key vault secret/key changes"
-    resource    = ["*_key_vault_*"]
-  }
-
   # Pattern-based detection: write/delete operations
   azurerm {
     privilege_escalation {
       actions      = ["*/write", "*/delete"]
       data_actions = ["*/write", "*/delete"]
     }
-    network_exposure {}
-    keyvault_access {}
   }
 }
 
@@ -477,8 +411,6 @@ go test ./plugins/azurerm/...
 
 # Specific test
 go test ./plugins/azurerm/ -run TestPrivilege
-go test ./plugins/azurerm/ -run TestNetwork
-go test ./plugins/azurerm/ -run TestKeyVault
 go test ./plugins/azurerm/ -run TestScoring
 go test ./plugins/azurerm/ -run TestAction
 ```
@@ -510,8 +442,6 @@ plugins/azurerm/
 ├── main.go              # Entry point: calls sdk/plugin.Serve()
 ├── plugin.go            # AzurermPluginSet and PluginConfig
 ├── privilege.go         # PrivilegeEscalationAnalyzer
-├── network.go           # NetworkExposureAnalyzer
-├── keyvault.go          # KeyVaultAccessAnalyzer
 ├── scoring.go           # Pattern matching: actionMatchesPattern, computeEffectiveActions
 ├── actions.go           # ActionRegistry (embedded JSON, wildcard expansion)
 ├── scope.go             # ARM scope path parsing

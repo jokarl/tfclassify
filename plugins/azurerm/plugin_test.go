@@ -58,25 +58,14 @@ func (r *mockRunner) EmitDecision(analyzer sdk.Analyzer, change *sdk.ResourceCha
 func TestDefaultConfig(t *testing.T) {
 	config := DefaultConfig()
 
-	// Check permissive sources
-	if len(config.PermissiveSources) != 3 {
-		t.Errorf("expected 3 default permissive sources, got %d", len(config.PermissiveSources))
-	}
-
-	// Check destructive KV permissions
-	if len(config.DestructiveKVPermissions) != 2 {
-		t.Errorf("expected 2 default destructive KV permissions, got %d", len(config.DestructiveKVPermissions))
-	}
-
-	// Check enabled flags
 	if !config.PrivilegeEnabled {
 		t.Error("expected PrivilegeEnabled to be true by default")
 	}
-	if !config.NetworkEnabled {
-		t.Error("expected NetworkEnabled to be true by default")
+	if config.RoleDatabase == nil {
+		t.Error("expected RoleDatabase to be set by default")
 	}
-	if !config.KeyVaultEnabled {
-		t.Error("expected KeyVaultEnabled to be true by default")
+	if !config.CrossReferenceCustomRoles {
+		t.Error("expected CrossReferenceCustomRoles to be true by default")
 	}
 }
 
@@ -92,27 +81,18 @@ func TestNewAzurermPluginSet(t *testing.T) {
 	}
 
 	names := ps.AnalyzerNames()
-	if len(names) != 3 {
-		t.Fatalf("expected 3 analyzers, got %d", len(names))
+	if len(names) != 1 {
+		t.Fatalf("expected 1 analyzer, got %d", len(names))
 	}
 
-	expectedNames := map[string]bool{
-		"privilege-escalation": true,
-		"network-exposure":     true,
-		"keyvault-access":      true,
-	}
-	for _, name := range names {
-		if !expectedNames[name] {
-			t.Errorf("unexpected analyzer name: %s", name)
-		}
+	if names[0] != "privilege-escalation" {
+		t.Errorf("expected analyzer name 'privilege-escalation', got %q", names[0])
 	}
 }
 
 func TestNewAzurermPluginSetWithConfig(t *testing.T) {
 	config := &PluginConfig{
 		PrivilegeEnabled: false,
-		NetworkEnabled:   true,
-		KeyVaultEnabled:  true,
 	}
 
 	ps := NewAzurermPluginSetWithConfig(config)
@@ -132,32 +112,16 @@ func TestAnalyzerResourcePatterns(t *testing.T) {
 	config := DefaultConfig()
 	ps := NewAzurermPluginSetWithConfig(config)
 
-	tests := []struct {
-		name     string
-		expected []string
-	}{
-		{"privilege-escalation", []string{"azurerm_role_assignment"}},
-		{"network-exposure", []string{"azurerm_network_security_rule"}},
-		{"keyvault-access", []string{"azurerm_key_vault_access_policy"}},
+	analyzer := ps.GetAnalyzer("privilege-escalation")
+	if analyzer == nil {
+		t.Fatal("analyzer 'privilege-escalation' not found")
 	}
 
-	for _, tt := range tests {
-		analyzer := ps.GetAnalyzer(tt.name)
-		if analyzer == nil {
-			t.Errorf("analyzer %q not found", tt.name)
-			continue
-		}
-
-		patterns := analyzer.ResourcePatterns()
-		if len(patterns) != len(tt.expected) {
-			t.Errorf("analyzer %q: expected %d patterns, got %d", tt.name, len(tt.expected), len(patterns))
-			continue
-		}
-
-		for i, p := range patterns {
-			if p != tt.expected[i] {
-				t.Errorf("analyzer %q: expected pattern %q, got %q", tt.name, tt.expected[i], p)
-			}
-		}
+	patterns := analyzer.ResourcePatterns()
+	if len(patterns) != 1 {
+		t.Fatalf("expected 1 pattern, got %d", len(patterns))
+	}
+	if patterns[0] != "azurerm_role_assignment" {
+		t.Errorf("expected pattern 'azurerm_role_assignment', got %q", patterns[0])
 	}
 }

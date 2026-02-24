@@ -457,6 +457,12 @@ go vet ./...
 * CR-0006 (gRPC protocol) — provides the `ApplyConfig` mechanism for plugin configuration; must be at least partially implemented for the plugin to receive config
 * CR-0007 (bundled plugin) — provides the pattern this plugin follows
 
+## Historical Note (2026-02-23)
+
+The `network_exposure` and `keyvault_access` analyzers specified in this CR were removed as part of a post-critique quality improvement. These analyzers were shallow attribute checks that did not meet the project's Analyzer Depth Principle — the bar that requires domain knowledge beyond what Trivy/Checkov can replicate. The `privilege_escalation` analyzer remains as the sole deep inspection analyzer and the reference implementation for the plugin SDK.
+
+The plugin authoring guide (`docs/plugin-authoring.md`) and the plugin architecture remain valid. The azurerm plugin now ships one analyzer instead of three. See CRITIQUE.md section 2 for the rationale and a list of deep analyzer ideas that would clear the quality bar.
+
 ## Decision Outcome
 
 Chosen approach: "Working azurerm example plugin with authoring guide", because a running example validates the SDK interfaces, demonstrates the full three-layer model, and gives plugin authors a concrete template to follow. Documentation without working code is insufficient for an interface-heavy architecture.

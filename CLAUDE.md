@@ -2,8 +2,6 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-**Always use the `golang-pro` skill when writing Go code.** Invoke it before implementing any Go changes to get expert-level guidance on concurrency, gRPC, and idiomatic patterns.
-
 ## Build & Test Commands
 
 ```bash
@@ -12,6 +10,7 @@ make build-all      # Build CLI + azurerm plugin
 make test           # Run all tests across workspace (go test ./...)
 make vet            # Static analysis (go vet ./...)
 make lint           # golangci-lint run ./...
+make ci             # Run all CI checks (build-all + test + vet + lint + govulncheck)
 make generate-roles           # Refresh Azure role database from AzAdvertizer CSV
 make generate-actions         # Refresh Azure action registry from Microsoft Docs + role database
 make generate-actions-offline # Refresh Azure action registry from role database only (no network)
@@ -20,18 +19,13 @@ make clean                    # Remove build artifacts
 
 Go workspace mode means all commands run across all three modules from the repo root.
 
-**Before pushing**, every CI check must pass locally first. Running locally is cheaper than wasting GitHub Actions minutes. The required checks are:
+The CI pipeline enforces four checks on every PR. Run `make ci` locally before pushing — it runs all of them in one command:
 
 ```bash
-make test            # All tests must pass
-make vet             # No static analysis issues
-make lint            # golangci-lint — zero violations allowed
-govulncheck ./...    # No reachable vulnerabilities
+make ci              # build-all + test + vet + lint + govulncheck
 ```
 
-Do NOT push until all four commands succeed. If any check fails, fix the issue and re-run before pushing.
-
-CI enforces these — the `vuln` job fails the PR if `govulncheck` finds reachable vulnerabilities. Fix by bumping the Go version in `go.work` and all three `go.mod` files, or by upgrading affected dependencies. The `lint` job fails the PR if `golangci-lint` finds any violation.
+The `vuln` job fails the PR if `govulncheck` finds reachable vulnerabilities. Fix by bumping the Go version in `go.work` and all three `go.mod` files, or by upgrading affected dependencies. The `lint` job fails the PR if `golangci-lint` finds any violation.
 
 **Run a single test:**
 ```bash
@@ -60,11 +54,9 @@ A policy engine, compliance scanner, or static analysis tool. We do not maintain
 
 **Either bring semantic depth or don't build it.** The bar for a new analyzer is: "Does this require domain knowledge that Trivy/Checkov cannot replicate?"
 
-The `privilege_escalation` analyzer is the gold standard — it resolves Azure role definitions from a built-in database, computes effective permissions with wildcard expansion and NotActions, separates data-plane from control-plane, cross-references custom role definitions from the plan, and supports graduated thresholds per classification. Users cannot replicate this with a Checkov policy.
+The `privilege_escalation` analyzer is the reference — it resolves Azure role definitions from a built-in database, computes effective permissions with wildcard expansion and NotActions, separates data-plane from control-plane, cross-references custom role definitions from the plan, and supports graduated thresholds per classification. Users cannot replicate this with a Checkov policy.
 
-A shallow attribute check ("if `default_action == Allow`, flag it") does NOT clear this bar. That is a policy check, and policy tools already do it across hundreds of resource types.
-
-The existing `network_exposure` and `keyvault_access` analyzers are borderline — simpler than privilege_escalation but already shipped and useful. They are **not** the model for future development. Do not extend them to cover additional resource types.
+A shallow attribute check ("if `default_action == Allow`, flag it") does not clear this bar. That is a policy check, and policy tools already do it across hundreds of resource types.
 
 ### Classification Naming Convention
 
@@ -78,9 +70,13 @@ tfclassify classifies Terraform plan changes into organizational categories (cri
 
 **Layer 2 — Builtin Analyzers** (`internal/classify/deletion.go`, `replace.go`, `sensitive.go`, `blast_radius.go`): Cross-provider heuristics that run in-process. Implement `classify.BuiltinAnalyzer` interface. Detect deletions, destroy-and-recreate, sensitive attribute changes, and plan-wide blast radius thresholds.
 
-**Layer 3 — External Plugins** (`sdk/` + `internal/plugin/`): Provider-specific deep inspection via gRPC (hashicorp/go-plugin). Plugins run as separate processes, communicate bidirectionally — host calls `PluginService.Analyze()`, plugin calls back `RunnerService.GetResourceChanges()` and `RunnerService.EmitDecision()`. The broker ID in `AnalyzeRequest` enables the plugin to dial back to the host's Runner server.
+**Layer 3 — External Plugins** (`sdk/` + `internal/plugin/`): Provider-specific deep inspection via gRPC (hashicorp/go-plugin). Plugins run as separate processes, communicate bidirectionally — host calls `PluginService.Analyze()`, plugin calls back `RunnerService.GetResourceChanges()` and `RunnerService.EmitDecision()`. The broker ID in `AnalyzeRequest` enables the plugin to dial back to the host's Runner server. Currently serves one deep analyzer (`privilege_escalation`) as the reference implementation.
 
 **Decision aggregation**: Plugin/analyzer decisions override core pattern matches based on the `precedence` list in config (lower index = higher precedence).
+
+### Output Pipeline
+
+`internal/output/` handles result formatting (text, JSON, GitHub Actions, SARIF). The evidence system (`output/evidence.go`) produces a self-contained JSON artifact with input hashes, timestamps, and optional Ed25519 signature for tamper evidence. Evidence can include the full explain trace for audit retention.
 
 ## Module Structure (Go Workspaces)
 
@@ -88,7 +84,7 @@ tfclassify classifies Terraform plan changes into organizational categories (cri
 |--------|------|---------|
 | Host/CLI | `.` | Core engine, config, plan parsing, plugin loading, CLI |
 | SDK | `sdk/` | Public interfaces for plugin authors (`Analyzer`, `Runner`, `PluginSet`) |
-| Azure plugin | `plugins/azurerm/` | Reference plugin: privilege escalation, network exposure, keyvault |
+| Azure plugin | `plugins/azurerm/` | Reference plugin: privilege escalation (deep RBAC analysis) |
 
 The SDK and plugin have their own `go.mod`. The plugin uses a `replace` directive to resolve the SDK locally. `go.work` ties them together for development.
 
@@ -129,11 +125,11 @@ Version negotiation: host checks `SDKVersionConstraints` against plugin's report
 
 E2E test scenarios live in `testdata/e2e/`. Each scenario has `main.tf`, `.tfclassify.hcl`, and `expected.json`. These run against real Azure infrastructure in CI.
 
-**E2e tests must be kept in sync with code changes.** When modifying plugin analyzers, config parsing, or classification logic, check whether existing e2e scenarios need updating and whether new scenarios are needed. The CI matrix in `.github/workflows/ci.yml` must include all scenarios.
+E2E tests must be kept in sync with code changes. When modifying plugin analyzers, config parsing, or classification logic, check whether existing e2e scenarios need updating and whether new scenarios are needed. The CI matrix in `.github/workflows/ci.yml` must include all scenarios.
 
 **Run e2e locally** with `testdata/e2e/run.sh`. Use `--build` for development — it compiles both the CLI and azurerm plugin from source:
 ```bash
-bash testdata/e2e/run.sh --build --plan-only -t blast-radius -t nsg-open-inbound
+bash testdata/e2e/run.sh --build --plan-only -t blast-radius -t role-assignment-privileged
 ```
 
 Use `--version` to test against a published GitHub release. This downloads the CLI via `gh release download` and installs plugins via `tfclassify init`:
@@ -149,7 +145,7 @@ gh workflow run ci.yml --ref $(git branch --show-current)
 gh run watch    # watch the latest run
 ```
 
-E2e tests run both JSON and binary `.tfplan` formats. Each scenario runs create and destroy phases, comparing exit codes against `expected.json`.
+E2E tests run both JSON and binary `.tfplan` formats. Each scenario runs create and destroy phases, comparing exit codes against `expected.json`.
 
 ## Governance
 

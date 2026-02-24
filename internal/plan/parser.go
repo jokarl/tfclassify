@@ -29,7 +29,7 @@ var supportedFormatVersions = map[string]bool{
 var BinaryPlanMagicBytes = []byte("PK") // ZIP file magic bytes
 
 // ParseFile reads and parses a Terraform plan file (JSON or binary).
-func ParseFile(path string) (*ParseResult, error) {
+func ParseFile(ctx context.Context, path string) (*ParseResult, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open plan file: %w", err)
@@ -50,7 +50,7 @@ func ParseFile(path string) (*ParseResult, error) {
 
 	// Check if it's a binary plan (ZIP format)
 	if n >= 2 && bytes.HasPrefix(header, BinaryPlanMagicBytes) {
-		return parseBinaryPlan(path)
+		return parseBinaryPlan(ctx, path)
 	}
 
 	// Try to parse as JSON
@@ -58,7 +58,7 @@ func ParseFile(path string) (*ParseResult, error) {
 }
 
 // parseBinaryPlan converts a binary Terraform plan to JSON using `terraform show -json`.
-func parseBinaryPlan(path string) (*ParseResult, error) {
+func parseBinaryPlan(ctx context.Context, path string) (*ParseResult, error) {
 	// Find terraform binary
 	terraformPath, err := findTerraform()
 	if err != nil {
@@ -73,7 +73,7 @@ func parseBinaryPlan(path string) (*ParseResult, error) {
 
 	// Run terraform show -json from the plan file's directory so that
 	// terraform can find the .terraform/ provider plugins created by init.
-	cmd := exec.CommandContext(context.TODO(), terraformPath, "show", "-json", filepath.Base(absPath))
+	cmd := exec.CommandContext(ctx, terraformPath, "show", "-json", filepath.Base(absPath))
 	cmd.Dir = filepath.Dir(absPath)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
