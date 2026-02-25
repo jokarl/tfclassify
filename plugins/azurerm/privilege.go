@@ -4,6 +4,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/jokarl/tfclassify/sdk"
@@ -28,6 +29,11 @@ type PrivilegeEscalationAnalyzerConfig struct {
 	// FlagUnknownRoles controls whether unresolvable roles emit decisions (CR-0028).
 	// Default: true (nil means true).
 	FlagUnknownRoles *bool `json:"flag_unknown_roles,omitempty"`
+	// MergePrincipalRoles enables principal-level evaluation. When true, the analyzer
+	// groups role assignments by principal_id, computes the union of effective
+	// permissions, and evaluates the merged set against the same actions/data_actions
+	// patterns. Decisions include the full effective permission set in metadata.
+	MergePrincipalRoles *bool `json:"merge_principal_roles,omitempty"`
 }
 
 // roleSource indicates where a role was resolved from.
@@ -128,6 +134,14 @@ func flagUnknownRolesEnabled(cfg *PrivilegeEscalationAnalyzerConfig) bool {
 	return *cfg.FlagUnknownRoles
 }
 
+// resolvedRoleAssignment tracks a role assignment's resolved information for combined evaluation.
+type resolvedRoleAssignment struct {
+	address  string
+	change   *sdk.ResourceChange
+	role     resolvedRole
+	scope    string
+}
+
 // analyzeWithConfig is the core analysis logic with optional classification-scoped config.
 func (a *PrivilegeEscalationAnalyzer) analyzeWithConfig(runner sdk.Runner, classification string, analyzerCfg *PrivilegeEscalationAnalyzerConfig) error {
 	changes, err := runner.GetResourceChanges(a.ResourcePatterns())
@@ -174,6 +188,9 @@ func (a *PrivilegeEscalationAnalyzer) analyzeWithConfig(runner sdk.Runner, class
 
 	useControlPlane := len(actionPatterns) > 0
 	useDataPlane := len(dataActionPatterns) > 0
+
+	// Collect resolved role info for combined evaluation (merge_principal_roles)
+	principalRoles := make(map[string][]resolvedRoleAssignment) // principal_id → assignments
 
 	for _, change := range changes {
 		scope := stringField(change.After, "scope")
@@ -246,6 +263,20 @@ func (a *PrivilegeEscalationAnalyzer) analyzeWithConfig(runner sdk.Runner, class
 			continue
 		}
 
+		// Collect resolved role assignment for combined evaluation
+		principalID := stringField(change.After, "principal_id")
+		if principalID == "" {
+			principalID = stringField(change.Before, "principal_id")
+		}
+		if principalID != "" && afterRole.definition != nil {
+			principalRoles[principalID] = append(principalRoles[principalID], resolvedRoleAssignment{
+				address: change.Address,
+				change:  change,
+				role:    afterRole,
+				scope:   scope,
+			})
+		}
+
 		// Pattern-based detection
 		controlPlaneTriggered := false
 		var controlPlaneMatchedActions []string
@@ -266,6 +297,13 @@ func (a *PrivilegeEscalationAnalyzer) analyzeWithConfig(runner sdk.Runner, class
 		}
 
 		if !controlPlaneTriggered && !dataPlaneTriggered {
+			continue
+		}
+
+		// When merge_principal_roles is enabled, defer emission to the combined pass.
+		// The combined pass evaluates per-principal (union of all roles) rather than
+		// per-role, so individual matches are handled there.
+		if mergePrincipalRolesEnabled(analyzerCfg) && principalID != "" {
 			continue
 		}
 
@@ -312,7 +350,184 @@ func (a *PrivilegeEscalationAnalyzer) analyzeWithConfig(runner sdk.Runner, class
 		}
 	}
 
+	// Combined role aggregation pass
+	if err := a.evaluateCombinedRoles(runner, classification, analyzerCfg, principalRoles); err != nil {
+		return err
+	}
+
 	return nil
+}
+
+// mergePrincipalRolesEnabled returns whether principal-level merging is enabled.
+// Default is false when the pointer is nil.
+func mergePrincipalRolesEnabled(cfg *PrivilegeEscalationAnalyzerConfig) bool {
+	if cfg == nil || cfg.MergePrincipalRoles == nil {
+		return false
+	}
+	return *cfg.MergePrincipalRoles
+}
+
+// evaluateCombinedRoles computes the union of effective permissions across all roles
+// assigned to the same principal, then evaluates the merged set against the same
+// actions/data_actions patterns. Decisions include the full effective permission set.
+// Skips principals that already emitted a per-role decision.
+func (a *PrivilegeEscalationAnalyzer) evaluateCombinedRoles(
+	runner sdk.Runner,
+	classification string,
+	analyzerCfg *PrivilegeEscalationAnalyzerConfig,
+	principalRoles map[string][]resolvedRoleAssignment,
+) error {
+	if !mergePrincipalRolesEnabled(analyzerCfg) {
+		return nil
+	}
+
+	actionPatterns := analyzerCfg.Actions
+	dataActionPatterns := analyzerCfg.DataActions
+	useControlPlane := len(actionPatterns) > 0
+	useDataPlane := len(dataActionPatterns) > 0
+
+	if !useControlPlane && !useDataPlane {
+		return nil
+	}
+
+	for principalID, assignments := range principalRoles {
+
+		// Merge effective actions across all roles for this principal
+		effectiveActions := make(map[string]bool)
+		effectiveDataActions := make(map[string]bool)
+
+		for _, ra := range assignments {
+			if ra.role.definition == nil {
+				continue
+			}
+			for _, perm := range ra.role.definition.Permissions {
+				for _, action := range computeEffectiveActionsWithRegistry(perm.Actions, perm.NotActions, false, nil) {
+					effectiveActions[action] = true
+				}
+				for _, action := range computeEffectiveActionsWithRegistry(perm.DataActions, perm.NotDataActions, true, nil) {
+					effectiveDataActions[action] = true
+				}
+			}
+		}
+
+		// Match merged actions against the same action patterns
+		var matchedActions []string
+		var matchedPatterns []string
+
+		if useControlPlane {
+			for action := range effectiveActions {
+				for _, pattern := range actionPatterns {
+					if actionMatchesPattern(action, pattern) {
+						matchedActions = append(matchedActions, action)
+						matchedPatterns = append(matchedPatterns, pattern)
+					}
+				}
+			}
+		}
+
+		var matchedDataActions []string
+		var matchedDataPatterns []string
+
+		if useDataPlane {
+			for action := range effectiveDataActions {
+				for _, pattern := range dataActionPatterns {
+					if actionMatchesPattern(action, pattern) {
+						matchedDataActions = append(matchedDataActions, action)
+						matchedDataPatterns = append(matchedDataPatterns, pattern)
+					}
+				}
+			}
+		}
+
+		if len(matchedActions) == 0 && len(matchedDataActions) == 0 {
+			continue
+		}
+
+		// Deduplicate matched patterns
+		matchedPatterns = dedup(matchedPatterns)
+		matchedDataPatterns = dedup(matchedDataPatterns)
+
+		// Build combined_roles metadata
+		combinedRolesInfo := make([]map[string]interface{}, 0, len(assignments))
+		for _, ra := range assignments {
+			combinedRolesInfo = append(combinedRolesInfo, map[string]interface{}{
+				"address":     ra.address,
+				"role":        ra.role.name,
+				"role_source": string(ra.role.source),
+				"scope":       ra.scope,
+				"scope_level": ParseScopeLevel(ra.scope).String(),
+			})
+		}
+
+		// Build sorted effective permission lists for metadata
+		effectiveActionsList := sortedKeys(effectiveActions)
+		effectiveDataActionsList := sortedKeys(effectiveDataActions)
+
+		// Emit decision on the first contributing role assignment
+		first := assignments[0]
+		metadata := map[string]interface{}{
+			"analyzer":       "privilege-escalation",
+			"trigger":        "combined-roles",
+			"principal_id":   principalID,
+			"combined_roles": combinedRolesInfo,
+		}
+
+		if len(effectiveActionsList) > 0 {
+			metadata["effective_actions"] = effectiveActionsList
+		}
+		if len(effectiveDataActionsList) > 0 {
+			metadata["effective_data_actions"] = effectiveDataActionsList
+		}
+		if len(matchedActions) > 0 {
+			metadata["matched_actions"] = matchedActions
+			metadata["matched_patterns"] = matchedPatterns
+		}
+		if len(matchedDataActions) > 0 {
+			metadata["matched_data_actions"] = matchedDataActions
+			metadata["matched_data_patterns"] = matchedDataPatterns
+		}
+
+		// Build role names list for the reason string
+		var roleNames []string
+		for _, ra := range assignments {
+			roleNames = append(roleNames, ra.role.name)
+		}
+
+		decision := &sdk.Decision{
+			Classification: classification,
+			Reason:         fmt.Sprintf("combined effective permissions for principal %s (roles: %s) match configured action patterns", principalID, strings.Join(roleNames, ", ")),
+			Metadata:       metadata,
+		}
+
+		if err := runner.EmitDecision(a, first.change, decision); err != nil {
+			return fmt.Errorf("failed to emit combined decision: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// sortedKeys returns the keys of a map sorted alphabetically.
+func sortedKeys(m map[string]bool) []string {
+	result := make([]string, 0, len(m))
+	for k := range m {
+		result = append(result, k)
+	}
+	sort.Strings(result)
+	return result
+}
+
+// dedup returns a new slice with duplicate strings removed, preserving order.
+func dedup(s []string) []string {
+	seen := make(map[string]bool, len(s))
+	result := make([]string, 0, len(s))
+	for _, v := range s {
+		if !seen[v] {
+			seen[v] = true
+			result = append(result, v)
+		}
+	}
+	return result
 }
 
 // matchAnyCustomRole checks if any custom role definition in the lookup matches

@@ -457,3 +457,53 @@ defaults {
 		t.Errorf("expected 'score_threshold is no longer supported' error, got: %v", err)
 	}
 }
+
+func TestLoad_CombinedRoleAggregation(t *testing.T) {
+	cfg, err := Load("testdata/combined_role_aggregation.hcl")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(cfg.Classifications) != 2 {
+		t.Fatalf("expected 2 classifications, got %d", len(cfg.Classifications))
+	}
+
+	critical := cfg.Classifications[0]
+	if critical.Name != "critical" {
+		t.Errorf("expected first classification 'critical', got %q", critical.Name)
+	}
+
+	azurermCfg, ok := critical.PluginAnalyzerConfigs["azurerm"]
+	if !ok {
+		t.Fatal("expected 'azurerm' plugin config in 'critical' classification")
+	}
+
+	if azurermCfg.PrivilegeEscalation == nil {
+		t.Fatal("expected PrivilegeEscalation config")
+	}
+
+	pe := azurermCfg.PrivilegeEscalation
+
+	// Verify actions parse correctly
+	if len(pe.Actions) != 1 || pe.Actions[0] != "Microsoft.Authorization/roleAssignments/write" {
+		t.Errorf("expected Actions = [\"Microsoft.Authorization/roleAssignments/write\"], got %v", pe.Actions)
+	}
+
+	// Verify data_actions
+	if len(pe.DataActions) != 1 || pe.DataActions[0] != "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/*" {
+		t.Errorf("expected DataActions = [\"Microsoft.Storage/...\"], got %v", pe.DataActions)
+	}
+
+	// Verify merge_principal_roles
+	if pe.MergePrincipalRoles == nil {
+		t.Fatal("expected MergePrincipalRoles to be set")
+	}
+	if *pe.MergePrincipalRoles != true {
+		t.Errorf("expected MergePrincipalRoles = true, got %v", *pe.MergePrincipalRoles)
+	}
+
+	// Verify scopes still parse alongside merge_principal_roles
+	if len(pe.Scopes) != 1 || pe.Scopes[0] != "subscription" {
+		t.Errorf("expected Scopes = [\"subscription\"], got %v", pe.Scopes)
+	}
+}

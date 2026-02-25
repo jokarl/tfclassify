@@ -142,6 +142,13 @@ classification "critical" {
       # Whether to flag roles whose permissions cannot be resolved (not in the
       # built-in database and not a custom role in the plan). Default: true.
       # flag_unknown_roles = true
+
+      # Enable per-principal evaluation: group role assignments by principal_id,
+      # compute the union of effective permissions across all assigned roles, and
+      # evaluate the merged set against the same actions/data_actions patterns.
+      # Emits one decision per principal instead of per role, with the full
+      # effective permission set in metadata. Default: false.
+      # merge_principal_roles = true
     }
 
   }

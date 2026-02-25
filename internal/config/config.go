@@ -112,6 +112,14 @@ type PrivilegeEscalationConfig struct {
 	// emit a decision with diagnostic metadata. Default: true.
 	// CR-0028: Pattern-Based Control-Plane Detection
 	FlagUnknownRoles *bool `hcl:"flag_unknown_roles,optional" json:"flag_unknown_roles,omitempty"`
+
+	// MergePrincipalRoles enables principal-level evaluation. When true, the analyzer
+	// groups role assignments by principal_id, computes the union of effective
+	// permissions across all assigned roles, and evaluates the merged set against
+	// the same actions/data_actions patterns. Decisions include the full effective
+	// permission set in metadata. Only principals with 2+ roles and no individual
+	// per-role trigger are evaluated. Default: false.
+	MergePrincipalRoles *bool `hcl:"merge_principal_roles,optional" json:"merge_principal_roles,omitempty"`
 }
 
 // ToJSON serializes the analyzer config for gRPC transport.
