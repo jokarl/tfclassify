@@ -102,6 +102,19 @@ classification "critical" {
     # No "actions" field — matches create, update, delete, read, and no-op.
   }
 
+  # Rule 4: Deletions inside production modules.
+  # The "module" field filters by Terraform module path. Uses glob patterns
+  # with "." as the separator — "*" matches one module level, "**" any depth.
+  # Omitting "module" (and "not_module") matches all modules including root.
+  rule {
+    description = "Production module deletions require security review"
+    module      = ["module.production", "module.production.**"]
+    resource    = ["*"]
+    actions     = ["delete"]
+    # "module" restricts this rule to resources inside the named modules.
+    # Cannot combine "module" and "not_module" in the same rule.
+  }
+
   # Blast radius thresholds — triggers when plan-wide counts exceed limits.
   # When any threshold is exceeded, ALL resources in the plan receive a
   # decision at this classification level. Omitted fields are not evaluated.
@@ -109,6 +122,16 @@ classification "critical" {
     max_deletions    = 5    # Standalone deletions (delete without create)
     max_replacements = 10   # Replacements (delete + create)
     max_changes      = 50   # All resources with non-no-op actions
+    exclude_drift    = true  # Don't count drift-corrected resources toward limits
+  }
+
+  # Topology thresholds — triggers when a single resource's change propagates
+  # to too many downstream resources in the Terraform dependency graph.
+  # Uses the plan's configuration block to build a directed dependency graph
+  # and computes fan-out via BFS from each changed resource.
+  topology {
+    max_downstream        = 10  # Flag if change affects 10+ downstream resources
+    max_propagation_depth = 3   # Flag if change cascades 3+ levels deep
   }
 
   # Plugin-specific analyzer configuration for this classification level.
@@ -186,10 +209,25 @@ classification "high" {
     resource    = ["*_dns_*"]
   }
 
+  # Rule 5: Deletions outside production modules.
+  # "not_module" is the inverse of "module" — matches resources NOT in
+  # the listed modules. Cannot combine with "module" in the same rule.
+  # rule {
+  #   description = "Non-production deletions need team lead review"
+  #   not_module  = ["module.production", "module.production.**"]
+  #   resource    = ["*"]
+  #   actions     = ["delete"]
+  # }
+
   # Less strict blast radius for "high" — catches medium-scale changes.
   blast_radius {
     max_deletions = 2
     max_changes   = 20
+  }
+
+  # Less strict topology thresholds for "high".
+  topology {
+    max_downstream = 20
   }
 
   # Plugin analyzer configuration for "high" — catch roles with write access
@@ -281,6 +319,13 @@ defaults {
   # Always produces exit code 0 regardless of the classification's position
   # in the precedence list.
   no_changes = "auto"
+
+  # Classification for drift-corrected resources. When set, resources that
+  # Terraform plans to change because their actual state has drifted from the
+  # desired configuration receive this classification. This separates intentional
+  # changes from drift corrections in your approval workflow.
+  # Omit to not apply drift-based classification.
+  drift_classification = "standard"
 
   # Timeout for external plugin execution. Parsed as a Go duration string
   # (e.g., "10s", "2m30s", "500ms"). If omitted or invalid, defaults to 30s.

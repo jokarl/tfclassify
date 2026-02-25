@@ -380,5 +380,6 @@ func toSDKResourceChange(change *plan.ResourceChange) *sdk.ResourceChange {
 		After:           change.After,
 		BeforeSensitive: change.BeforeSensitive,
 		AfterSensitive:  change.AfterSensitive,
+		ModuleAddress:   change.ModuleAddress,
 	}
 }

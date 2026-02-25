@@ -15,6 +15,11 @@ func defaultAnalyzers() []BuiltinAnalyzer {
 	}
 }
 
+// planResultFromChanges creates a minimal ParseResult wrapping changes.
+func planResultFromChanges(changes []plan.ResourceChange) *plan.ParseResult {
+	return &plan.ParseResult{Changes: changes}
+}
+
 func TestRunBuiltinAnalyzers_Integration(t *testing.T) {
 	cfg := &config.Config{
 		Classifications: []config.ClassificationConfig{
@@ -55,7 +60,7 @@ func TestRunBuiltinAnalyzers_Integration(t *testing.T) {
 	}
 
 	// Run builtin analyzers
-	classifier.RunBuiltinAnalyzers(result, changes, defaultAnalyzers())
+	classifier.RunBuiltinAnalyzers(result, planResultFromChanges(changes), defaultAnalyzers(), nil)
 
 	// Analyzers emit empty classification => maps to "standard" (unclassified default)
 	// So results remain standard (no upgrade)
@@ -90,7 +95,7 @@ func TestRunBuiltinAnalyzers_MergePrecedence(t *testing.T) {
 	}
 
 	// Builtin analyzers emit empty classification => maps to defaults.unclassified = "critical"
-	classifier.RunBuiltinAnalyzers(result, changes, defaultAnalyzers())
+	classifier.RunBuiltinAnalyzers(result, planResultFromChanges(changes), defaultAnalyzers(), nil)
 
 	if result.ResourceDecisions[0].Classification != "critical" {
 		t.Errorf("expected 'critical' after builtin analyzer merge, got %q", result.ResourceDecisions[0].Classification)
@@ -116,7 +121,7 @@ func TestRunBuiltinAnalyzers_NoChanges(t *testing.T) {
 
 	result := classifier.Classify([]plan.ResourceChange{})
 
-	classifier.RunBuiltinAnalyzers(result, []plan.ResourceChange{}, defaultAnalyzers())
+	classifier.RunBuiltinAnalyzers(result, planResultFromChanges(nil), defaultAnalyzers(), nil)
 
 	if !result.NoChanges {
 		t.Error("expected NoChanges to remain true")
@@ -146,7 +151,7 @@ func TestRunBuiltinAnalyzers_NoTriggers(t *testing.T) {
 	initialDecisions := make([]ResourceDecision, len(result.ResourceDecisions))
 	copy(initialDecisions, result.ResourceDecisions)
 
-	classifier.RunBuiltinAnalyzers(result, changes, defaultAnalyzers())
+	classifier.RunBuiltinAnalyzers(result, planResultFromChanges(changes), defaultAnalyzers(), nil)
 
 	for i, d := range result.ResourceDecisions {
 		if d.Classification != initialDecisions[i].Classification {
@@ -176,7 +181,7 @@ func TestRunBuiltinAnalyzers_NilAnalyzers(t *testing.T) {
 
 	result := classifier.Classify(changes)
 
-	classifier.RunBuiltinAnalyzers(result, changes, nil)
+	classifier.RunBuiltinAnalyzers(result, planResultFromChanges(changes), nil, nil)
 
 	if result.ResourceDecisions[0].Classification != "standard" {
 		t.Errorf("expected classification unchanged, got %q", result.ResourceDecisions[0].Classification)
@@ -214,7 +219,7 @@ func TestRunBuiltinAnalyzers_AllThreeAnalyzersTrigger(t *testing.T) {
 	}
 
 	result := classifier.Classify(changes)
-	classifier.RunBuiltinAnalyzers(result, changes, defaultAnalyzers())
+	classifier.RunBuiltinAnalyzers(result, planResultFromChanges(changes), defaultAnalyzers(), nil)
 
 	if len(result.ResourceDecisions) != 4 {
 		t.Fatalf("expected 4 decisions, got %d", len(result.ResourceDecisions))

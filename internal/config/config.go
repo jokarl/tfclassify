@@ -63,6 +63,10 @@ type ClassificationConfig struct {
 	// Populated during parsing from blast_radius {} blocks.
 	BlastRadius *BlastRadiusConfig
 
+	// Topology holds the optional topology thresholds for this classification.
+	// Populated during parsing from topology {} blocks.
+	Topology *TopologyConfig
+
 	// PluginAnalyzerConfigs holds per-analyzer configuration for each plugin.
 	// Key is the plugin name (e.g., "azurerm").
 	// This is populated during parsing when plugin-named blocks are found.
@@ -139,6 +143,17 @@ type BlastRadiusConfig struct {
 	MaxReplacements *int `json:"max_replacements,omitempty"`
 	// MaxChanges triggers when total non-no-op changes exceed this count.
 	MaxChanges *int `json:"max_changes,omitempty"`
+	// ExcludeDrift, when true, excludes drift-corrected resources from blast radius counts.
+	ExcludeDrift *bool `json:"exclude_drift,omitempty"`
+}
+
+// TopologyConfig holds thresholds for the topology analyzer.
+// Each field is a pointer so that omitted fields are distinguishable from zero.
+type TopologyConfig struct {
+	// MaxDownstream triggers when a single resource's change propagates to more than N downstream resources.
+	MaxDownstream *int `json:"max_downstream,omitempty"`
+	// MaxPropagationDepth triggers when a change cascades more than N levels deep.
+	MaxPropagationDepth *int `json:"max_propagation_depth,omitempty"`
 }
 
 // RuleConfig represents a classification rule.
@@ -148,11 +163,14 @@ type RuleConfig struct {
 	NotResource []string `hcl:"not_resource,optional"`
 	Actions     []string `hcl:"actions,optional"`
 	NotActions  []string `hcl:"not_actions,optional"`
+	Module      []string `hcl:"module,optional"`
+	NotModule   []string `hcl:"not_module,optional"`
 }
 
 // DefaultsConfig contains default configuration values.
 type DefaultsConfig struct {
-	Unclassified  string `hcl:"unclassified"`
-	NoChanges     string `hcl:"no_changes"`
-	PluginTimeout string `hcl:"plugin_timeout,optional"`
+	Unclassified        string `hcl:"unclassified"`
+	NoChanges           string `hcl:"no_changes"`
+	PluginTimeout       string `hcl:"plugin_timeout,optional"`
+	DriftClassification string `hcl:"drift_classification,optional"`
 }

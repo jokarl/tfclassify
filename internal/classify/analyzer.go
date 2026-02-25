@@ -15,12 +15,25 @@ type BuiltinAnalyzer interface {
 	Analyze(changes []plan.ResourceChange) []ResourceDecision
 }
 
-// RunBuiltinAnalyzers runs all registered builtin analyzers against the given
-// changes and merges their decisions into the result using precedence rules.
-func (c *Classifier) RunBuiltinAnalyzers(result *Result, changes []plan.ResourceChange, analyzers []BuiltinAnalyzer) {
+// PlanAwareAnalyzer is like BuiltinAnalyzer but receives the full ParseResult
+// for analyzers that need plan-level context (drift, topology).
+type PlanAwareAnalyzer interface {
+	// Name returns the analyzer's identifier.
+	Name() string
+	// AnalyzePlan inspects the full parse result and returns decisions.
+	AnalyzePlan(result *plan.ParseResult) []ResourceDecision
+}
+
+// RunBuiltinAnalyzers runs all registered builtin analyzers and plan-aware analyzers
+// against the given plan result and merges their decisions into the result using precedence rules.
+func (c *Classifier) RunBuiltinAnalyzers(result *Result, planResult *plan.ParseResult, analyzers []BuiltinAnalyzer, planAnalyzers []PlanAwareAnalyzer) {
 	var allDecisions []ResourceDecision
 	for _, a := range analyzers {
-		decisions := a.Analyze(changes)
+		decisions := a.Analyze(planResult.Changes)
+		allDecisions = append(allDecisions, decisions...)
+	}
+	for _, a := range planAnalyzers {
+		decisions := a.AnalyzePlan(planResult)
 		allDecisions = append(allDecisions, decisions...)
 	}
 	if len(allDecisions) > 0 {

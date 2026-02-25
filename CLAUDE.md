@@ -68,7 +68,7 @@ tfclassify classifies Terraform plan changes into organizational categories (cri
 
 **Layer 1 — Core Engine** (`internal/classify/`): Config-driven pattern matching. Glob patterns on resource types + actions, evaluated against precedence order from `.tfclassify.hcl`. This is the fast path — no plugins involved.
 
-**Layer 2 — Builtin Analyzers** (`internal/classify/deletion.go`, `replace.go`, `sensitive.go`, `blast_radius.go`): Cross-provider heuristics that run in-process. Implement `classify.BuiltinAnalyzer` interface. Detect deletions, destroy-and-recreate, sensitive attribute changes, and plan-wide blast radius thresholds.
+**Layer 2 — Builtin Analyzers** (`internal/classify/deletion.go`, `replace.go`, `sensitive.go`, `blast_radius.go`, `drift.go`, `topology.go`): Cross-provider heuristics that run in-process. Simple analyzers implement `classify.BuiltinAnalyzer` interface; plan-aware analyzers implement `classify.PlanAwareAnalyzer` (receives full `ParseResult`). Detect deletions, destroy-and-recreate, sensitive attribute changes, plan-wide blast radius thresholds, drift corrections, and dependency graph topology.
 
 **Layer 3 — External Plugins** (`sdk/` + `internal/plugin/`): Provider-specific deep inspection via gRPC (hashicorp/go-plugin). Plugins run as separate processes, communicate bidirectionally — host calls `PluginService.Analyze()`, plugin calls back `RunnerService.GetResourceChanges()` and `RunnerService.EmitDecision()`. The broker ID in `AnalyzeRequest` enables the plugin to dial back to the host's Runner server. Currently serves one deep analyzer (`privilege_escalation`) as the reference implementation.
 
@@ -94,6 +94,7 @@ The SDK and plugin have their own `go.mod`. The plugin uses a `replace` directiv
 - `sdk.Runner` — Host-side API exposed to plugins via gRPC. Methods: `GetResourceChanges`, `GetResourceChange`, `EmitDecision`.
 - `sdk.PluginSet` — Collection of analyzers provided by a plugin binary.
 - `classify.BuiltinAnalyzer` — In-process analyzer (Layer 2). Simpler interface: takes `[]plan.ResourceChange`, returns `[]ResourceDecision`.
+- `classify.PlanAwareAnalyzer` — In-process analyzer that receives the full `*plan.ParseResult` (for analyzers needing plan-level context like drift data or dependency graph).
 
 ## gRPC Protocol
 
@@ -105,7 +106,7 @@ Defined in `proto/tfclassify.proto`, generated code in `sdk/pb/`. Two services:
 
 ## Configuration
 
-HCL format (`.tfclassify.hcl`), parsed by `internal/config/` using `hashicorp/hcl/v2`. Key blocks: `classification` (rules with resource/not_resource glob + actions/not_actions, blast_radius thresholds), `plugin` (source, version, enabled, config), `precedence` list, `defaults`, `evidence` (artifact output with optional Ed25519 signing).
+HCL format (`.tfclassify.hcl`), parsed by `internal/config/` using `hashicorp/hcl/v2`. Key blocks: `classification` (rules with resource/not_resource glob + actions/not_actions + module/not_module, blast_radius thresholds, topology thresholds), `plugin` (source, version, enabled, config), `precedence` list, `defaults` (unclassified, no_changes, drift_classification), `evidence` (artifact output with optional Ed25519 signing).
 
 ## Plugin System
 

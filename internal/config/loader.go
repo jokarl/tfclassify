@@ -113,6 +113,16 @@ func parseClassificationPluginBlocks(cfg *Config, body hcl.Body) error {
 				continue
 			}
 
+			// Parse topology blocks
+			if subBlock.Type == "topology" {
+				topoConfig := &TopologyConfig{}
+				if err := parseTopologyConfig(subBlock, topoConfig); err != nil {
+					return fmt.Errorf("classification %q: %w", classification.Name, err)
+				}
+				classification.Topology = topoConfig
+				continue
+			}
+
 			// This is a plugin-named block (e.g., "azurerm")
 			pluginName := subBlock.Type
 
@@ -225,8 +235,35 @@ func parseBlastRadiusConfig(block *hclsyntax.Block, config *BlastRadiusConfig) e
 			n, _ := val.AsBigFloat().Int64()
 			v := int(n)
 			config.MaxChanges = &v
+		case "exclude_drift":
+			b := val.True()
+			config.ExcludeDrift = &b
 		default:
 			return fmt.Errorf("blast_radius: unknown attribute %q", name)
+		}
+	}
+	return nil
+}
+
+// parseTopologyConfig parses attributes from a topology block.
+func parseTopologyConfig(block *hclsyntax.Block, config *TopologyConfig) error {
+	for name, attr := range block.Body.Attributes {
+		val, diags := attr.Expr.Value(nil)
+		if diags.HasErrors() {
+			return fmt.Errorf("topology.%s: %v", name, diags.Error())
+		}
+
+		switch name {
+		case "max_downstream":
+			n, _ := val.AsBigFloat().Int64()
+			v := int(n)
+			config.MaxDownstream = &v
+		case "max_propagation_depth":
+			n, _ := val.AsBigFloat().Int64()
+			v := int(n)
+			config.MaxPropagationDepth = &v
+		default:
+			return fmt.Errorf("topology: unknown attribute %q", name)
 		}
 	}
 	return nil

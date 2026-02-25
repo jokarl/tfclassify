@@ -89,7 +89,7 @@ func (c *Classifier) classifyResource(change plan.ResourceChange) ResourceDecisi
 		rules := c.matchers[classificationName]
 
 		for _, rule := range rules {
-			if rule.matchesResource(change.Type) && rule.matchesActions(change.Actions) {
+			if rule.matchesResource(change.Type) && rule.matchesActions(change.Actions) && rule.matchesModule(change.ModuleAddress) {
 				decision.Classification = classificationName
 				decision.ClassificationDescription = rule.classificationDescription
 				decision.MatchedRules = []string{rule.ruleDescription}
@@ -173,8 +173,9 @@ func (c *Classifier) explainResource(change plan.ResourceChange) ResourceExplana
 
 			resourceMatch := rule.matchesResource(change.Type)
 			actionMatch := rule.matchesActions(change.Actions)
+			moduleMatch := rule.matchesModule(change.ModuleAddress)
 
-			if resourceMatch && actionMatch {
+			if resourceMatch && actionMatch && moduleMatch {
 				entry.Result = TraceMatch
 				if len(rule.actions) == 0 {
 					entry.Reason = "catch-all"
@@ -189,6 +190,8 @@ func (c *Classifier) explainResource(change plan.ResourceChange) ResourceExplana
 				entry.Result = TraceSkip
 				if !resourceMatch {
 					entry.Reason = "resource mismatch"
+				} else if !moduleMatch {
+					entry.Reason = "module mismatch"
 				} else {
 					entry.Reason = formatActionMismatch(change.Actions, rule.actions)
 				}
@@ -222,22 +225,17 @@ func formatActionMismatch(changeActions []string, ruleActions map[string]struct{
 	return fmt.Sprintf("action mismatch: %v not in %v", changeActions, ruleList)
 }
 
-// AddExplainBuiltinAnalyzers runs builtin analyzers and adds their results to the
-// explanation trace. Returns decisions for precedence merging.
-func (c *Classifier) AddExplainBuiltinAnalyzers(result *ExplainResult, changes []plan.ResourceChange, analyzers []BuiltinAnalyzer) []ResourceDecision {
+// AddExplainBuiltinAnalyzers runs builtin analyzers and plan-aware analyzers, adding
+// their results to the explanation trace. Returns decisions for precedence merging.
+func (c *Classifier) AddExplainBuiltinAnalyzers(result *ExplainResult, planResult *plan.ParseResult, analyzers []BuiltinAnalyzer, planAnalyzers []PlanAwareAnalyzer) []ResourceDecision {
 	// Build a lookup of explanations by address
 	explanationMap := make(map[string]*ResourceExplanation)
 	for i := range result.Resources {
 		explanationMap[result.Resources[i].Address] = &result.Resources[i]
 	}
 
-	var allDecisions []ResourceDecision
-	for _, analyzer := range analyzers {
-		decisions := analyzer.Analyze(changes)
+	addDecisionsToTrace := func(analyzerName string, decisions []ResourceDecision) {
 		for _, decision := range decisions {
-			allDecisions = append(allDecisions, decision)
-
-			// Resolve empty classification to default (same as AddPluginDecisions)
 			classification := decision.Classification
 			if classification == "" {
 				classification = c.config.Defaults.Unclassified
@@ -250,8 +248,8 @@ func (c *Classifier) AddExplainBuiltinAnalyzers(result *ExplainResult, changes [
 
 			entry := TraceEntry{
 				Classification: classification,
-				Source:         "builtin: " + analyzer.Name(),
-				Rule:           analyzer.Name(),
+				Source:         "builtin: " + analyzerName,
+				Rule:           analyzerName,
 				Result:         TraceMatch,
 				Reason:         reason,
 			}
@@ -260,6 +258,18 @@ func (c *Classifier) AddExplainBuiltinAnalyzers(result *ExplainResult, changes [
 				exp.Trace = append(exp.Trace, entry)
 			}
 		}
+	}
+
+	var allDecisions []ResourceDecision
+	for _, analyzer := range analyzers {
+		decisions := analyzer.Analyze(planResult.Changes)
+		allDecisions = append(allDecisions, decisions...)
+		addDecisionsToTrace(analyzer.Name(), decisions)
+	}
+	for _, analyzer := range planAnalyzers {
+		decisions := analyzer.AnalyzePlan(planResult)
+		allDecisions = append(allDecisions, decisions...)
+		addDecisionsToTrace(analyzer.Name(), decisions)
 	}
 
 	return allDecisions

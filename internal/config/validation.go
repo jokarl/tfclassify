@@ -46,6 +46,10 @@ func Validate(cfg *Config) error {
 		return err
 	}
 
+	if err := validateTopology(cfg); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -85,6 +89,10 @@ func validateDefaults(cfg *Config, classificationNames map[string]bool) error {
 		return fmt.Errorf("defaults.no_changes references undefined classification %q", cfg.Defaults.NoChanges)
 	}
 
+	if cfg.Defaults.DriftClassification != "" && !classificationNames[cfg.Defaults.DriftClassification] {
+		return fmt.Errorf("defaults.drift_classification references undefined classification %q", cfg.Defaults.DriftClassification)
+	}
+
 	return nil
 }
 
@@ -121,6 +129,11 @@ func validateRules(cfg *Config) error {
 
 			if len(rule.Actions) > 0 && len(rule.NotActions) > 0 {
 				return fmt.Errorf("classification %q rule %d: cannot combine actions and not_actions in the same rule",
+					classification.Name, i+1)
+			}
+
+			if len(rule.Module) > 0 && len(rule.NotModule) > 0 {
+				return fmt.Errorf("classification %q rule %d: cannot combine module and not_module in the same rule",
 					classification.Name, i+1)
 			}
 
@@ -175,6 +188,25 @@ func validateBlastRadius(cfg *Config) error {
 		if br.MaxChanges != nil && *br.MaxChanges <= 0 {
 			return fmt.Errorf("classification %q: blast_radius.max_changes must be a positive integer, got %d",
 				c.Name, *br.MaxChanges)
+		}
+	}
+	return nil
+}
+
+// validateTopology checks that topology threshold values are positive integers.
+func validateTopology(cfg *Config) error {
+	for _, c := range cfg.Classifications {
+		if c.Topology == nil {
+			continue
+		}
+		topo := c.Topology
+		if topo.MaxDownstream != nil && *topo.MaxDownstream <= 0 {
+			return fmt.Errorf("classification %q: topology.max_downstream must be a positive integer, got %d",
+				c.Name, *topo.MaxDownstream)
+		}
+		if topo.MaxPropagationDepth != nil && *topo.MaxPropagationDepth <= 0 {
+			return fmt.Errorf("classification %q: topology.max_propagation_depth must be a positive integer, got %d",
+				c.Name, *topo.MaxPropagationDepth)
 		}
 	}
 	return nil
@@ -265,6 +297,18 @@ func ValidateGlobPatterns(cfg *Config) error {
 			for _, pattern := range rule.NotResource {
 				if _, err := glob.Compile(pattern); err != nil {
 					return fmt.Errorf("classification %q rule %d: invalid not_resource pattern %q: %w",
+						classification.Name, i+1, pattern, err)
+				}
+			}
+			for _, pattern := range rule.Module {
+				if _, err := glob.Compile(pattern, '.'); err != nil {
+					return fmt.Errorf("classification %q rule %d: invalid module pattern %q: %w",
+						classification.Name, i+1, pattern, err)
+				}
+			}
+			for _, pattern := range rule.NotModule {
+				if _, err := glob.Compile(pattern, '.'); err != nil {
+					return fmt.Errorf("classification %q rule %d: invalid not_module pattern %q: %w",
 						classification.Name, i+1, pattern, err)
 				}
 			}
@@ -361,7 +405,7 @@ func isCatchAllRule(rule RuleConfig) bool {
 func warnEmptyClassifications(cfg *Config) []Warning {
 	var warnings []Warning
 	for _, c := range cfg.Classifications {
-		if len(c.Rules) == 0 && !hasPluginAnalyzers(c) && c.BlastRadius == nil {
+		if len(c.Rules) == 0 && !hasPluginAnalyzers(c) && c.BlastRadius == nil && c.Topology == nil {
 			warnings = append(warnings, Warning{
 				Classification: c.Name,
 				Message:        "has no rules and no plugin analyzer blocks; it will never match any resource",

@@ -15,6 +15,7 @@ type ResourceChange struct {
 	After           map[string]interface{}
 	BeforeSensitive map[string]interface{}
 	AfterSensitive  map[string]interface{}
+	ModuleAddress   string // e.g. "module.production.module.network", "" for root
 }
 
 // Decision represents a classification decision from a plugin analyzer.

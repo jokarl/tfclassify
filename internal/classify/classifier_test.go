@@ -590,9 +590,9 @@ func TestExplainClassify_BuiltinAnalyzerTrace(t *testing.T) {
 	}
 
 	result := classifier.ExplainClassify(changes)
-	builtinDecisions := classifier.AddExplainBuiltinAnalyzers(result, changes, []BuiltinAnalyzer{
+	builtinDecisions := classifier.AddExplainBuiltinAnalyzers(result, planResultFromChanges(changes), []BuiltinAnalyzer{
 		&DeletionAnalyzer{},
-	})
+	}, nil)
 
 	if len(builtinDecisions) != 1 {
 		t.Fatalf("expected 1 builtin decision, got %d", len(builtinDecisions))
@@ -706,6 +706,203 @@ func TestClassify_PluginDecisionsWithUnknownClassification(t *testing.T) {
 	if result.ResourceDecisions[0].Classification != "standard" {
 		t.Errorf("expected resource to remain 'standard' when unknown classification is ignored, got '%s'",
 			result.ResourceDecisions[0].Classification)
+	}
+}
+
+func TestClassify_ModuleScopedRules(t *testing.T) {
+	cfg := &config.Config{
+		Classifications: []config.ClassificationConfig{
+			{
+				Name:        "critical",
+				Description: "Critical",
+				Rules: []config.RuleConfig{
+					{Resource: []string{"*"}, Actions: []string{"delete"}, Module: []string{"module.production", "module.production.**"}},
+				},
+			},
+			{
+				Name:        "standard",
+				Description: "Standard",
+				Rules: []config.RuleConfig{
+					{Resource: []string{"*"}},
+				},
+			},
+		},
+		Precedence: []string{"critical", "standard"},
+		Defaults: &config.DefaultsConfig{
+			Unclassified: "standard",
+			NoChanges:    "standard",
+		},
+	}
+
+	classifier, err := New(cfg)
+	if err != nil {
+		t.Fatalf("failed to create classifier: %v", err)
+	}
+
+	tests := []struct {
+		name          string
+		moduleAddress string
+		actions       []string
+		wantClass     string
+	}{
+		{
+			name:          "delete in production module → critical",
+			moduleAddress: "module.production",
+			actions:       []string{"delete"},
+			wantClass:     "critical",
+		},
+		{
+			name:          "delete in production submodule → critical",
+			moduleAddress: "module.production.module.network",
+			actions:       []string{"delete"},
+			wantClass:     "critical",
+		},
+		{
+			name:          "delete in staging module → standard (no module match)",
+			moduleAddress: "module.staging",
+			actions:       []string{"delete"},
+			wantClass:     "standard",
+		},
+		{
+			name:          "delete in root module → standard (no module match)",
+			moduleAddress: "",
+			actions:       []string{"delete"},
+			wantClass:     "standard",
+		},
+		{
+			name:          "create in production module → standard (no action match)",
+			moduleAddress: "module.production",
+			actions:       []string{"create"},
+			wantClass:     "standard",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			changes := []plan.ResourceChange{
+				{
+					Address:       "azurerm_resource_group.test",
+					Type:          "azurerm_resource_group",
+					Actions:       tt.actions,
+					ModuleAddress: tt.moduleAddress,
+				},
+			}
+
+			result := classifier.Classify(changes)
+
+			if result.ResourceDecisions[0].Classification != tt.wantClass {
+				t.Errorf("expected classification %q, got %q",
+					tt.wantClass, result.ResourceDecisions[0].Classification)
+			}
+		})
+	}
+}
+
+func TestClassify_NotModuleRules(t *testing.T) {
+	cfg := &config.Config{
+		Classifications: []config.ClassificationConfig{
+			{
+				Name:        "critical",
+				Description: "Critical",
+				Rules: []config.RuleConfig{
+					{Resource: []string{"*"}, Actions: []string{"delete"}, NotModule: []string{"module.staging", "module.staging.**"}},
+				},
+			},
+			{
+				Name:        "standard",
+				Description: "Standard",
+				Rules: []config.RuleConfig{
+					{Resource: []string{"*"}},
+				},
+			},
+		},
+		Precedence: []string{"critical", "standard"},
+		Defaults: &config.DefaultsConfig{
+			Unclassified: "standard",
+			NoChanges:    "standard",
+		},
+	}
+
+	classifier, err := New(cfg)
+	if err != nil {
+		t.Fatalf("failed to create classifier: %v", err)
+	}
+
+	tests := []struct {
+		name          string
+		moduleAddress string
+		wantClass     string
+	}{
+		{"delete in production → critical", "module.production", "critical"},
+		{"delete in root → critical", "", "critical"},
+		{"delete in staging → standard (excluded)", "module.staging", "standard"},
+		{"delete in staging submodule → standard (excluded)", "module.staging.module.db", "standard"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			changes := []plan.ResourceChange{
+				{
+					Address:       "azurerm_resource_group.test",
+					Type:          "azurerm_resource_group",
+					Actions:       []string{"delete"},
+					ModuleAddress: tt.moduleAddress,
+				},
+			}
+
+			result := classifier.Classify(changes)
+
+			if result.ResourceDecisions[0].Classification != tt.wantClass {
+				t.Errorf("expected classification %q, got %q",
+					tt.wantClass, result.ResourceDecisions[0].Classification)
+			}
+		})
+	}
+}
+
+func TestExplainClassify_ModuleMismatchReason(t *testing.T) {
+	cfg := &config.Config{
+		Classifications: []config.ClassificationConfig{
+			{
+				Name: "critical",
+				Rules: []config.RuleConfig{
+					{Resource: []string{"*"}, Module: []string{"module.production"}},
+				},
+			},
+			{
+				Name: "standard",
+				Rules: []config.RuleConfig{
+					{Resource: []string{"*"}},
+				},
+			},
+		},
+		Precedence: []string{"critical", "standard"},
+		Defaults: &config.DefaultsConfig{
+			Unclassified: "standard",
+			NoChanges:    "standard",
+		},
+	}
+
+	classifier, err := New(cfg)
+	if err != nil {
+		t.Fatalf("failed to create classifier: %v", err)
+	}
+
+	changes := []plan.ResourceChange{
+		{
+			Address:       "azurerm_resource_group.test",
+			Type:          "azurerm_resource_group",
+			Actions:       []string{"delete"},
+			ModuleAddress: "module.staging",
+		},
+	}
+
+	result := classifier.ExplainClassify(changes)
+	res := result.Resources[0]
+
+	// The critical rule should show "module mismatch"
+	if res.Trace[0].Reason != "module mismatch" {
+		t.Errorf("expected 'module mismatch' reason for critical rule, got %q", res.Trace[0].Reason)
 	}
 }
 

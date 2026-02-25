@@ -14,6 +14,9 @@ import (
 type BlastRadiusAnalyzer struct {
 	// thresholds maps classification name to its blast radius config.
 	thresholds map[string]*config.BlastRadiusConfig
+	// driftAddresses is the set of resource addresses that are drift corrections.
+	// When exclude_drift is enabled for a threshold, these addresses are excluded from counts.
+	driftAddresses map[string]struct{}
 }
 
 // NewBlastRadiusAnalyzer creates a BlastRadiusAnalyzer from the classification configs.
@@ -25,6 +28,11 @@ func NewBlastRadiusAnalyzer(classifications []config.ClassificationConfig) *Blas
 		}
 	}
 	return &BlastRadiusAnalyzer{thresholds: thresholds}
+}
+
+// SetDriftAddresses provides the set of drift addresses for exclude_drift support.
+func (a *BlastRadiusAnalyzer) SetDriftAddresses(addrs map[string]struct{}) {
+	a.driftAddresses = addrs
 }
 
 // Name returns the analyzer name.
@@ -40,38 +48,7 @@ func (a *BlastRadiusAnalyzer) Analyze(changes []plan.ResourceChange) []ResourceD
 		return nil
 	}
 
-	// Single pass to count actions
-	var deletions, replacements, totalChanges int
-	for _, change := range changes {
-		hasDelete := false
-		hasCreate := false
-		hasNonNoOp := false
-
-		for _, action := range change.Actions {
-			if action == "delete" {
-				hasDelete = true
-			}
-			if action == "create" {
-				hasCreate = true
-			}
-			if action != "no-op" {
-				hasNonNoOp = true
-			}
-		}
-
-		if hasDelete && !hasCreate {
-			deletions++
-		}
-		if hasDelete && hasCreate {
-			replacements++
-		}
-		if hasNonNoOp {
-			totalChanges++
-		}
-	}
-
 	// Check each classification's thresholds and collect decisions per classification
-	// We use a map to accumulate multiple reasons per classification
 	type classDecision struct {
 		classification string
 		reasons        []string
@@ -79,6 +56,42 @@ func (a *BlastRadiusAnalyzer) Analyze(changes []plan.ResourceChange) []ResourceD
 	var triggered []classDecision
 
 	for classificationName, br := range a.thresholds {
+		excludeDrift := br.ExcludeDrift != nil && *br.ExcludeDrift
+
+		// Single pass to count actions (per threshold, since exclude_drift may differ)
+		var deletions, replacements, totalChanges int
+		for _, change := range changes {
+			if excludeDrift && a.isDrift(change.Address) {
+				continue
+			}
+
+			hasDelete := false
+			hasCreate := false
+			hasNonNoOp := false
+
+			for _, action := range change.Actions {
+				if action == "delete" {
+					hasDelete = true
+				}
+				if action == "create" {
+					hasCreate = true
+				}
+				if action != "no-op" {
+					hasNonNoOp = true
+				}
+			}
+
+			if hasDelete && !hasCreate {
+				deletions++
+			}
+			if hasDelete && hasCreate {
+				replacements++
+			}
+			if hasNonNoOp {
+				totalChanges++
+			}
+		}
+
 		var reasons []string
 		if br.MaxDeletions != nil && deletions > *br.MaxDeletions {
 			reasons = append(reasons, fmt.Sprintf(
@@ -128,6 +141,15 @@ func (a *BlastRadiusAnalyzer) Analyze(changes []plan.ResourceChange) []ResourceD
 	}
 
 	return decisions
+}
+
+// isDrift returns true if the address is a drift-corrected resource.
+func (a *BlastRadiusAnalyzer) isDrift(address string) bool {
+	if a.driftAddresses == nil {
+		return false
+	}
+	_, ok := a.driftAddresses[address]
+	return ok
 }
 
 // isNoOp returns true if the resource's actions consist only of "no-op".
