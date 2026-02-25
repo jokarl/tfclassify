@@ -14,6 +14,7 @@ Deep inspection plugin for Azure Resource Manager (azurerm) resources. Analyzes 
 - [Role Resolution](#role-resolution)
 - [Data-Plane Detection](#data-plane-detection)
 - [Pattern-Based Control-Plane Detection](#pattern-based-control-plane-detection)
+- [Principal-Level Evaluation](#principal-level-evaluation)
 - [Building](#building)
 - [Development](#development)
 
@@ -39,6 +40,7 @@ Detects privilege escalation in Azure role assignments by matching the role's ef
 - New privileged role assignments (e.g., assigning Owner to a principal)
 - Role escalations (e.g., changing Reader to Contributor)
 - Data-plane access grants (e.g., storage blob read access)
+- Combined effective permissions across multiple roles assigned to the same principal
 - Unknown roles whose permissions cannot be resolved
 
 **How it works:**
@@ -46,12 +48,14 @@ Detects privilege escalation in Azure role assignments by matching the role's ef
 2. Computes effective actions: `Actions - NotActions` for control-plane, `DataActions - NotDataActions` for data-plane
 3. Matches effective actions against configured patterns
 4. Optionally filters by ARM scope level
+5. When `merge_principal_roles` is enabled, groups role assignments by `principal_id`, computes the union of effective permissions, and evaluates per-principal instead of per-role (see [Principal-Level Evaluation](#principal-level-evaluation))
 
 **Example output:**
 
 ```
 role "Owner" grants control-plane access matching configured patterns
 role "Storage Blob Data Owner" grants data-plane access matching configured patterns
+combined effective permissions for principal aaaa-bbbb (roles: Reader, Custom Auth Writer) match configured action patterns
 unknown role "Custom Role" flagged (role permissions could not be resolved)
 ```
 
@@ -123,6 +127,7 @@ classification "critical" {
 | `roles` | list(string) | `[]` | If non-empty, only analyze these specific roles |
 | `scopes` | list(string) | `[]` | Scope levels to match: `"management_group"`, `"subscription"`, `"resource_group"`, `"resource"`. Empty matches any scope. |
 | `flag_unknown_roles` | bool | `true` | Emit decisions for roles whose permissions cannot be resolved, with diagnostic metadata |
+| `merge_principal_roles` | bool | `false` | Enable per-principal evaluation: group role assignments by `principal_id`, compute the union of effective permissions, and evaluate the merged set against the same `actions`/`data_actions` patterns. See [Principal-Level Evaluation](#principal-level-evaluation). |
 
 #### Behavior Notes
 
@@ -190,10 +195,12 @@ classification "high" {
   }
 
   # Pattern-based detection: write/delete operations
+  # merge_principal_roles evaluates the union of all roles per identity
   azurerm {
     privilege_escalation {
-      actions      = ["*/write", "*/delete"]
-      data_actions = ["*/write", "*/delete"]
+      actions               = ["*/write", "*/delete"]
+      data_actions          = ["*/write", "*/delete"]
+      merge_principal_roles = true
     }
   }
 }
@@ -381,6 +388,60 @@ classification "critical" {
 ```
 
 A role triggers if it matches EITHER the control-plane patterns OR the data-plane patterns. The decision metadata indicates which triggered via the `trigger` field.
+
+## Principal-Level Evaluation
+
+When `merge_principal_roles = true`, the analyzer switches from per-role evaluation to per-principal evaluation. Instead of checking each role assignment independently, it groups all role assignments by `principal_id`, computes the union of effective permissions across all assigned roles, and evaluates the merged set against the same `actions`/`data_actions` patterns.
+
+### Why This Matters
+
+Azure RBAC permissions are additive -- when an identity has multiple role assignments, its effective permissions are the union of all roles. A principal with Reader + a custom role with `Microsoft.Authorization/roleAssignments/write` has both read access and the ability to write role assignments. Per-principal evaluation surfaces this combined effective permission set.
+
+### Configuration
+
+```hcl
+classification "critical" {
+  azurerm {
+    privilege_escalation {
+      actions               = ["Microsoft.Authorization/roleAssignments/write"]
+      merge_principal_roles = true
+    }
+  }
+}
+```
+
+### How It Works
+
+1. Resolve all role assignments as normal (role database, custom roles, scope filtering)
+2. Group resolved role assignments by `principal_id`
+3. For each principal, compute the union of effective actions across all assigned roles (both control-plane and data-plane)
+4. Match the merged action set against the same `actions`/`data_actions` patterns
+5. Emit one decision per principal (not per role)
+
+### Decision Metadata
+
+Combined decisions include the full effective permission set:
+
+```json
+{
+  "analyzer": "privilege-escalation",
+  "trigger": "combined-roles",
+  "principal_id": "aaaa-bbbb-cccc-dddd",
+  "combined_roles": [
+    {"address": "azurerm_role_assignment.reader", "role": "Reader", "role_source": "builtin"},
+    {"address": "azurerm_role_assignment.writer", "role": "Custom Auth Writer", "role_source": "plan-custom-role"}
+  ],
+  "effective_actions": ["Microsoft.Authorization/roleAssignments/write", "Microsoft.Resources/subscriptions/read", "..."],
+  "effective_data_actions": ["..."],
+  "matched_actions": ["Microsoft.Authorization/roleAssignments/write"],
+  "matched_patterns": ["Microsoft.Authorization/roleAssignments/write"]
+}
+```
+
+### Limitations
+
+- **Unknown `principal_id`**: When the identity is created in the same plan (e.g., `azurerm_user_assigned_identity`), the `principal_id` is unknown at plan time. These role assignments fall back to per-role evaluation. Use `data "azurerm_client_config"` or reference existing identities for known principal IDs.
+- **Roles with unknown principal_id or empty principal_id**: These are not included in any principal group. Per-role evaluation handles them normally (including `flag_unknown_roles` behavior).
 
 ## Building
 

@@ -2287,3 +2287,729 @@ func TestPrivilege_NoSeverityOnDecisions(t *testing.T) {
 		t.Error("decision should NOT contain a score field")
 	}
 }
+
+// === Combined role aggregation tests (merge_principal_roles) ===
+
+func TestPrivilege_CombinedRoles_MergedEffectivePermissions(t *testing.T) {
+	config := DefaultConfig()
+	analyzer := NewPrivilegeEscalationAnalyzer(config)
+	mergeTrue := true
+
+	principalID := "aaaa-bbbb-cccc-dddd"
+
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			{
+				Address: "azurerm_role_assignment.reader",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"role_definition_name": "Reader",
+					"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
+					"principal_id":         principalID,
+				},
+			},
+			{
+				Address: "azurerm_role_definition.auth_writer",
+				Type:    "azurerm_role_definition",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"name": "Custom Auth Writer",
+					"permissions": []interface{}{
+						map[string]interface{}{
+							"actions":     []interface{}{"Microsoft.Authorization/roleAssignments/write"},
+							"not_actions": []interface{}{},
+						},
+					},
+				},
+			},
+			{
+				Address: "azurerm_role_assignment.auth_writer",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"role_definition_name": "Custom Auth Writer",
+					"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
+					"principal_id":         principalID,
+				},
+			},
+		},
+	}
+
+	// With merge_principal_roles, per-role emission is deferred. The combined pass
+	// evaluates the union of Reader + Custom Auth Writer effective permissions
+	// against the same patterns. Auth Writer has roleAssignments/write → matches.
+	analyzerConfig := &PluginAnalyzerConfig{
+		PrivilegeEscalation: &PrivilegeEscalationAnalyzerConfig{
+			Actions:             []string{"Microsoft.Authorization/roleAssignments/write"},
+			MergePrincipalRoles: &mergeTrue,
+		},
+	}
+	configJSON, _ := json.Marshal(analyzerConfig)
+
+	err := analyzer.AnalyzeWithClassification(runner, "critical", configJSON)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(runner.decisions) != 1 {
+		t.Fatalf("expected 1 combined decision, got %d", len(runner.decisions))
+	}
+
+	decision := runner.decisions[0]
+	if decision.Classification != "critical" {
+		t.Errorf("expected classification 'critical', got %q", decision.Classification)
+	}
+	if decision.Metadata["trigger"] != "combined-roles" {
+		t.Errorf("expected trigger 'combined-roles', got %v", decision.Metadata["trigger"])
+	}
+	if decision.Metadata["principal_id"] != principalID {
+		t.Errorf("expected principal_id %q, got %v", principalID, decision.Metadata["principal_id"])
+	}
+	// Verify effective_actions is present (the full effective permission set)
+	if _, ok := decision.Metadata["effective_actions"]; !ok {
+		t.Error("expected effective_actions in metadata")
+	}
+}
+
+func TestPrivilege_CombinedRoles_NeitherTriggersIndividually(t *testing.T) {
+	config := DefaultConfig()
+	analyzer := NewPrivilegeEscalationAnalyzer(config)
+	mergeTrue := true
+
+	principalID := "aaaa-bbbb-cccc-dddd"
+
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			{
+				Address: "azurerm_role_definition.compute_reader",
+				Type:    "azurerm_role_definition",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"name": "Compute Reader",
+					"permissions": []interface{}{
+						map[string]interface{}{
+							"actions":     []interface{}{"Microsoft.Compute/virtualMachines/read"},
+							"not_actions": []interface{}{},
+						},
+					},
+				},
+			},
+			{
+				Address: "azurerm_role_definition.auth_writer",
+				Type:    "azurerm_role_definition",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"name": "Custom Auth Writer",
+					"permissions": []interface{}{
+						map[string]interface{}{
+							"actions":     []interface{}{"Microsoft.Authorization/roleAssignments/write"},
+							"not_actions": []interface{}{},
+						},
+					},
+				},
+			},
+			{
+				Address: "azurerm_role_assignment.compute_reader",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"role_definition_name": "Compute Reader",
+					"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
+					"principal_id":         principalID,
+				},
+			},
+			{
+				Address: "azurerm_role_assignment.auth_writer",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"role_definition_name": "Custom Auth Writer",
+					"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
+					"principal_id":         principalID,
+				},
+			},
+		},
+	}
+
+	// Pattern: Microsoft.Authorization/roleAssignments/delete — neither role has delete
+	// But merge_principal_roles evaluates the union against the SAME pattern.
+	// The union contains roleAssignments/write but NOT delete, so combined also doesn't match.
+	analyzerConfig := &PluginAnalyzerConfig{
+		PrivilegeEscalation: &PrivilegeEscalationAnalyzerConfig{
+			Actions:             []string{"Microsoft.Authorization/roleAssignments/delete"},
+			MergePrincipalRoles: &mergeTrue,
+		},
+	}
+	configJSON, _ := json.Marshal(analyzerConfig)
+
+	err := analyzer.AnalyzeWithClassification(runner, "critical", configJSON)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Neither per-role nor combined matches (neither role has delete)
+	if len(runner.decisions) != 0 {
+		t.Errorf("expected 0 decisions (no role has delete), got %d", len(runner.decisions))
+	}
+}
+
+func TestPrivilege_CombinedRoles_BuiltinRoles_SingleDecisionPerPrincipal(t *testing.T) {
+	config := DefaultConfig()
+	analyzer := NewPrivilegeEscalationAnalyzer(config)
+	mergeTrue := true
+
+	principalID := "aaaa-bbbb-cccc-dddd"
+
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			{
+				Address: "azurerm_role_assignment.owner",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"role_definition_name": "Owner",
+					"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
+					"principal_id":         principalID,
+				},
+			},
+			{
+				Address: "azurerm_role_assignment.reader",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"role_definition_name": "Reader",
+					"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
+					"principal_id":         principalID,
+				},
+			},
+		},
+	}
+
+	// With merge_principal_roles, both roles are evaluated as a union per principal.
+	// Owner has roleAssignments/write → union matches the pattern.
+	// Result: one combined-roles decision for the principal.
+	analyzerConfig := &PluginAnalyzerConfig{
+		PrivilegeEscalation: &PrivilegeEscalationAnalyzerConfig{
+			Actions:             []string{"Microsoft.Authorization/roleAssignments/write"},
+			MergePrincipalRoles: &mergeTrue,
+		},
+	}
+	configJSON, _ := json.Marshal(analyzerConfig)
+
+	err := analyzer.AnalyzeWithClassification(runner, "critical", configJSON)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Single combined decision per principal (not per role)
+	if len(runner.decisions) != 1 {
+		t.Fatalf("expected 1 combined decision, got %d", len(runner.decisions))
+	}
+
+	decision := runner.decisions[0]
+	if decision.Metadata["trigger"] != "combined-roles" {
+		t.Errorf("expected trigger 'combined-roles', got %v", decision.Metadata["trigger"])
+	}
+
+	// Verify combined_roles lists both roles
+	combinedRoles, ok := decision.Metadata["combined_roles"].([]map[string]interface{})
+	if !ok {
+		t.Fatalf("expected combined_roles in metadata, got %T", decision.Metadata["combined_roles"])
+	}
+	if len(combinedRoles) != 2 {
+		t.Errorf("expected 2 combined_roles entries, got %d", len(combinedRoles))
+	}
+}
+
+func TestPrivilege_CombinedRoles_DifferentPrincipals_NoTrigger(t *testing.T) {
+	config := DefaultConfig()
+	analyzer := NewPrivilegeEscalationAnalyzer(config)
+	mergeTrue := true
+
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			{
+				Address: "azurerm_role_definition.auth_writer",
+				Type:    "azurerm_role_definition",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"name": "Custom Auth Writer",
+					"permissions": []interface{}{
+						map[string]interface{}{
+							"actions":     []interface{}{"Microsoft.Authorization/roleAssignments/write"},
+							"not_actions": []interface{}{},
+						},
+					},
+				},
+			},
+			{
+				Address: "azurerm_role_assignment.reader",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"role_definition_name": "Reader",
+					"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
+					"principal_id":         "principal-1",
+				},
+			},
+			{
+				Address: "azurerm_role_assignment.auth_writer",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"role_definition_name": "Custom Auth Writer",
+					"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
+					"principal_id":         "principal-2",
+				},
+			},
+		},
+	}
+
+	// Different principals — each has only 1 role, so merge has no candidates
+	analyzerConfig := &PluginAnalyzerConfig{
+		PrivilegeEscalation: &PrivilegeEscalationAnalyzerConfig{
+			Actions:             []string{"Microsoft.Authorization/roleAssignments/delete"},
+			MergePrincipalRoles: &mergeTrue,
+		},
+	}
+	configJSON, _ := json.Marshal(analyzerConfig)
+
+	err := analyzer.AnalyzeWithClassification(runner, "critical", configJSON)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(runner.decisions) != 0 {
+		t.Errorf("expected 0 decisions (different principals, 1 role each), got %d", len(runner.decisions))
+	}
+}
+
+func TestPrivilege_CombinedRoles_UnknownPrincipalID_Skipped(t *testing.T) {
+	config := DefaultConfig()
+	analyzer := NewPrivilegeEscalationAnalyzer(config)
+	mergeTrue := true
+
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			{
+				Address: "azurerm_role_definition.auth_writer",
+				Type:    "azurerm_role_definition",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"name": "Custom Auth Writer",
+					"permissions": []interface{}{
+						map[string]interface{}{
+							"actions":     []interface{}{"Microsoft.Authorization/roleAssignments/write"},
+							"not_actions": []interface{}{},
+						},
+					},
+				},
+			},
+			{
+				Address: "azurerm_role_assignment.reader",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"role_definition_name": "Reader",
+					"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
+					// No principal_id — unknown/computed
+				},
+			},
+			{
+				Address: "azurerm_role_assignment.auth_writer",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"role_definition_name": "Custom Auth Writer",
+					"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
+					// No principal_id — unknown/computed
+				},
+			},
+		},
+	}
+
+	analyzerConfig := &PluginAnalyzerConfig{
+		PrivilegeEscalation: &PrivilegeEscalationAnalyzerConfig{
+			Actions:             []string{"Microsoft.Authorization/roleAssignments/delete"},
+			MergePrincipalRoles: &mergeTrue,
+		},
+	}
+	configJSON, _ := json.Marshal(analyzerConfig)
+
+	err := analyzer.AnalyzeWithClassification(runner, "critical", configJSON)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(runner.decisions) != 0 {
+		t.Errorf("expected 0 decisions (unknown principal_id), got %d", len(runner.decisions))
+	}
+}
+
+func TestPrivilege_CombinedRoles_ThreeRolesEffectivePermissions(t *testing.T) {
+	config := DefaultConfig()
+	analyzer := NewPrivilegeEscalationAnalyzer(config)
+	mergeTrue := true
+
+	principalID := "aaaa-bbbb-cccc-dddd"
+
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			{
+				Address: "azurerm_role_definition.role_a",
+				Type:    "azurerm_role_definition",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"name": "Role A",
+					"permissions": []interface{}{
+						map[string]interface{}{
+							"actions":     []interface{}{"Microsoft.Compute/virtualMachines/read"},
+							"not_actions": []interface{}{},
+						},
+					},
+				},
+			},
+			{
+				Address: "azurerm_role_definition.role_b",
+				Type:    "azurerm_role_definition",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"name": "Role B",
+					"permissions": []interface{}{
+						map[string]interface{}{
+							"actions":     []interface{}{"Microsoft.Network/virtualNetworks/read"},
+							"not_actions": []interface{}{},
+						},
+					},
+				},
+			},
+			{
+				Address: "azurerm_role_definition.role_c",
+				Type:    "azurerm_role_definition",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"name": "Role C",
+					"permissions": []interface{}{
+						map[string]interface{}{
+							"actions":     []interface{}{"Microsoft.Authorization/roleAssignments/write"},
+							"not_actions": []interface{}{},
+						},
+					},
+				},
+			},
+			{
+				Address: "azurerm_role_assignment.a",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"role_definition_name": "Role A",
+					"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
+					"principal_id":         principalID,
+				},
+			},
+			{
+				Address: "azurerm_role_assignment.b",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"role_definition_name": "Role B",
+					"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
+					"principal_id":         principalID,
+				},
+			},
+			{
+				Address: "azurerm_role_assignment.c",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"role_definition_name": "Role C",
+					"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
+					"principal_id":         principalID,
+				},
+			},
+		},
+	}
+
+	// With merge_principal_roles, all three roles are evaluated as a union.
+	// Role C has roleAssignments/write → union matches. Single combined decision.
+	analyzerConfig := &PluginAnalyzerConfig{
+		PrivilegeEscalation: &PrivilegeEscalationAnalyzerConfig{
+			Actions:             []string{"Microsoft.Authorization/roleAssignments/write"},
+			MergePrincipalRoles: &mergeTrue,
+		},
+	}
+	configJSON, _ := json.Marshal(analyzerConfig)
+
+	err := analyzer.AnalyzeWithClassification(runner, "critical", configJSON)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(runner.decisions) != 1 {
+		t.Fatalf("expected 1 combined decision, got %d", len(runner.decisions))
+	}
+
+	decision := runner.decisions[0]
+	if decision.Metadata["trigger"] != "combined-roles" {
+		t.Errorf("expected trigger 'combined-roles', got %v", decision.Metadata["trigger"])
+	}
+
+	// Verify all three roles listed in combined_roles
+	combinedRoles, ok := decision.Metadata["combined_roles"].([]map[string]interface{})
+	if !ok {
+		t.Fatalf("expected combined_roles in metadata, got %T", decision.Metadata["combined_roles"])
+	}
+	if len(combinedRoles) != 3 {
+		t.Errorf("expected 3 combined_roles entries, got %d", len(combinedRoles))
+	}
+
+	// Verify effective_actions includes actions from all three roles
+	effectiveActions, ok := decision.Metadata["effective_actions"]
+	if !ok {
+		t.Fatal("expected effective_actions in metadata")
+	}
+	actionsList, ok := effectiveActions.([]string)
+	if !ok {
+		t.Fatalf("expected effective_actions to be []string, got %T", effectiveActions)
+	}
+	// Should contain actions from all three roles
+	if len(actionsList) < 3 {
+		t.Errorf("expected at least 3 effective_actions (one per role), got %d: %v", len(actionsList), actionsList)
+	}
+}
+
+func TestPrivilege_CombinedRoles_MergeDisabled_NoEffect(t *testing.T) {
+	config := DefaultConfig()
+	analyzer := NewPrivilegeEscalationAnalyzer(config)
+
+	principalID := "aaaa-bbbb-cccc-dddd"
+
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			{
+				Address: "azurerm_role_assignment.reader",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"role_definition_name": "Reader",
+					"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
+					"principal_id":         principalID,
+				},
+			},
+			{
+				Address: "azurerm_role_assignment.contributor",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"role_definition_name": "Contributor",
+					"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
+					"principal_id":         principalID,
+				},
+			},
+		},
+	}
+
+	// merge_principal_roles not set (nil = false) — combined pass skipped
+	analyzerConfig := &PluginAnalyzerConfig{
+		PrivilegeEscalation: &PrivilegeEscalationAnalyzerConfig{
+			Actions: []string{"Microsoft.Authorization/roleAssignments/delete"},
+		},
+	}
+	configJSON, _ := json.Marshal(analyzerConfig)
+
+	err := analyzer.AnalyzeWithClassification(runner, "critical", configJSON)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(runner.decisions) != 0 {
+		t.Errorf("expected 0 decisions (merge disabled, no per-role match), got %d", len(runner.decisions))
+	}
+}
+
+func TestPrivilege_CombinedRoles_CustomRolesFromPlan(t *testing.T) {
+	config := DefaultConfig()
+	analyzer := NewPrivilegeEscalationAnalyzer(config)
+	mergeTrue := true
+
+	principalID := "aaaa-bbbb-cccc-dddd"
+
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			{
+				Address: "azurerm_role_definition.reader_custom",
+				Type:    "azurerm_role_definition",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"name": "Custom Reader",
+					"permissions": []interface{}{
+						map[string]interface{}{
+							"actions":     []interface{}{"Microsoft.Resources/subscriptions/read"},
+							"not_actions": []interface{}{},
+						},
+					},
+				},
+			},
+			{
+				Address: "azurerm_role_definition.auth_writer",
+				Type:    "azurerm_role_definition",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"name": "Custom Auth Writer",
+					"permissions": []interface{}{
+						map[string]interface{}{
+							"actions":     []interface{}{"Microsoft.Authorization/roleAssignments/write"},
+							"not_actions": []interface{}{},
+						},
+					},
+				},
+			},
+			{
+				Address: "azurerm_role_assignment.reader",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"role_definition_name": "Custom Reader",
+					"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
+					"principal_id":         principalID,
+				},
+			},
+			{
+				Address: "azurerm_role_assignment.auth_writer",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"role_definition_name": "Custom Auth Writer",
+					"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
+					"principal_id":         principalID,
+				},
+			},
+		},
+	}
+
+	// With merge_principal_roles, per-role emission is deferred. The combined pass
+	// evaluates both custom roles' union of effective permissions.
+	// Custom Auth Writer has roleAssignments/write → union matches.
+	analyzerConfig := &PluginAnalyzerConfig{
+		PrivilegeEscalation: &PrivilegeEscalationAnalyzerConfig{
+			Actions:             []string{"Microsoft.Authorization/roleAssignments/write"},
+			MergePrincipalRoles: &mergeTrue,
+		},
+	}
+	configJSON, _ := json.Marshal(analyzerConfig)
+
+	err := analyzer.AnalyzeWithClassification(runner, "critical", configJSON)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(runner.decisions) != 1 {
+		t.Fatalf("expected 1 combined decision, got %d", len(runner.decisions))
+	}
+
+	decision := runner.decisions[0]
+	if decision.Metadata["trigger"] != "combined-roles" {
+		t.Errorf("expected trigger 'combined-roles', got %v", decision.Metadata["trigger"])
+	}
+
+	// Verify combined_roles includes both custom roles
+	combinedRoles, ok := decision.Metadata["combined_roles"].([]map[string]interface{})
+	if !ok {
+		t.Fatalf("expected combined_roles in metadata, got %T", decision.Metadata["combined_roles"])
+	}
+	if len(combinedRoles) != 2 {
+		t.Errorf("expected 2 combined_roles entries, got %d", len(combinedRoles))
+	}
+}
+
+func TestPrivilege_CombinedRoles_DataActions(t *testing.T) {
+	config := DefaultConfig()
+	analyzer := NewPrivilegeEscalationAnalyzer(config)
+
+	principalID := "aaaa-bbbb-cccc-dddd"
+
+	runner := &mockRunner{
+		changes: []*sdk.ResourceChange{
+			{
+				Address: "azurerm_role_definition.data_reader",
+				Type:    "azurerm_role_definition",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"name": "Data Reader",
+					"permissions": []interface{}{
+						map[string]interface{}{
+							"actions":      []interface{}{},
+							"not_actions":  []interface{}{},
+							"data_actions": []interface{}{"Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read"},
+						},
+					},
+				},
+			},
+			{
+				Address: "azurerm_role_definition.data_writer",
+				Type:    "azurerm_role_definition",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"name": "Data Writer",
+					"permissions": []interface{}{
+						map[string]interface{}{
+							"actions":      []interface{}{},
+							"not_actions":  []interface{}{},
+							"data_actions": []interface{}{"Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write"},
+						},
+					},
+				},
+			},
+			{
+				Address: "azurerm_role_assignment.data_reader",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"role_definition_name": "Data Reader",
+					"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
+					"principal_id":         principalID,
+				},
+			},
+			{
+				Address: "azurerm_role_assignment.data_writer",
+				Type:    "azurerm_role_assignment",
+				Actions: []string{"create"},
+				After: map[string]interface{}{
+					"role_definition_name": "Data Writer",
+					"scope":                "/subscriptions/00000000-0000-0000-0000-000000000000",
+					"principal_id":         principalID,
+				},
+			},
+		},
+	}
+
+	// Neither data role matches individually, but combined they cover blob/*
+	mergeTrue := true
+	analyzerConfig := &PluginAnalyzerConfig{
+		PrivilegeEscalation: &PrivilegeEscalationAnalyzerConfig{
+			DataActions:         []string{"Microsoft.Storage/storageAccounts/blobServices/containers/blobs/*"},
+			MergePrincipalRoles: &mergeTrue,
+		},
+	}
+	configJSON, _ := json.Marshal(analyzerConfig)
+
+	err := analyzer.AnalyzeWithClassification(runner, "critical", configJSON)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(runner.decisions) != 1 {
+		t.Fatalf("expected 1 combined decision (data plane), got %d", len(runner.decisions))
+	}
+
+	decision := runner.decisions[0]
+	if decision.Metadata["trigger"] != "combined-roles" {
+		t.Errorf("expected trigger 'combined-roles', got %v", decision.Metadata["trigger"])
+	}
+
+	// Should have matched_data_actions
+	if _, ok := decision.Metadata["matched_data_actions"]; !ok {
+		t.Error("expected matched_data_actions in metadata")
+	}
+}

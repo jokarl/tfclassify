@@ -189,6 +189,13 @@ func parsePrivilegeEscalationConfig(block *hclsyntax.Block, config *PrivilegeEsc
 			}
 			b := val.True()
 			config.FlagUnknownRoles = &b
+		case "merge_principal_roles":
+			val, diags := attr.Expr.Value(nil)
+			if diags.HasErrors() {
+				return fmt.Errorf("privilege_escalation.merge_principal_roles: %v", diags.Error())
+			}
+			b := val.True()
+			config.MergePrincipalRoles = &b
 		default:
 			return fmt.Errorf("privilege_escalation: unknown attribute %q", name)
 		}
