@@ -31,7 +31,7 @@ func TestLoad_ValidConfig(t *testing.T) {
 	if cfg.Plugins[1].Source != "github.com/jokarl/tfclassify-plugin-azurerm" {
 		t.Errorf("unexpected source: %s", cfg.Plugins[1].Source)
 	}
-	if cfg.Plugins[1].Version != "0.1.0" {
+	if cfg.Plugins[1].Version != "0.3.0" {
 		t.Errorf("unexpected version: %s", cfg.Plugins[1].Version)
 	}
 

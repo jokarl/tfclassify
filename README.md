@@ -487,7 +487,7 @@ All fields are optional. Omitted fields are not evaluated. Values must be positi
 plugin "azurerm" {
   enabled = true
   source  = "github.com/jokarl/tfclassify"   # GitHub repo for download
-  version = "0.1.0"                            # Semantic version
+  version = "0.3.0"                            # Semantic version
 }
 
 # Plugin analyzer configuration lives inside classification blocks.

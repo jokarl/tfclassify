@@ -75,7 +75,7 @@ plugin "azurerm" {
 plugin "azurerm" {
   enabled = true
   source  = "github.com/jokarl/tfclassify"
-  version = "0.1.0"
+  version = "0.3.0"
 }
 ```
 
@@ -153,7 +153,7 @@ A `.tfclassify.hcl` that uses the azurerm plugin alongside core classification r
 plugin "azurerm" {
   enabled = true
   source  = "github.com/jokarl/tfclassify"
-  version = "0.1.0"
+  version = "0.3.0"
 }
 
 # ─── Classifications ─────────────────────────────────────────────────

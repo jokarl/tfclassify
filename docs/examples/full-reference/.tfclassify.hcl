@@ -37,7 +37,7 @@ plugin "azurerm" {
   source = "github.com/jokarl/tfclassify"
 
   # Semantic version to download.
-  version = "0.1.0"
+  version = "0.3.0"
 
   # Note: plugin-specific configuration is now defined per-classification
   # inside classification blocks (see "critical" and "high" below).
