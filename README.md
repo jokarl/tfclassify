@@ -22,6 +22,7 @@ Classify Terraform plan changes based on organization-defined rules. tfclassify 
   - [Precedence](#precedence)
   - [Defaults](#defaults)
   - [Blast Radius](#blast-radius)
+  - [Topology](#topology)
   - [Plugin Declarations](#plugin-declarations)
   - [Evidence](#evidence)
 - [Plan File Formats](#plan-file-formats)
@@ -338,6 +339,8 @@ classification "review" {
 | `not_resource` | list of globs | Resource type must match **none** of the patterns. Cannot combine with `resource` in the same rule. |
 | `actions` | list of strings | Terraform plan action. Omit to match all actions. See **Action Values** below. |
 | `not_actions` | list of strings | Inverse of `actions` — matches all actions EXCEPT those listed. Cannot combine with `actions` in the same rule. Same valid values as `actions`. |
+| `module` | list of globs | Module path must match at least one pattern. Uses `.` as separator (`*` matches one level, `**` any depth). Omit to match all modules. |
+| `not_module` | list of globs | Module path must match **none** of the patterns. Cannot combine with `module` in the same rule. |
 
 ### Action Values
 
@@ -373,6 +376,31 @@ Glob patterns use `*` to match any sequence of characters. Some useful patterns:
 | `*_key_vault_*` | `azurerm_key_vault_secret`, `azurerm_key_vault_key` | `azurerm_key_vault` |
 | `*` | Everything | — |
 
+### Module Filtering
+
+Rules can be scoped to specific Terraform modules using the `module` and `not_module` fields. These use glob patterns with `.` as the separator — `*` matches one module level, `**` matches any depth. An empty string matches the root module.
+
+```hcl
+# Only apply to resources inside module.production (any depth)
+classification "critical" {
+  rule {
+    module   = ["module.production", "module.production.**"]
+    resource = ["*"]
+    actions  = ["delete"]
+  }
+}
+
+# Apply to everything except production modules
+classification "standard" {
+  rule {
+    not_module = ["module.production", "module.production.**"]
+    resource   = ["*"]
+  }
+}
+```
+
+`module` and `not_module` are mutually exclusive — specifying both in the same rule is a validation error. Omitting both matches all modules including root (backward compatible).
+
 ### Precedence
 
 The `precedence` list controls two things:
@@ -391,13 +419,19 @@ The overall exit code is the highest across all resources. One critical resource
 
 ```hcl
 defaults {
-  unclassified   = "standard"   # Resources matching no rule
-  no_changes     = "auto"       # Plans with zero resource changes
-  plugin_timeout = "30s"        # Timeout for external plugin execution
+  unclassified         = "standard"   # Resources matching no rule
+  no_changes           = "auto"       # Plans with zero resource changes
+  drift_classification = "standard"   # Drift-corrected resources (optional)
+  plugin_timeout       = "30s"        # Timeout for external plugin execution
 }
 ```
 
-`unclassified` and `no_changes` must reference classification names from the precedence list. `plugin_timeout` accepts Go duration strings (e.g. `"10s"`, `"2m30s"`).
+| Field | Type | Description |
+|-------|------|-------------|
+| `unclassified` | string | Classification for resources matching no rule. Must reference a name in `precedence`. |
+| `no_changes` | string | Classification when the plan has zero resource changes. Must reference a name in `precedence`. |
+| `drift_classification` | string | Optional. Classification for resources whose changes are drift corrections (actual state diverged from config outside Terraform). Must reference a name in `precedence`. |
+| `plugin_timeout` | string | Timeout for external plugin execution. Go duration string (e.g. `"10s"`, `"2m30s"`). Default: `"30s"`. |
 
 ### Blast Radius
 
@@ -411,6 +445,7 @@ classification "critical" {
     max_deletions    = 5    # Standalone deletions (delete without create)
     max_replacements = 10   # Replacements (delete + create pairs)
     max_changes      = 50   # All resources with non-no-op actions
+    exclude_drift    = true  # Don't count drift corrections toward limits
   }
 }
 ```
@@ -420,8 +455,31 @@ classification "critical" {
 | `max_deletions` | int | Trigger when standalone deletions exceed this count |
 | `max_replacements` | int | Trigger when replacements (destroy + recreate) exceed this count |
 | `max_changes` | int | Trigger when total non-no-op changes exceed this count |
+| `exclude_drift` | bool | When `true`, drift-corrected resources are excluded from blast radius counts. Requires `drift_classification` in defaults. |
 
-All fields are optional. Omitted fields are not evaluated. Values must be positive integers. Multiple classifications can define different thresholds for graduated blast radius detection.
+All fields are optional. Omitted fields are not evaluated. Threshold values must be positive integers. Multiple classifications can define different thresholds for graduated blast radius detection.
+
+### Topology
+
+The optional `topology` block inside a classification uses the Terraform dependency graph to detect changes with high downstream impact. It builds a directed graph from the plan's configuration and computes each changed resource's downstream fan-out via BFS.
+
+```hcl
+classification "critical" {
+  description = "Requires security team approval"
+
+  topology {
+    max_downstream        = 10  # Flag if change affects 10+ downstream resources
+    max_propagation_depth = 3   # Flag if change cascades 3+ levels deep
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `max_downstream` | int | Trigger when a single resource's change propagates to more than N downstream resources |
+| `max_propagation_depth` | int | Trigger when a change cascades more than N levels deep in the dependency graph |
+
+All fields are optional. Omitted fields are not evaluated. Values must be positive integers. Multiple classifications can define different thresholds for graduated topology detection.
 
 ### Plugin Declarations
 
@@ -515,8 +573,13 @@ Cross-provider heuristics that run in-process after core rules. These detect Ter
 | `replace` | Resource replacements (destroy + recreate) |
 | `sensitive` | Changes to Terraform-marked sensitive attributes |
 | `blast_radius` | Plan-wide change counts exceeding configured thresholds |
+| `drift` | Resources whose changes are drift corrections (actual state diverged outside Terraform) |
+| `topology` | Resources whose changes propagate to many downstream dependents in the dependency graph |
 
-Builtin analyzers are always enabled and require no configuration, except `blast_radius` which requires a `blast_radius {}` block inside a classification (see [Blast Radius](#blast-radius)).
+Builtin analyzers are always enabled and require no configuration, except:
+- `blast_radius` requires a `blast_radius {}` block inside a classification (see [Blast Radius](#blast-radius))
+- `drift` requires `drift_classification` in the `defaults` block (see [Defaults](#defaults))
+- `topology` requires a `topology {}` block inside a classification (see [Topology](#topology))
 
 ### Layer 3: Deep Inspection Plugins
 
@@ -563,6 +626,8 @@ The [e2e test scenarios](testdata/e2e/) serve as a progressive learning path fro
 | Graduated thresholds | [role-escalation-threshold](testdata/e2e/role-escalation-threshold/) | Different action patterns per classification level |
 | Role exclusions | [role-exclusion](testdata/e2e/role-exclusion/) | `exclude` list bypasses plugin detection |
 | Module support | [modules-pluginless](testdata/e2e/modules-pluginless/) | Resources inside Terraform modules |
+| Module-scoped rules | [module-scoped-rules](testdata/e2e/module-scoped-rules/) | `module` field filters rules by module path |
+| Change topology | [topology](testdata/e2e/topology/) | Dependency graph fan-out thresholds |
 | CIS benchmark mapping | [cis-azure-foundations](testdata/e2e/cis-azure-foundations/) | Classifications named after CIS controls |
 
 ## E2E Test Scenarios
@@ -600,6 +665,13 @@ These scenarios demonstrate real-world classification behavior across all three 
 |----------|--------|---------------|
 | [modules-pluginless](testdata/e2e/modules-pluginless/) | Glob rules only, no plugins | Resources created inside Terraform modules are classified correctly. Module-expanded addresses (e.g., `module.network.azurerm_network_security_group.nsg`) match glob patterns on the resource type. |
 | [modules-plugin](testdata/e2e/modules-plugin/) | Plugin with `privilege_escalation` | Resources inside modules are passed to plugins for deep inspection. Module-expanded role assignments are analyzed for privilege escalation patterns. |
+| [module-scoped-rules](testdata/e2e/module-scoped-rules/) | `module = ["module.network"]` on critical | **Module-scoped rules.** Deletions inside `module.network` are classified as `critical`, while the same deletion at root level stays `standard`. Demonstrates the `module` field for per-module classification. |
+
+### Change Topology
+
+| Scenario | Config | What It Tests |
+|----------|--------|---------------|
+| [topology](testdata/e2e/topology/) | `topology { max_downstream = 1 }` on critical | **Dependency graph analysis.** VNet → Subnet → NSG Association chain. VNet has 2+ downstream dependents, exceeding `max_downstream = 1` threshold, triggering `critical`. |
 
 ### Compliance Benchmark Mapping
 
@@ -756,6 +828,6 @@ protoc --go_out=. --go-grpc_out=. proto/tfclassify.proto
 
 - **Sensitive attribute detection is top-level only.** The builtin `sensitive` analyzer detects changes to Terraform-marked sensitive attributes at the top level of a resource. Sensitive values nested inside objects or lists are not detected.
 
-- **Blast radius thresholds count all resources including no-ops.** The `max_changes` threshold in `blast_radius` applies to every resource with a non-no-op action. There is no way to scope thresholds to specific resource types or exclude certain actions from the count.
+- **Blast radius thresholds count all non-no-op resources.** The `max_changes` threshold in `blast_radius` applies to every resource with a non-no-op action. There is no way to scope thresholds to specific resource types. Use `exclude_drift = true` to exclude drift corrections from the count.
 
 - **Plugin analyzer errors are silently skipped.** If an external plugin analyzer returns an error during analysis, the error is logged but does not fail the classification run. This means plugin failures may produce incomplete results without an obvious indication in the output. Check verbose (`-v`) output or the explain command if you suspect a plugin is not producing expected decisions.

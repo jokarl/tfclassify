@@ -10,12 +10,16 @@ See [`.tfclassify.hcl`](.tfclassify.hcl) for the fully annotated configuration f
 |---------|-------|
 | Plugin declaration (enabled + disabled) | `plugin "azurerm"`, `plugin "aws"` |
 | Classification-scoped plugin config | `azurerm { privilege_escalation { ... } }` inside classification blocks |
-| Multiple rules per classification | `classification "critical"` has 3 rules |
+| Multiple rules per classification | `classification "critical"` has 4 rules |
 | Rule descriptions | `description = "..."` on each rule block |
 | Action filtering | `actions = ["delete"]` on critical rules |
+| Module-scoped rules | `module = ["module.production", ...]` on critical rule 4 |
 | `not_resource` exclusion | `classification "standard"` uses `not_resource` |
 | Glob precision (`*_key_vault` vs `*_key_vault_*`) | Rules 2-3 in critical/high |
 | Five-level precedence with exit codes | `precedence = ["critical", "high", "standard", "low", "auto"]` |
+| Blast radius with drift exclusion | `blast_radius { exclude_drift = true }` in critical |
+| Change topology thresholds | `topology { max_downstream = 10 }` in critical and high |
+| Drift classification | `defaults { drift_classification = "standard" }` |
 | `plugin_timeout` default | `defaults { plugin_timeout = "30s" }` |
 
 ## Terraform Plan
@@ -87,8 +91,12 @@ Exit code **4** corresponds to `critical` in a five-level precedence list (auto=
 | Five precedence levels | `critical` → `high` → `standard` → `low` → `auto` with exit codes 4-0 |
 | Rule descriptions in output | Custom descriptions appear instead of auto-generated ones |
 | Glob precision | `*_key_vault` matches the vault itself; `*_key_vault_*` matches children only |
+| Module-scoped rules | `module = ["module.production", ...]` targets specific Terraform modules |
 | `not_resource` | Standard catches everything except monitoring resources |
 | `actions` filtering | Same resource type can be critical (delete) vs high (create/update) |
 | No-op classification | Resources with no changes classified as auto (exit code 0) |
 | Plugin configuration | Classification-scoped plugin config with graduated thresholds |
 | Sensitive attributes | `db_password` has `after_sensitive.value = true` (detected by builtin analyzer) |
+| Drift classification | `drift_classification = "standard"` separates drift from intentional changes |
+| Blast radius drift exclusion | `exclude_drift = true` ignores drift corrections in blast radius counts |
+| Topology thresholds | `topology { max_downstream = 10 }` detects high-impact dependency chains |

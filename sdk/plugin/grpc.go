@@ -255,6 +255,7 @@ func ProtoToSDKResourceChange(p *pb.ResourceChange) (*sdk.ResourceChange, error)
 		After:           after,
 		BeforeSensitive: beforeSensitive,
 		AfterSensitive:  afterSensitive,
+		ModuleAddress:   p.ModuleAddress,
 	}, nil
 }
 
@@ -302,6 +303,7 @@ func SDKToProtoResourceChange(s *sdk.ResourceChange) (*pb.ResourceChange, error)
 		After:           after,
 		BeforeSensitive: beforeSensitive,
 		AfterSensitive:  afterSensitive,
+		ModuleAddress:   s.ModuleAddress,
 	}, nil
 }
 

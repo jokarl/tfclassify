@@ -545,6 +545,94 @@ func TestValidate_DuplicatePrecedence_NoDuplicates(t *testing.T) {
 	}
 }
 
+func TestValidateRules_ModuleAndNotModuleMutuallyExclusive(t *testing.T) {
+	cfg := &Config{
+		Classifications: []ClassificationConfig{
+			{
+				Name:        "critical",
+				Description: "Critical",
+				Rules: []RuleConfig{
+					{
+						Resource:  []string{"*"},
+						Module:    []string{"module.production"},
+						NotModule: []string{"module.staging"},
+					},
+				},
+			},
+		},
+		Precedence: []string{"critical"},
+		Defaults:   &DefaultsConfig{Unclassified: "critical", NoChanges: "critical"},
+	}
+
+	err := Validate(cfg)
+	if err == nil {
+		t.Fatal("expected error for rule with both module and not_module, got nil")
+	}
+
+	if !strings.Contains(err.Error(), "cannot combine module and not_module") {
+		t.Errorf("expected mutual exclusivity error, got: %v", err)
+	}
+}
+
+func TestValidateGlobPatterns_ModulePatterns(t *testing.T) {
+	cfg := &Config{
+		Classifications: []ClassificationConfig{
+			{
+				Name: "critical",
+				Rules: []RuleConfig{
+					{Resource: []string{"*"}, Module: []string{"module.production", "module.production.**"}},
+				},
+			},
+		},
+	}
+
+	if err := ValidateGlobPatterns(cfg); err != nil {
+		t.Errorf("expected no error for valid module patterns, got: %v", err)
+	}
+}
+
+func TestValidateGlobPatterns_InvalidModulePattern(t *testing.T) {
+	cfg := &Config{
+		Classifications: []ClassificationConfig{
+			{
+				Name: "critical",
+				Rules: []RuleConfig{
+					{Resource: []string{"*"}, Module: []string{"[bad"}},
+				},
+			},
+		},
+	}
+
+	err := ValidateGlobPatterns(cfg)
+	if err == nil {
+		t.Fatal("expected error for invalid module pattern, got nil")
+	}
+	if !strings.Contains(err.Error(), "module pattern") {
+		t.Errorf("expected error to mention module pattern, got: %v", err)
+	}
+}
+
+func TestValidateGlobPatterns_InvalidNotModulePattern(t *testing.T) {
+	cfg := &Config{
+		Classifications: []ClassificationConfig{
+			{
+				Name: "critical",
+				Rules: []RuleConfig{
+					{Resource: []string{"*"}, NotModule: []string{"[bad"}},
+				},
+			},
+		},
+	}
+
+	err := ValidateGlobPatterns(cfg)
+	if err == nil {
+		t.Fatal("expected error for invalid not_module pattern, got nil")
+	}
+	if !strings.Contains(err.Error(), "not_module pattern") {
+		t.Errorf("expected error to mention not_module pattern, got: %v", err)
+	}
+}
+
 func TestValidateWarnings_EmptyClassification_WithPlugin(t *testing.T) {
 	cfg := &Config{
 		Classifications: []ClassificationConfig{

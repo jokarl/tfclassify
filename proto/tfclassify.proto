@@ -43,6 +43,7 @@ message ResourceChange {
     bytes after = 7;            // JSON-encoded map
     bytes before_sensitive = 8; // JSON-encoded sensitive markers
     bytes after_sensitive = 9;  // JSON-encoded sensitive markers
+    string module_address = 10; // e.g. "module.production.module.network", "" for root
 }
 
 // Decision represents a classification decision from an analyzer.

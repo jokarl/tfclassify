@@ -33,6 +33,7 @@ type ResourceChange struct {
 	After           []byte                 `protobuf:"bytes,7,opt,name=after,proto3" json:"after,omitempty"`                                            // JSON-encoded map
 	BeforeSensitive []byte                 `protobuf:"bytes,8,opt,name=before_sensitive,json=beforeSensitive,proto3" json:"before_sensitive,omitempty"` // JSON-encoded sensitive markers
 	AfterSensitive  []byte                 `protobuf:"bytes,9,opt,name=after_sensitive,json=afterSensitive,proto3" json:"after_sensitive,omitempty"`    // JSON-encoded sensitive markers
+	ModuleAddress   string                 `protobuf:"bytes,10,opt,name=module_address,json=moduleAddress,proto3" json:"module_address,omitempty"`      // e.g. "module.production.module.network", "" for root
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -128,6 +129,13 @@ func (x *ResourceChange) GetAfterSensitive() []byte {
 		return x.AfterSensitive
 	}
 	return nil
+}
+
+func (x *ResourceChange) GetModuleAddress() string {
+	if x != nil {
+		return x.ModuleAddress
+	}
+	return ""
 }
 
 // Decision represents a classification decision from an analyzer.
@@ -928,7 +936,7 @@ var File_proto_tfclassify_proto protoreflect.FileDescriptor
 const file_proto_tfclassify_proto_rawDesc = "" +
 	"\n" +
 	"\x16proto/tfclassify.proto\x12\n" +
-	"tfclassify\"\x93\x02\n" +
+	"tfclassify\"\xba\x02\n" +
 	"\x0eResourceChange\x12\x18\n" +
 	"\aaddress\x18\x01 \x01(\tR\aaddress\x12\x12\n" +
 	"\x04type\x18\x02 \x01(\tR\x04type\x12#\n" +
@@ -938,7 +946,9 @@ const file_proto_tfclassify_proto_rawDesc = "" +
 	"\x06before\x18\x06 \x01(\fR\x06before\x12\x14\n" +
 	"\x05after\x18\a \x01(\fR\x05after\x12)\n" +
 	"\x10before_sensitive\x18\b \x01(\fR\x0fbeforeSensitive\x12'\n" +
-	"\x0fafter_sensitive\x18\t \x01(\fR\x0eafterSensitive\"\x82\x01\n" +
+	"\x0fafter_sensitive\x18\t \x01(\fR\x0eafterSensitive\x12%\n" +
+	"\x0emodule_address\x18\n" +
+	" \x01(\tR\rmoduleAddress\"\x82\x01\n" +
 	"\bDecision\x12&\n" +
 	"\x0eclassification\x18\x01 \x01(\tR\x0eclassification\x12\x16\n" +
 	"\x06reason\x18\x02 \x01(\tR\x06reason\x12\x1a\n" +

@@ -197,6 +197,164 @@ func TestMatchesActions_NeitherActionsNorNotActions(t *testing.T) {
 	}
 }
 
+func TestMatchesModule_NoModuleSpecified(t *testing.T) {
+	// Rule with no module/not_module should match everything
+	rule := compiledRule{}
+	if !rule.matchesModule("") {
+		t.Error("expected empty module address to match rule with no module constraint")
+	}
+	if !rule.matchesModule("module.production") {
+		t.Error("expected module.production to match rule with no module constraint")
+	}
+}
+
+func TestMatchesModule_MatchExact(t *testing.T) {
+	cfg := &config.Config{
+		Classifications: []config.ClassificationConfig{
+			{
+				Name: "critical",
+				Rules: []config.RuleConfig{
+					{Resource: []string{"*"}, Module: []string{"module.production"}},
+				},
+			},
+		},
+	}
+
+	matchers, err := compileRules(cfg)
+	if err != nil {
+		t.Fatalf("failed to compile rules: %v", err)
+	}
+
+	rules := matchers["critical"]
+	if !rules[0].matchesModule("module.production") {
+		t.Error("expected module.production to match exact module pattern")
+	}
+	if rules[0].matchesModule("module.staging") {
+		t.Error("expected module.staging NOT to match module.production pattern")
+	}
+	if rules[0].matchesModule("") {
+		t.Error("expected root module NOT to match module.production pattern")
+	}
+}
+
+func TestMatchesModule_WildcardSingleLevel(t *testing.T) {
+	cfg := &config.Config{
+		Classifications: []config.ClassificationConfig{
+			{
+				Name: "critical",
+				Rules: []config.RuleConfig{
+					{Resource: []string{"*"}, Module: []string{"module.*"}},
+				},
+			},
+		},
+	}
+
+	matchers, err := compileRules(cfg)
+	if err != nil {
+		t.Fatalf("failed to compile rules: %v", err)
+	}
+
+	rules := matchers["critical"]
+	if !rules[0].matchesModule("module.production") {
+		t.Error("expected module.production to match module.* pattern")
+	}
+	if !rules[0].matchesModule("module.staging") {
+		t.Error("expected module.staging to match module.* pattern")
+	}
+	// With dot separator, * should NOT match nested modules
+	if rules[0].matchesModule("module.production.module.network") {
+		t.Error("expected module.production.module.network NOT to match module.* (single level)")
+	}
+}
+
+func TestMatchesModule_WildcardMultiLevel(t *testing.T) {
+	cfg := &config.Config{
+		Classifications: []config.ClassificationConfig{
+			{
+				Name: "critical",
+				Rules: []config.RuleConfig{
+					{Resource: []string{"*"}, Module: []string{"module.production.**"}},
+				},
+			},
+		},
+	}
+
+	matchers, err := compileRules(cfg)
+	if err != nil {
+		t.Fatalf("failed to compile rules: %v", err)
+	}
+
+	rules := matchers["critical"]
+	if !rules[0].matchesModule("module.production.module.network") {
+		t.Error("expected module.production.module.network to match module.production.** pattern")
+	}
+	if !rules[0].matchesModule("module.production.module.network.module.subnet") {
+		t.Error("expected deeply nested module to match module.production.** pattern")
+	}
+	if rules[0].matchesModule("module.staging.module.network") {
+		t.Error("expected module.staging.module.network NOT to match module.production.** pattern")
+	}
+}
+
+func TestMatchesModule_NotModule(t *testing.T) {
+	cfg := &config.Config{
+		Classifications: []config.ClassificationConfig{
+			{
+				Name: "standard",
+				Rules: []config.RuleConfig{
+					{Resource: []string{"*"}, NotModule: []string{"module.production", "module.production.**"}},
+				},
+			},
+		},
+	}
+
+	matchers, err := compileRules(cfg)
+	if err != nil {
+		t.Fatalf("failed to compile rules: %v", err)
+	}
+
+	rules := matchers["standard"]
+	if rules[0].matchesModule("module.production") {
+		t.Error("expected module.production NOT to match not_module pattern")
+	}
+	if rules[0].matchesModule("module.production.module.network") {
+		t.Error("expected module.production.module.network NOT to match not_module pattern")
+	}
+	if !rules[0].matchesModule("module.staging") {
+		t.Error("expected module.staging to match not_module (excluded production)")
+	}
+	if !rules[0].matchesModule("") {
+		t.Error("expected root module to match not_module (excluded production)")
+	}
+}
+
+func TestMatchesModule_RootModuleEmptyString(t *testing.T) {
+	cfg := &config.Config{
+		Classifications: []config.ClassificationConfig{
+			{
+				Name: "critical",
+				Rules: []config.RuleConfig{
+					// Empty string matches root module resources
+					{Resource: []string{"*"}, Module: []string{""}},
+				},
+			},
+		},
+	}
+
+	matchers, err := compileRules(cfg)
+	if err != nil {
+		t.Fatalf("failed to compile rules: %v", err)
+	}
+
+	rules := matchers["critical"]
+	if !rules[0].matchesModule("") {
+		t.Error("expected root module (empty string) to match empty module pattern")
+	}
+	if rules[0].matchesModule("module.production") {
+		t.Error("expected module.production NOT to match empty module pattern")
+	}
+}
+
 func TestMatchesResource_NoGlobsSpecified(t *testing.T) {
 	// A rule with neither resource nor not_resource globs should not match anything.
 	// This is an edge case that shouldn't occur in valid configs (validation should catch it),

@@ -30,13 +30,31 @@ var (
 )
 
 // builtinAnalyzers returns the default set of builtin analyzers.
-func builtinAnalyzers(cfg *config.Config) []classify.BuiltinAnalyzer {
+// planResult is used to provide drift data for blast radius drift exclusion.
+func builtinAnalyzers(cfg *config.Config, planResult *plan.ParseResult) []classify.BuiltinAnalyzer {
+	br := classify.NewBlastRadiusAnalyzer(cfg.Classifications)
+	br.SetDriftAddresses(classify.DriftAddresses(planResult))
 	return []classify.BuiltinAnalyzer{
 		&classify.DeletionAnalyzer{},
 		&classify.ReplaceAnalyzer{},
 		&classify.SensitiveAnalyzer{},
-		classify.NewBlastRadiusAnalyzer(cfg.Classifications),
+		br,
 	}
+}
+
+// planAwareAnalyzers returns the set of plan-aware analyzers.
+func planAwareAnalyzers(cfg *config.Config) []classify.PlanAwareAnalyzer {
+	var analyzers []classify.PlanAwareAnalyzer
+	if cfg.Defaults != nil && cfg.Defaults.DriftClassification != "" {
+		analyzers = append(analyzers, &classify.DriftAnalyzer{
+			DriftClassification: cfg.Defaults.DriftClassification,
+		})
+	}
+	topoAnalyzer := classify.NewTopologyAnalyzer(cfg.Classifications)
+	if len(topoAnalyzer.Thresholds()) > 0 {
+		analyzers = append(analyzers, topoAnalyzer)
+	}
+	return analyzers
 }
 
 func main() {
@@ -155,7 +173,7 @@ func run(cmd *cobra.Command, args []string) error {
 	result := classifier.Classify(planResult.Changes)
 
 	// Run builtin analyzers (deletion, replace, sensitive detection)
-	classifier.RunBuiltinAnalyzers(result, planResult.Changes, builtinAnalyzers(cfg))
+	classifier.RunBuiltinAnalyzers(result, planResult, builtinAnalyzers(cfg, planResult), planAwareAnalyzers(cfg))
 
 	// Run external plugins (if any configured)
 	if hasExternalPlugins(cfg) {
@@ -242,7 +260,7 @@ func generateEvidence(cfg *config.Config, result *classify.Result, planResult *p
 	var explainResult *classify.ExplainResult
 	if opts.IncludeTrace {
 		explainResult = classifier.ExplainClassify(planResult.Changes)
-		classifier.AddExplainBuiltinAnalyzers(explainResult, planResult.Changes, builtinAnalyzers(cfg))
+		classifier.AddExplainBuiltinAnalyzers(explainResult, planResult, builtinAnalyzers(cfg, planResult), planAwareAnalyzers(cfg))
 		classifier.FinalizeExplanation(explainResult)
 	}
 
@@ -312,7 +330,7 @@ func runExplain(cmd *cobra.Command, args []string) error {
 	result := classifier.ExplainClassify(planResult.Changes)
 
 	// Run builtin analyzers with trace collection
-	builtinDecisions := classifier.AddExplainBuiltinAnalyzers(result, planResult.Changes, builtinAnalyzers(cfg))
+	builtinDecisions := classifier.AddExplainBuiltinAnalyzers(result, planResult, builtinAnalyzers(cfg, planResult), planAwareAnalyzers(cfg))
 
 	// Run external plugins (if any configured)
 	if hasExternalPlugins(cfg) {

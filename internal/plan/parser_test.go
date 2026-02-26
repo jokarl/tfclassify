@@ -605,6 +605,172 @@ func TestParseBinaryPlan_NoTerraform(t *testing.T) {
 	}
 }
 
+func TestParse_ModuleAddress(t *testing.T) {
+	json := `{
+		"format_version": "1.2",
+		"terraform_version": "1.9.0",
+		"resource_changes": [
+			{
+				"address": "azurerm_resource_group.root",
+				"module_address": "",
+				"mode": "managed",
+				"type": "azurerm_resource_group",
+				"name": "root",
+				"provider_name": "registry.terraform.io/hashicorp/azurerm",
+				"change": {"actions": ["create"], "before": null, "after": null}
+			},
+			{
+				"address": "module.production.azurerm_resource_group.main",
+				"module_address": "module.production",
+				"mode": "managed",
+				"type": "azurerm_resource_group",
+				"name": "main",
+				"provider_name": "registry.terraform.io/hashicorp/azurerm",
+				"change": {"actions": ["create"], "before": null, "after": null}
+			},
+			{
+				"address": "module.production.module.network.azurerm_virtual_network.main",
+				"module_address": "module.production.module.network",
+				"mode": "managed",
+				"type": "azurerm_virtual_network",
+				"name": "main",
+				"provider_name": "registry.terraform.io/hashicorp/azurerm",
+				"change": {"actions": ["create"], "before": null, "after": null}
+			}
+		]
+	}`
+	reader := strings.NewReader(json)
+	result, err := Parse(reader)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(result.Changes) != 3 {
+		t.Fatalf("expected 3 changes, got %d", len(result.Changes))
+	}
+
+	tests := []struct {
+		address       string
+		moduleAddress string
+	}{
+		{"azurerm_resource_group.root", ""},
+		{"module.production.azurerm_resource_group.main", "module.production"},
+		{"module.production.module.network.azurerm_virtual_network.main", "module.production.module.network"},
+	}
+
+	for i, tt := range tests {
+		if result.Changes[i].Address != tt.address {
+			t.Errorf("change %d: expected address %s, got %s", i, tt.address, result.Changes[i].Address)
+		}
+		if result.Changes[i].ModuleAddress != tt.moduleAddress {
+			t.Errorf("change %d: expected module_address %q, got %q", i, tt.moduleAddress, result.Changes[i].ModuleAddress)
+		}
+	}
+}
+
+func TestParse_DriftChanges(t *testing.T) {
+	json := `{
+		"format_version": "1.2",
+		"terraform_version": "1.9.0",
+		"resource_changes": [
+			{
+				"address": "azurerm_resource_group.main",
+				"mode": "managed",
+				"type": "azurerm_resource_group",
+				"name": "main",
+				"provider_name": "registry.terraform.io/hashicorp/azurerm",
+				"change": {"actions": ["update"], "before": {"name": "old"}, "after": {"name": "new"}}
+			}
+		],
+		"resource_drift": [
+			{
+				"address": "azurerm_resource_group.main",
+				"mode": "managed",
+				"type": "azurerm_resource_group",
+				"name": "main",
+				"provider_name": "registry.terraform.io/hashicorp/azurerm",
+				"change": {"actions": ["update"], "before": {"tags": {}}, "after": {"tags": {"env": "prod"}}}
+			}
+		]
+	}`
+	reader := strings.NewReader(json)
+	result, err := Parse(reader)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(result.Changes) != 1 {
+		t.Errorf("expected 1 change, got %d", len(result.Changes))
+	}
+	if len(result.DriftChanges) != 1 {
+		t.Fatalf("expected 1 drift change, got %d", len(result.DriftChanges))
+	}
+
+	drift := result.DriftChanges[0]
+	if drift.Address != "azurerm_resource_group.main" {
+		t.Errorf("expected drift address azurerm_resource_group.main, got %s", drift.Address)
+	}
+	if drift.Actions[0] != "update" {
+		t.Errorf("expected drift action update, got %s", drift.Actions[0])
+	}
+}
+
+func TestParse_NoDrift(t *testing.T) {
+	json := `{
+		"format_version": "1.2",
+		"terraform_version": "1.9.0",
+		"resource_changes": []
+	}`
+	reader := strings.NewReader(json)
+	result, err := Parse(reader)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if result.DriftChanges == nil {
+		t.Error("expected DriftChanges to be non-nil empty slice")
+	}
+	if len(result.DriftChanges) != 0 {
+		t.Errorf("expected 0 drift changes, got %d", len(result.DriftChanges))
+	}
+}
+
+func TestParse_ConfigPassthrough(t *testing.T) {
+	json := `{
+		"format_version": "1.2",
+		"terraform_version": "1.9.0",
+		"resource_changes": [],
+		"configuration": {
+			"root_module": {
+				"resources": [
+					{
+						"address": "azurerm_resource_group.main",
+						"mode": "managed",
+						"type": "azurerm_resource_group",
+						"name": "main",
+						"provider_config_key": "azurerm"
+					}
+				]
+			}
+		}
+	}`
+	reader := strings.NewReader(json)
+	result, err := Parse(reader)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if result.Config == nil {
+		t.Fatal("expected Config to be non-nil")
+	}
+	if result.Config.RootModule == nil {
+		t.Fatal("expected Config.RootModule to be non-nil")
+	}
+	if len(result.Config.RootModule.Resources) != 1 {
+		t.Errorf("expected 1 config resource, got %d", len(result.Config.RootModule.Resources))
+	}
+}
+
 func TestParseResourceChange_ProviderName(t *testing.T) {
 	json := `{
 		"format_version": "1.2",

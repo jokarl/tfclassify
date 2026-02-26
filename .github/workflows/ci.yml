@@ -134,6 +134,8 @@ jobs:
           - cis-azure-foundations
           - blast-radius
           - evidence-signing
+          - module-scoped-rules
+          - topology
         include:
           # custom-role-cross-reference creates an azurerm_role_definition, which
           # requires Microsoft.Authorization/roleDefinitions/write — a permission

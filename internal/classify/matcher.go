@@ -14,6 +14,8 @@ type compiledRule struct {
 	classificationDescription string
 	resourceGlobs             []glob.Glob
 	notResourceGlobs          []glob.Glob
+	moduleGlobs               []glob.Glob
+	notModuleGlobs            []glob.Glob
 	actions                   map[string]struct{} // pre-computed set for O(1) lookup
 	notActions                map[string]struct{} // pre-computed exclusion set for O(1) lookup
 	ruleDescription           string
@@ -77,6 +79,24 @@ func compileRules(cfg *config.Config) (map[string][]compiledRule, error) {
 				compiled.notResourceGlobs = append(compiled.notResourceGlobs, g)
 			}
 
+			// Compile module globs (dot separator: * matches one level, ** matches any depth)
+			for _, pattern := range rule.Module {
+				g, err := glob.Compile(pattern, '.')
+				if err != nil {
+					return nil, err
+				}
+				compiled.moduleGlobs = append(compiled.moduleGlobs, g)
+			}
+
+			// Compile not_module globs
+			for _, pattern := range rule.NotModule {
+				g, err := glob.Compile(pattern, '.')
+				if err != nil {
+					return nil, err
+				}
+				compiled.notModuleGlobs = append(compiled.notModuleGlobs, g)
+			}
+
 			rules = append(rules, compiled)
 		}
 
@@ -109,6 +129,33 @@ func (r *compiledRule) matchesResource(resourceType string) bool {
 	}
 
 	return false
+}
+
+// matchesModule returns true if the module address matches this rule's module patterns.
+// If neither module nor not_module is specified, matches everything (backward compatible).
+func (r *compiledRule) matchesModule(moduleAddress string) bool {
+	// If module globs are specified, check if address matches any of them
+	if len(r.moduleGlobs) > 0 {
+		for _, g := range r.moduleGlobs {
+			if g.Match(moduleAddress) {
+				return true
+			}
+		}
+		return false
+	}
+
+	// If not_module globs are specified, check if address does NOT match any of them
+	if len(r.notModuleGlobs) > 0 {
+		for _, g := range r.notModuleGlobs {
+			if g.Match(moduleAddress) {
+				return false
+			}
+		}
+		return true
+	}
+
+	// Neither specified: match everything
+	return true
 }
 
 // matchesActions returns true if the change actions match this rule's action constraints.
@@ -152,6 +199,20 @@ func formatRuleDescription(classification string, ruleIndex int, rule config.Rul
 	} else if len(rule.NotResource) > 0 {
 		part := "not_resource: " + rule.NotResource[0]
 		if len(rule.NotResource) > 1 {
+			part += ", ..."
+		}
+		parts = append(parts, part)
+	}
+
+	if len(rule.Module) > 0 {
+		part := "module: " + rule.Module[0]
+		if len(rule.Module) > 1 {
+			part += ", ..."
+		}
+		parts = append(parts, part)
+	} else if len(rule.NotModule) > 0 {
+		part := "not_module: " + rule.NotModule[0]
+		if len(rule.NotModule) > 1 {
 			part += ", ..."
 		}
 		parts = append(parts, part)

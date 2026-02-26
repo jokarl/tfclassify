@@ -124,11 +124,14 @@ func Parse(r io.Reader) (*ParseResult, error) {
 		return nil, err
 	}
 
-	changes := extractResourceChanges(&plan)
+	changes := extractResourceChanges(plan.ResourceChanges)
+	driftChanges := extractResourceChanges(plan.ResourceDrift)
 
 	return &ParseResult{
 		FormatVersion: plan.FormatVersion,
 		Changes:       changes,
+		DriftChanges:  driftChanges,
+		Config:        plan.Config,
 	}, nil
 }
 
@@ -165,18 +168,19 @@ func extractMajorMinor(version string) string {
 }
 
 // extractResourceChanges converts terraform-json resource changes to our internal type.
-func extractResourceChanges(plan *tfjson.Plan) []ResourceChange {
-	if plan.ResourceChanges == nil {
+func extractResourceChanges(resourceChanges []*tfjson.ResourceChange) []ResourceChange {
+	if resourceChanges == nil {
 		return []ResourceChange{}
 	}
 
-	changes := make([]ResourceChange, 0, len(plan.ResourceChanges))
-	for _, rc := range plan.ResourceChanges {
+	changes := make([]ResourceChange, 0, len(resourceChanges))
+	for _, rc := range resourceChanges {
 		change := ResourceChange{
-			Address:      rc.Address,
-			Type:         rc.Type,
-			ProviderName: rc.ProviderName,
-			Mode:         string(rc.Mode),
+			Address:       rc.Address,
+			Type:          rc.Type,
+			ProviderName:  rc.ProviderName,
+			Mode:          string(rc.Mode),
+			ModuleAddress: rc.ModuleAddress,
 		}
 
 		if rc.Change != nil {
