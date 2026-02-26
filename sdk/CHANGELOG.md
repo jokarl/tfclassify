@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/jokarl/tfclassify/compare/tfclassify-plugin-sdk-v0.2.1...tfclassify-plugin-sdk-v0.3.0) (2026-02-26)
+
+
+### Features
+
+* add module-scoped rules, drift classification, and topology analysis ([#65](https://github.com/jokarl/tfclassify/issues/65)) ([87b33bd](https://github.com/jokarl/tfclassify/commit/87b33bd3a78750abdec93d3a1758b897f6a88dee))
+
 ## [0.2.1](https://github.com/jokarl/tfclassify/compare/tfclassify-plugin-sdk-v0.2.0...tfclassify-plugin-sdk-v0.2.1) (2026-02-22)
 
 

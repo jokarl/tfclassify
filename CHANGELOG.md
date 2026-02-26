@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.6.0](https://github.com/jokarl/tfclassify/compare/tfclassify-v0.5.2...tfclassify-v0.6.0) (2026-02-26)
+
+
+### Features
+
+* add combined exposure analysis ([#64](https://github.com/jokarl/tfclassify/issues/64)) ([569c32b](https://github.com/jokarl/tfclassify/commit/569c32b663facfb78c9c70df8ce710ec58b47657))
+* add module-scoped rules, drift classification, and topology analysis ([#65](https://github.com/jokarl/tfclassify/issues/65)) ([87b33bd](https://github.com/jokarl/tfclassify/commit/87b33bd3a78750abdec93d3a1758b897f6a88dee))
+
+
+### Bug Fixes
+
+* remove shallow analyzers, fix code defects, harden testing ([#62](https://github.com/jokarl/tfclassify/issues/62)) ([74b15c4](https://github.com/jokarl/tfclassify/commit/74b15c4e0dfa45288c7c6b8c062f8c441918b364))
+
 ## [0.5.2](https://github.com/jokarl/tfclassify/compare/tfclassify-v0.5.1...tfclassify-v0.5.2) (2026-02-23)
 
 
