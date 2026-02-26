@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.0](https://github.com/jokarl/tfclassify/compare/tfclassify-plugin-azurerm-v0.2.2...tfclassify-plugin-azurerm-v0.3.0) (2026-02-26)
+
+
+### Features
+
+* add combined exposure analysis ([#64](https://github.com/jokarl/tfclassify/issues/64)) ([569c32b](https://github.com/jokarl/tfclassify/commit/569c32b663facfb78c9c70df8ce710ec58b47657))
+
+
+### Bug Fixes
+
+* remove shallow analyzers, fix code defects, harden testing ([#62](https://github.com/jokarl/tfclassify/issues/62)) ([74b15c4](https://github.com/jokarl/tfclassify/commit/74b15c4e0dfa45288c7c6b8c062f8c441918b364))
+
 ## [0.2.2](https://github.com/jokarl/tfclassify/compare/tfclassify-plugin-azurerm-v0.2.1...tfclassify-plugin-azurerm-v0.2.2) (2026-02-23)
 
 
