@@ -4352,7 +4352,8 @@
       {
         "actions": [
           "Microsoft.ContainerService/fleets/*",
-          "Microsoft.Resources/deployments/*"
+          "Microsoft.Resources/deployments/*",
+          "Microsoft.ContainerService/fleetMemberships/*"
         ],
         "notActions": [],
         "dataActions": [],
@@ -11949,6 +11950,40 @@
     ]
   },
   {
+    "id": "1dc24dd8-b00e-4344-837c-58b193cd23c7",
+    "roleName": "Defender Servers P2",
+    "description": "Defender Servers P2",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.Compute/virtualMachines/read",
+          "Microsoft.Network/loadBalancers/read",
+          "Microsoft.Network/networkSecurityGroups/read",
+          "Microsoft.Network/networkSecurityGroups/write",
+          "Microsoft.Network/azureFirewalls/read",
+          "Microsoft.Network/azureFirewalls/write",
+          "Microsoft.Network/virtualNetworks/read",
+          "Microsoft.Network/networkInterfaces/read",
+          "Microsoft.Network/publicIPAddresses/read",
+          "Microsoft.Network/routeTables/read",
+          "Microsoft.HybridCompute/machines/read",
+          "Microsoft.OperationalInsights/workspaces/read",
+          "Microsoft.OperationsManagement/solutions/read",
+          "Microsoft.Compute/virtualMachines/extensions/read",
+          "Microsoft.Compute/virtualMachines/extensions/write",
+          "Microsoft.HybridCompute/machines/extensions/write",
+          "Microsoft.HybridCompute/machines/extensions/delete",
+          "Microsoft.HybridCompute/machines/extensions/read",
+          "Microsoft.Compute/virtualMachines/extensions/delete"
+        ],
+        "notActions": [],
+        "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
     "id": "7d0c0268-1199-449b-a52e-75c20879f46b",
     "roleName": "Defender Settings Contributor",
     "description": "Grants Microsoft Defender for Cloud access to Defender Settings",
@@ -14852,6 +14887,22 @@
     ]
   },
   {
+    "id": "ef3729d8-2861-401e-95ae-c7d4845a6097",
+    "roleName": "Genome Admin",
+    "description": "Full access to Genome control plane operations only",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.Genome/*"
+        ],
+        "notActions": [],
+        "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
     "id": "c9c97b9c-105d-4bb5-a2a7-7d15666c2484",
     "roleName": "GeoCatalog Administrator",
     "description": "Grants full access to manage GeoCatalogs, but does not allow you to assign roles in Azure RBAC.",
@@ -15485,6 +15536,22 @@
           "Microsoft.Insights/alertRules/*",
           "Microsoft.Resources/deployments/*",
           "Microsoft.Resources/subscriptions/resourceGroups/read"
+        ],
+        "notActions": [],
+        "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "585db2ed-219e-4821-a06a-c6c14b602afa",
+    "roleName": "Healthcare Interop Contributor",
+    "description": "Allows all actions on healthcare interop provider resources",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.HealthcareInterop/*"
         ],
         "notActions": [],
         "dataActions": [],
@@ -17003,7 +17070,9 @@
           "Microsoft.Support/*"
         ],
         "notActions": [],
-        "dataActions": [],
+        "dataActions": [
+          "Microsoft.OperationalInsights/workspaces/jobs/export/action"
+        ],
         "notDataActions": []
       }
     ]
@@ -17043,7 +17112,9 @@
         "notActions": [
           "Microsoft.OperationalInsights/workspaces/sharedKeys/read"
         ],
-        "dataActions": [],
+        "dataActions": [
+          "Microsoft.OperationalInsights/workspaces/jobs/export/action"
+        ],
         "notDataActions": []
       }
     ]
@@ -19143,7 +19214,6 @@
           "Microsoft.Loadtestservice/playwrightworkspaces/*/read",
           "Microsoft.Loadtestservice/locations/playwrightquotas/*/read",
           "Microsoft.Authorization/*/read",
-          "Microsoft.Resources/deployments/*",
           "Microsoft.Resources/subscriptions/resourceGroups/read"
         ],
         "notActions": [],
