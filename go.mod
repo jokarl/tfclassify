@@ -11,8 +11,7 @@ require (
 	github.com/jokarl/tfclassify/sdk v0.0.0
 	github.com/spf13/cobra v1.10.2
 	github.com/zclconf/go-cty v1.17.0
-	golang.org/x/sync v0.19.0
-	google.golang.org/grpc v1.79.1
+	google.golang.org/grpc v1.79.2
 )
 
 require (
@@ -31,6 +30,7 @@ require (
 	github.com/spf13/pflag v1.0.9 // indirect
 	golang.org/x/mod v0.30.0 // indirect
 	golang.org/x/net v0.48.0 // indirect
+	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/sys v0.39.0 // indirect
 	golang.org/x/text v0.32.0 // indirect
 	golang.org/x/tools v0.39.0 // indirect
