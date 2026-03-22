@@ -11,7 +11,7 @@ require (
 	github.com/jokarl/tfclassify/sdk v0.0.0
 	github.com/spf13/cobra v1.10.2
 	github.com/zclconf/go-cty v1.18.0
-	google.golang.org/grpc v1.79.1
+	google.golang.org/grpc v1.79.3
 )
 
 require (
