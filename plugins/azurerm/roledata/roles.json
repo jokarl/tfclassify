@@ -11,7 +11,9 @@
           "Microsoft.MachineLearningServices/workspaces/models/read",
           "Microsoft.MachineLearningServices/workspaces/models/versions/read",
           "Microsoft.MachineLearningServices/workspaces/datastores/read",
-          "Microsoft.MachineLearningServices/workspaces/metadata/artifacts/read"
+          "Microsoft.MachineLearningServices/workspaces/metadata/artifacts/read",
+          "Microsoft.MachineLearningServices/registries/read",
+          "Microsoft.MachineLearningServices/registries/assets/read"
         ],
         "notActions": [],
         "dataActions": [],
@@ -2156,7 +2158,7 @@
           "Microsoft.Authorization/*/read",
           "Microsoft.Insights/alertRules/*",
           "Microsoft.ResourceHealth/availabilityStatuses/read",
-          "Microsoft.Resources/deployments/*",
+          "Microsoft.Resources/deployments/*/read",
           "Microsoft.Resources/subscriptions/resourceGroups/read"
         ],
         "notActions": [],
@@ -3799,6 +3801,22 @@
     ]
   },
   {
+    "id": "12675fd7-7f59-493f-9201-f7944860a2f1",
+    "roleName": "Azure Device Registry Administrator",
+    "description": "Azure Device Registry Administrator",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.DeviceRegistry/*"
+        ],
+        "notActions": [],
+        "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
     "id": "a5c3590a-3a1a-4cd4-9648-ea0a32b15137",
     "roleName": "Azure Device Registry Contributor",
     "description": "Allows for full access to IoT devices within Azure Device Registry Namespace.",
@@ -3951,6 +3969,22 @@
       {
         "actions": [
           "Microsoft.EdgeOrder/orderItems/read"
+        ],
+        "notActions": [],
+        "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "78739afa-3ece-4d6b-90ba-762fdccd7438",
+    "roleName": "Azure Edge On-Site Deployment Manager",
+    "description": "Grants you access to take actions as an on-site person to assist in the provisioning of an edge device",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.AzureStackHCI/EdgeMachines/Read"
         ],
         "notActions": [],
         "dataActions": [],
@@ -6430,8 +6464,8 @@
     "permissions": [
       {
         "actions": [
-          "Microsoft.Authorization/*/read",
           "Microsoft.Authorization/roleAssignments/write",
+          "Microsoft.Authorization/*/read",
           "Microsoft.AzureResilienceManagement/drills/*/action",
           "Microsoft.AzureResilienceManagement/drills/*/delete",
           "Microsoft.AzureResilienceManagement/drills/*/read",
@@ -6455,8 +6489,8 @@
     "permissions": [
       {
         "actions": [
-          "Microsoft.Authorization/*/read",
           "Microsoft.Authorization/roleAssignments/write",
+          "Microsoft.Authorization/*/read",
           "Microsoft.Automation/automationAccounts/delete",
           "Microsoft.Automation/automationAccounts/read",
           "Microsoft.Automation/automationAccounts/write",
@@ -6616,9 +6650,13 @@
         "actions": [
           "Microsoft.Authorization/*/read",
           "Microsoft.Insights/alertRules/",
-          "Microsoft.Resources/deployments/*",
+          "Microsoft.Resources/deployments/*/read",
           "Microsoft.Resources/subscriptions/resourceGroups/read",
-          "Microsoft.AzureResilienceManagement/drills/*/read"
+          "Microsoft.AzureResilienceManagement/drills/drillResources/read",
+          "Microsoft.AzureResilienceManagement/drills/drillRuns/read",
+          "Microsoft.AzureResilienceManagement/drills/drillRuns/drillRunChildJobs/read",
+          "Microsoft.AzureResilienceManagement/drills/drillRuns/drillRunResources/read",
+          "Microsoft.AzureResilienceManagement/drills/read"
         ],
         "notActions": [],
         "dataActions": [],
@@ -6634,9 +6672,9 @@
     "permissions": [
       {
         "actions": [
+          "Microsoft.Authorization/roleAssignments/write",
           "*/read",
           "Microsoft.Authorization/*/read",
-          "Microsoft.Authorization/roleAssignments/write",
           "Microsoft.Chaos/locations/targetTypes/capabilityTypes/read",
           "Microsoft.Chaos/locations/targetTypes/read",
           "Microsoft.Chaos/targets/capabilities/delete",
@@ -6765,8 +6803,8 @@
     "permissions": [
       {
         "actions": [
-          "Microsoft.Authorization/*/read",
           "Microsoft.Authorization/roleAssignments/write",
+          "Microsoft.Authorization/*/read",
           "Microsoft.Automation/automationAccounts/runbooks/read",
           "Microsoft.AzureResilienceManagement/recoveryPlans/*/action",
           "Microsoft.AzureResilienceManagement/recoveryPlans/*/delete",
@@ -6793,8 +6831,8 @@
     "permissions": [
       {
         "actions": [
-          "Microsoft.Authorization/*/read",
           "Microsoft.Authorization/roleAssignments/write",
+          "Microsoft.Authorization/*/read",
           "Microsoft.Automation/automationAccounts/runbooks/read",
           "Microsoft.AzureResilienceManagement/recoveryPlans/*/action",
           "Microsoft.AzureResilienceManagement/recoveryPlans/*/delete",
@@ -6851,7 +6889,7 @@
           "Microsoft.Insights/alertRules/",
           "Microsoft.Management/ServiceGroups/read",
           "Microsoft.Relationships/ServiceGroupMember/read",
-          "Microsoft.Resources/deployments/*",
+          "Microsoft.Resources/deployments/*/read",
           "Microsoft.Resources/subscriptions/resourceGroups/read"
         ],
         "notActions": [],
@@ -8661,7 +8699,7 @@
           "Microsoft.Cdn/profiles/endpoints/*/read",
           "Microsoft.Cdn/profiles/afdendpoints/validateCustomDomain/action",
           "Microsoft.Insights/alertRules/*",
-          "Microsoft.Resources/deployments/*",
+          "Microsoft.Resources/deployments/read",
           "Microsoft.Resources/subscriptions/resourceGroups/read",
           "Microsoft.Support/*"
         ],
@@ -8707,7 +8745,7 @@
           "Microsoft.Cdn/operationresults/*",
           "Microsoft.Cdn/profiles/*/read",
           "Microsoft.Insights/alertRules/*",
-          "Microsoft.Resources/deployments/*",
+          "Microsoft.Resources/deployments/read",
           "Microsoft.Cdn/profiles/afdendpoints/validateCustomDomain/action",
           "Microsoft.Resources/subscriptions/resourceGroups/read",
           "Microsoft.Support/*",
@@ -9031,6 +9069,31 @@
           "Microsoft.Insights/alertRules/*",
           "Microsoft.Resources/deployments/*",
           "Microsoft.Resources/subscriptions/read"
+        ],
+        "notActions": [],
+        "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "b1e6a0dd-ea0f-4108-8925-7047693f2cfe",
+    "roleName": "CloudTest Leased VM Reader",
+    "description": "Can view CloudTest leased VM's credentials",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.Authorization/*/read",
+          "Microsoft.Insights/alertRules/",
+          "Microsoft.Resources/deployments/*",
+          "Microsoft.Resources/subscriptions/resourceGroups/read",
+          "Microsoft.CloudTest/pools/leases/action",
+          "Microsoft.CloudTest/pools/leases/complete/action",
+          "Microsoft.CloudTest/pools/leases/extend/action",
+          "Microsoft.CloudTest/hostedpools/leases/action",
+          "Microsoft.CloudTest/hostedpools/leases/complete/action",
+          "Microsoft.CloudTest/hostedpools/leases/extend/action"
         ],
         "notActions": [],
         "dataActions": [],
@@ -10208,6 +10271,39 @@
     ]
   },
   {
+    "id": "f1641a58-a144-402b-baf9-39d1a4c10119",
+    "roleName": "Confidential Ledger Data Contributor",
+    "description": "Allows read and write access to Confidential Ledger transactions, including reading entries, receipts, and transaction status, and creating new ledger entries.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [],
+        "notActions": [],
+        "dataActions": [
+          "Microsoft.ConfidentialLedger/ledgers/transactions/read",
+          "Microsoft.ConfidentialLedger/ledgers/transactions/write"
+        ],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "4f1e6fca-3fde-4291-961e-642def6d5e1d",
+    "roleName": "Confidential Ledger Data Reader",
+    "description": "Allows read access to Confidential Ledger transactions, including reading entries, receipts, and transaction status.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [],
+        "notActions": [],
+        "dataActions": [
+          "Microsoft.ConfidentialLedger/ledgers/transactions/read"
+        ],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
     "id": "65a14201-8f6c-4c28-bec4-12619c5a9aaa",
     "roleName": "Connected Cluster Managed Identity CheckAccess Reader",
     "description": "Built-in role that allows a Connected Cluster managed identity to call the checkAccess API",
@@ -10294,7 +10390,7 @@
         "actions": [
           "Microsoft.Authorization/*/read",
           "Microsoft.Insights/alertRules/*",
-          "Microsoft.Resources/deployments/*",
+          "Microsoft.Resources/deployments/read",
           "Microsoft.App/connectedEnvironments/read",
           "Microsoft.App/connectedEnvironments/*/read",
           "Microsoft.Resources/subscriptions/resourceGroups/read"
@@ -10889,7 +10985,7 @@
           "Microsoft.App/containerApps/read",
           "Microsoft.Authorization/*/read",
           "Microsoft.Insights/alertRules/*",
-          "Microsoft.Resources/deployments/*",
+          "Microsoft.Resources/deployments/read",
           "Microsoft.Resources/subscriptions/resourceGroups/read"
         ],
         "notActions": [],
@@ -10957,6 +11053,43 @@
           "Microsoft.Insights/Metrics/read",
           "Microsoft.Resources/subscriptions/resourceGroups/read",
           "Microsoft.Support/*"
+        ],
+        "notActions": [],
+        "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "fc896ebc-f9a8-484d-a5ff-bd6a8c36289f",
+    "roleName": "Cosmos DB Long Term Retention Backup Role",
+    "description": "Allows performing long term retention backup operations for Cosmos DB",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.DocumentDB/databaseAccounts/validateForLongTermProtection/action",
+          "Microsoft.DocumentDB/databaseAccounts/enableLongTermProtection/action",
+          "Microsoft.DocumentDB/databaseAccounts/disableLongTermProtection/action",
+          "Microsoft.DocumentDB/databaseAccounts/preBackup/action",
+          "Microsoft.DocumentDB/databaseAccounts/backup/action"
+        ],
+        "notActions": [],
+        "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "955d0cb2-de4e-43ed-819a-14220e079ba7",
+    "roleName": "Cosmos DB Long Term Retention Restore Role",
+    "description": "Allows performing long term retention restore operations for Cosmos DB",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.DocumentDB/databaseAccounts/preRestore/action",
+          "Microsoft.DocumentDB/databaseAccounts/restore/action"
         ],
         "notActions": [],
         "dataActions": [],
@@ -11550,6 +11683,28 @@
     ]
   },
   {
+    "id": "6fe711ec-654d-4ef7-8e32-eb7de3d94774",
+    "roleName": "Defender AI",
+    "description": "Service role that provides permissions for Microsoft Defender for AI",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.CognitiveServices/accounts/read",
+          "Microsoft.CognitiveServices/accounts/defenderForAISettings/read",
+          "Microsoft.CognitiveServices/accounts/defenderForAISettings/write",
+          "Microsoft.CognitiveServices/accounts/defenderForAISettings/delete",
+          "Microsoft.CognitiveServices/raiPolicy/read",
+          "Microsoft.CognitiveServices/raiPolicy/write",
+          "Microsoft.Search/searchServices/knowledgeBases/read"
+        ],
+        "notActions": [],
+        "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
     "id": "6f91a4f9-10ee-4b95-b8cd-96ee73c5968d",
     "roleName": "Defender API Security",
     "description": "Grants Microsoft Defender for Cloud access to computes to provide API security",
@@ -11609,6 +11764,35 @@
           "Microsoft.DocumentDB/databaseAccounts/read",
           "Microsoft.Security/advancedThreatProtectionSettings/read",
           "Microsoft.Security/advancedThreatProtectionSettings/write"
+        ],
+        "notActions": [],
+        "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "eef9d654-743f-4e2c-ad0f-9ed243177663",
+    "roleName": "Defender Azure SQL Databases",
+    "description": "Microsoft Defender for Azure SQL Databases role. Grant permissions for enablement.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.Sql/managedInstances/read",
+          "Microsoft.Sql/managedInstances/securityAlertPolicies/read",
+          "Microsoft.Sql/managedInstances/securityAlertPolicies/write",
+          "Microsoft.Sql/servers/read",
+          "Microsoft.Sql/servers/securityAlertPolicies/read",
+          "Microsoft.Sql/servers/securityAlertPolicies/write",
+          "Microsoft.Sql/servers/sqlVulnerabilityAssessments/read",
+          "Microsoft.Sql/servers/sqlVulnerabilityAssessments/write",
+          "Microsoft.Synapse/workspaces/read",
+          "Microsoft.Synapse/workspaces/securityAlertPolicies/read",
+          "Microsoft.Synapse/workspaces/securityAlertPolicies/write",
+          "Microsoft.Sql/servers/vulnerabilityAssessments/read",
+          "Microsoft.Synapse/workspaces/vulnerabilityAssessments/read",
+          "Microsoft.Sql/managedInstances/vulnerabilityAssessments/read"
         ],
         "notActions": [],
         "dataActions": [],
@@ -11890,6 +12074,10 @@
     "permissions": [
       {
         "actions": [
+          "Microsoft.Security/defenderforstoragesettings/read",
+          "Microsoft.Security/defenderforstoragesettings/write",
+          "Microsoft.Security/advancedThreatProtectionSettings/read",
+          "Microsoft.Security/advancedThreatProtectionSettings/write",
           "Microsoft.Storage/storageAccounts/write",
           "Microsoft.Storage/storageAccounts/read",
           "Microsoft.Storage/storageAccounts/blobServices/containers/read",
@@ -11998,6 +12186,77 @@
           "microsoft.security/register/action",
           "microsoft.security/settings/read",
           "microsoft.security/settings/write"
+        ],
+        "notActions": [],
+        "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "c6c9b2d8-9a5e-4122-85e1-81612a046ab2",
+    "roleName": "Defender Storage Automated Malware Remediation",
+    "description": "Grants additional permissions for Microsoft Defender for Storage automated remediation operations including soft-delete management and blob deletion.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.Storage/storageAccounts/blobServices/read",
+          "Microsoft.Storage/storageAccounts/blobServices/write"
+        ],
+        "notActions": [
+          "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/delete"
+        ],
+        "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "cd50fd1f-0421-46f2-8cce-afc587dbcc77",
+    "roleName": "Defender Storage Malware Data Scanner",
+    "description": "Grants data plane permissions for Microsoft Defender for Storage scanning operations — blob/file read, index tag updates.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.Storage/storageAccounts/blobServices/containers/read",
+          "Microsoft.Storage/storageAccounts/fileServices/shares/read"
+        ],
+        "notActions": [
+          "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read",
+          "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/tags/write",
+          "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/tags/read",
+          "Microsoft.Storage/storageAccounts/fileServices/fileshares/files/read",
+          "Microsoft.Storage/storageAccounts/fileServices/readFileBackupSemantics/action",
+          "Microsoft.EventGrid/events/send/action"
+        ],
+        "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "971cce9f-2680-4357-9678-c947847a9425",
+    "roleName": "Defender Storage Malware Operator",
+    "description": "Grants permissions for Microsoft Defender for Storage malware scanning operations including blob/file read, index tag updates, EventGrid management, and network bypass.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.Security/defenderforstoragesettings/read",
+          "Microsoft.Security/defenderforstoragesettings/write",
+          "Microsoft.Security/advancedThreatProtectionSettings/read",
+          "Microsoft.Security/advancedThreatProtectionSettings/write",
+          "Microsoft.Storage/storageAccounts/write",
+          "Microsoft.Storage/storageAccounts/read",
+          "Microsoft.EventGrid/topics/read",
+          "Microsoft.EventGrid/register/action",
+          "Microsoft.EventGrid/eventSubscriptions/read",
+          "Microsoft.EventGrid/eventSubscriptions/write",
+          "Microsoft.EventGrid/eventSubscriptions/delete",
+          "Microsoft.Storage/storageAccounts/blobServices/containers/read",
+          "Microsoft.Storage/storageAccounts/fileServices/shares/read"
         ],
         "notActions": [],
         "dataActions": [],
@@ -12995,10 +13254,11 @@
       {
         "actions": [
           "Microsoft.Authorization/*/read",
-          "Microsoft.Resources/deployments/*",
           "Microsoft.Resources/subscriptions/resourceGroups/read",
           "Microsoft.Support/*",
-          "Microsoft.Insights/alertRules/*"
+          "Microsoft.Insights/alertRules/*",
+          "Microsoft.DeviceUpdate/accounts/read",
+          "Microsoft.DeviceUpdate/accounts/instances/read"
         ],
         "notActions": [],
         "dataActions": [
@@ -13022,10 +13282,11 @@
       {
         "actions": [
           "Microsoft.Authorization/*/read",
-          "Microsoft.Resources/deployments/*",
           "Microsoft.Resources/subscriptions/resourceGroups/read",
           "Microsoft.Support/*",
-          "Microsoft.Insights/alertRules/*"
+          "Microsoft.Insights/alertRules/*",
+          "Microsoft.DeviceUpdate/accounts/read",
+          "Microsoft.DeviceUpdate/accounts/instances/read"
         ],
         "notActions": [],
         "dataActions": [
@@ -13046,10 +13307,11 @@
       {
         "actions": [
           "Microsoft.Authorization/*/read",
-          "Microsoft.Resources/deployments/*",
           "Microsoft.Resources/subscriptions/resourceGroups/read",
           "Microsoft.Support/*",
-          "Microsoft.Insights/alertRules/*"
+          "Microsoft.Insights/alertRules/*",
+          "Microsoft.DeviceUpdate/accounts/read",
+          "Microsoft.DeviceUpdate/accounts/instances/read"
         ],
         "notActions": [],
         "dataActions": [
@@ -13096,10 +13358,11 @@
       {
         "actions": [
           "Microsoft.Authorization/*/read",
-          "Microsoft.Resources/deployments/*",
           "Microsoft.Resources/subscriptions/resourceGroups/read",
           "Microsoft.Support/*",
-          "Microsoft.Insights/alertRules/*"
+          "Microsoft.Insights/alertRules/*",
+          "Microsoft.DeviceUpdate/accounts/read",
+          "Microsoft.DeviceUpdate/accounts/instances/read"
         ],
         "notActions": [],
         "dataActions": [
@@ -13121,10 +13384,11 @@
       {
         "actions": [
           "Microsoft.Authorization/*/read",
-          "Microsoft.Resources/deployments/*",
           "Microsoft.Resources/subscriptions/resourceGroups/read",
           "Microsoft.Support/*",
-          "Microsoft.Insights/alertRules/*"
+          "Microsoft.Insights/alertRules/*",
+          "Microsoft.DeviceUpdate/accounts/read",
+          "Microsoft.DeviceUpdate/accounts/instances/read"
         ],
         "notActions": [],
         "dataActions": [
@@ -13144,10 +13408,11 @@
       {
         "actions": [
           "Microsoft.Authorization/*/read",
-          "Microsoft.Resources/deployments/*",
           "Microsoft.Resources/subscriptions/resourceGroups/read",
           "Microsoft.Support/*",
-          "Microsoft.Insights/alertRules/*"
+          "Microsoft.Insights/alertRules/*",
+          "Microsoft.DeviceUpdate/accounts/read",
+          "Microsoft.DeviceUpdate/accounts/instances/read"
         ],
         "notActions": [],
         "dataActions": [
@@ -14485,7 +14750,7 @@
           "Microsoft.IoTFirmwareDefense/workspaces/firmwares/*",
           "Microsoft.Authorization/*/read",
           "Microsoft.Resources/subscriptions/resourceGroups/read",
-          "Microsoft.Resources/deployments/*"
+          "Microsoft.Resources/deployments/read"
         ],
         "notActions": [
           "Microsoft.IoTFirmwareDefense/firmwareGroups/*",
@@ -14508,7 +14773,7 @@
           "Microsoft.IoTFirmwareDefense/*",
           "Microsoft.Authorization/*/read",
           "Microsoft.Resources/subscriptions/resourceGroups/read",
-          "Microsoft.Resources/deployments/*"
+          "Microsoft.Resources/deployments/read"
         ],
         "notActions": [
           "Microsoft.IoTFirmwareDefense/firmwareGroups/*",
@@ -14933,7 +15198,7 @@
         "actions": [
           "Microsoft.Authorization/*/read",
           "Microsoft.Insights/alertRules/*",
-          "Microsoft.Resources/deployments/*",
+          "Microsoft.Resources/deployments/read",
           "Microsoft.Resources/subscriptions/resourceGroups/read",
           "Microsoft.Orbital/operations/read",
           "Microsoft.Orbital/geoCatalogs/read"
@@ -15551,7 +15816,50 @@
     "permissions": [
       {
         "actions": [
-          "Microsoft.HealthcareInterop/*"
+          "Microsoft.HealthcareInterop/ddmsConnectors/delete",
+          "Microsoft.HealthcareInterop/ddmsConnectors/write",
+          "Microsoft.HealthcareInterop/ddmsFhirEventBatchChannels/delete",
+          "Microsoft.HealthcareInterop/ddmsFhirEventBatchChannels/write",
+          "Microsoft.HealthcareInterop/ddmsFhirFlatFileBatchChannels/delete",
+          "Microsoft.HealthcareInterop/ddmsFhirFlatFileBatchChannels/write",
+          "Microsoft.HealthcareInterop/dicomConnectors/delete",
+          "Microsoft.HealthcareInterop/dicomConnectors/write",
+          "Microsoft.HealthcareInterop/dicomDirectChannels/delete",
+          "Microsoft.HealthcareInterop/dicomDirectChannels/write",
+          "Microsoft.HealthcareInterop/dicomEdgeConnectors/delete",
+          "Microsoft.HealthcareInterop/dicomEdgeConnectors/write",
+          "Microsoft.HealthcareInterop/fhirQueryEventBatchChannels/delete",
+          "Microsoft.HealthcareInterop/fhirQueryEventBatchChannels/write",
+          "Microsoft.HealthcareInterop/fhirQueryFlatFileBatchChannels/delete",
+          "Microsoft.HealthcareInterop/fhirQueryFlatFileBatchChannels/write",
+          "Microsoft.HealthcareInterop/hl7Connectors/delete",
+          "Microsoft.HealthcareInterop/hl7Connectors/write",
+          "Microsoft.HealthcareInterop/hl7EdgeConnectors/delete",
+          "Microsoft.HealthcareInterop/hl7EdgeConnectors/write",
+          "Microsoft.HealthcareInterop/hubs/delete",
+          "Microsoft.HealthcareInterop/hubs/write",
+          "Microsoft.HealthcareInterop/locations/operationStatuses/write",
+          "Microsoft.HealthcareInterop/oneLakeConnectors/delete",
+          "Microsoft.HealthcareInterop/oneLakeConnectors/write",
+          "Microsoft.HealthcareInterop/storageAccountConnectors/delete",
+          "Microsoft.HealthcareInterop/storageAccountConnectors/write",
+          "Microsoft.HealthcareInterop/locations/operationStatuses/read",
+          "Microsoft.HealthcareInterop/operations/read",
+          "Microsoft.HealthcareInterop/hl7Connectors/read",
+          "Microsoft.HealthcareInterop/oneLakeConnectors/read",
+          "Microsoft.HealthcareInterop/storageAccountConnectors/read",
+          "Microsoft.HealthcareInterop/fhirQueryFlatFileBatchChannels/read",
+          "Microsoft.HealthcareInterop/fhirQueryEventBatchChannels/read",
+          "Microsoft.HealthcareInterop/hl7EdgeConnectors/read",
+          "Microsoft.HealthcareInterop/hubs/read",
+          "Microsoft.HealthcareInterop/dicomEdgeConnectors/read",
+          "Microsoft.HealthcareInterop/dicomConnectors/read",
+          "Microsoft.HealthcareInterop/dicomDirectChannels/read",
+          "Microsoft.HealthcareInterop/ddmsFhirEventBatchChannels/read",
+          "Microsoft.HealthcareInterop/ddmsConnectors/read",
+          "Microsoft.HealthcareInterop/ddmsFhirFlatFileBatchChannels/read",
+          "Microsoft.HealthcareInterop/register/action",
+          "Microsoft.HealthcareInterop/unregister/action"
         ],
         "notActions": [],
         "dataActions": [],
@@ -16936,7 +17244,6 @@
         "actions": [
           "Microsoft.LoadTestService/*/read",
           "Microsoft.Authorization/*/read",
-          "Microsoft.Resources/deployments/*",
           "Microsoft.Resources/subscriptions/resourceGroups/read",
           "Microsoft.Insights/alertRules/*"
         ],
@@ -17070,9 +17377,7 @@
           "Microsoft.Support/*"
         ],
         "notActions": [],
-        "dataActions": [
-          "Microsoft.OperationalInsights/workspaces/jobs/export/action"
-        ],
+        "dataActions": [],
         "notDataActions": []
       }
     ]
@@ -17112,9 +17417,7 @@
         "notActions": [
           "Microsoft.OperationalInsights/workspaces/sharedKeys/read"
         ],
-        "dataActions": [
-          "Microsoft.OperationalInsights/workspaces/jobs/export/action"
-        ],
+        "dataActions": [],
         "notDataActions": []
       }
     ]
@@ -17721,6 +18024,7 @@
           "Microsoft.Discovery/supercomputers/nodePools/read",
           "Microsoft.Discovery/tools/*",
           "Microsoft.Discovery/workflows/*",
+          "Microsoft.Discovery/workspaces/chatModelDeployments/read",
           "Microsoft.Discovery/workspaces/projects/read",
           "Microsoft.Discovery/operations/read",
           "Microsoft.Insights/AlertRules/*",
@@ -17740,6 +18044,8 @@
           "Microsoft.Discovery/bookshelves/delete",
           "Microsoft.Discovery/supercomputers/nodePools/write",
           "Microsoft.Discovery/supercomputers/nodePools/delete",
+          "Microsoft.Discovery/workspaces/chatModelDeployments/write",
+          "Microsoft.Discovery/workspaces/chatModelDeployments/delete",
           "Microsoft.Discovery/workspaces/projects/write",
           "Microsoft.Discovery/workspaces/projects/delete"
         ],
@@ -17753,13 +18059,13 @@
   {
     "id": "3bb7c424-af4e-436b-bfcc-8779c8934c31",
     "roleName": "Microsoft Discovery Platform Reader (Preview)",
-    "description": "Grants readonly permissions to view Microsoft.Discovery resources. This role in preview and subjet to change.",
+    "description": "Grants readonly permissions to view Microsoft.Discovery resources. This role in preview and subject to change.",
     "roleType": "BuiltInRole",
     "permissions": [
       {
         "actions": [
           "Microsoft.Discovery/*/read",
-          "Microsoft.Resources/deployments/*",
+          "Microsoft.Resources/deployments/read",
           "Microsoft.Resources/subscriptions/resourceGroups/read"
         ],
         "notActions": [],
@@ -18495,7 +18801,9 @@
           "Microsoft.ManagedNetworkFabric/*/read",
           "Microsoft.Authorization/*/read",
           "Microsoft.Insights/alertRules/*",
-          "Microsoft.Resources/deployments/*",
+          "Microsoft.Resources/deployments/read",
+          "Microsoft.Resources/deployments/operations/read",
+          "Microsoft.Resources/deployments/operationStatuses/read",
           "Microsoft.Resources/subscriptions/resourceGroups/read"
         ],
         "notActions": [],
@@ -19288,8 +19596,15 @@
     "permissions": [
       {
         "actions": [
+          "Microsoft.DBforPostgreSQL/flexibleServers/ltrBackup/action",
+          "Microsoft.DBforPostgreSQL/flexibleServers/ltrBackupAccess/action",
           "Microsoft.DBforPostgreSQL/flexibleServers/ltrBackupOperations/read",
+          "Microsoft.DBforPostgreSQL/flexibleServers/ltrBackupPreCheck/action",
           "Microsoft.DBforPostgreSQL/flexibleServers/ltrPreBackup/action",
+          "Microsoft.DBforPostgreSQL/flexibleServers/ltrRestoreFinalize/action",
+          "Microsoft.DBforPostgreSQL/flexibleServers/ltrRestoreInitialize/action",
+          "Microsoft.DBforPostgreSQL/flexibleServers/ltrRestorePreCheck/action",
+          "Microsoft.DBforPostgreSQL/flexibleServers/read",
           "Microsoft.DBforPostgreSQL/flexibleServers/startLtrBackup/action",
           "Microsoft.DBforPostgreSQL/locations/azureAsyncOperation/read",
           "Microsoft.DBforPostgreSQL/locations/operationResults/read",
@@ -19404,6 +19719,22 @@
     ]
   },
   {
+    "id": "d622af9a-030e-4f32-8267-419abfd54702",
+    "roleName": "Pro Active Coding Data User",
+    "description": "Allows processing of health data in Pro Active Coding",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [],
+        "notActions": [],
+        "dataActions": [
+          "Microsoft.HealthBot/healthBots/AIActions/ProActiveCoding/Process/Action"
+        ],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
     "id": "be1a1ac2-09d3-4261-9e57-a73a6e227f53",
     "roleName": "Procurement Contributor",
     "description": "Lets you manage the procurement of products and services.",
@@ -19463,6 +19794,13 @@
           "Microsoft.SoftwarePlan/softwareSubscriptions/productDownloadOptions/read",
           "Microsoft.SoftwarePlan/softwareSubscriptions/productDownloadOptions/generateDownloadLinks/action",
           "Microsoft.SoftwarePlan/validateSoftwareSubscriptionCreate/action",
+          "Microsoft.SoftwarePlan/softwareLicenses/read",
+          "Microsoft.SoftwarePlan/softwareLicenses/write",
+          "Microsoft.SoftwarePlan/softwareLicenses/productKeys/read",
+          "Microsoft.SoftwarePlan/softwareLicenses/productKeys/showFullKey/action",
+          "Microsoft.SoftwarePlan/softwareLicenses/productDownloadOptions/read",
+          "Microsoft.SoftwarePlan/softwareLicenses/productDownloadOptions/generateDownloadLinks/action",
+          "Microsoft.SoftwarePlan/validateSoftwareLicenseCreate/action",
           "Microsoft.Hardware/register/action",
           "Microsoft.Hardware/orderPreview/action",
           "Microsoft.Hardware/orders/read",
@@ -22529,7 +22867,10 @@
       {
         "actions": [
           "Microsoft.AzureActiveDirectory/directories/write",
-          "Microsoft.AzureActiveDirectory/directories/read"
+          "Microsoft.AzureActiveDirectory/directories/read",
+          "Microsoft.AzureActiveDirectory/register/action",
+          "Microsoft.Resources/subscriptions/resourceGroups/read",
+          "Microsoft.Resources/subscriptions/read"
         ],
         "notActions": [],
         "dataActions": [],
