@@ -163,6 +163,11 @@ func run(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to parse plan: %w", err)
 	}
 
+	// Preprocess: downgrade cosmetic-only updates (e.g., tag-only changes) to no-op
+	if cfg.Defaults != nil && len(cfg.Defaults.IgnoreAttributes) > 0 {
+		classify.FilterCosmeticChanges(planResult.Changes, cfg.Defaults.IgnoreAttributes)
+	}
+
 	// Create classifier
 	classifier, err := classify.New(cfg)
 	if err != nil {
@@ -318,6 +323,11 @@ func runExplain(cmd *cobra.Command, args []string) error {
 	planResult, err := plan.ParseFile(cmd.Context(), planPath)
 	if err != nil {
 		return fmt.Errorf("failed to parse plan: %w", err)
+	}
+
+	// Preprocess: downgrade cosmetic-only updates (e.g., tag-only changes) to no-op
+	if cfg.Defaults != nil && len(cfg.Defaults.IgnoreAttributes) > 0 {
+		classify.FilterCosmeticChanges(planResult.Changes, cfg.Defaults.IgnoreAttributes)
 	}
 
 	// Create classifier

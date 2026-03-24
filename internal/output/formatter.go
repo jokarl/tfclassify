@@ -88,6 +88,8 @@ type JSONResource struct {
 	Classification            string   `json:"classification"`
 	ClassificationDescription string   `json:"classification_description,omitempty"`
 	MatchedRules              []string `json:"matched_rules"`
+	OriginalActions           []string `json:"original_actions,omitempty"`
+	IgnoredAttributes         []string `json:"ignored_attributes,omitempty"`
 }
 
 func (f *Formatter) formatJSON(result *classify.Result) error {
@@ -107,6 +109,8 @@ func (f *Formatter) formatJSON(result *classify.Result) error {
 			Classification:            decision.Classification,
 			ClassificationDescription: decision.ClassificationDescription,
 			MatchedRules:              decision.MatchedRules,
+			OriginalActions:           decision.OriginalActions,
+			IgnoredAttributes:         decision.IgnoredAttributes,
 		})
 	}
 
@@ -153,6 +157,10 @@ func (f *Formatter) formatText(result *classify.Result) error {
 				for _, decision := range decisions {
 					fmt.Fprintf(&sb, "  - %s (%s) %v\n",
 						decision.Address, decision.ResourceType, decision.Actions)
+					if len(decision.OriginalActions) > 0 {
+						fmt.Fprintf(&sb, "    Originally: %v (downgraded by ignore_attributes: %s)\n",
+							decision.OriginalActions, strings.Join(decision.IgnoredAttributes, ", "))
+					}
 					for _, rule := range decision.MatchedRules {
 						fmt.Fprintf(&sb, "    Rule: %s\n", rule)
 					}

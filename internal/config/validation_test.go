@@ -633,6 +633,34 @@ func TestValidateGlobPatterns_InvalidNotModulePattern(t *testing.T) {
 	}
 }
 
+func TestValidate_IgnoreAttributesEmpty(t *testing.T) {
+	_, err := LoadFile("testdata/ignore_attributes_empty.hcl")
+	if err == nil {
+		t.Fatal("expected error for empty ignore_attributes entry, got nil")
+	}
+
+	if !strings.Contains(err.Error(), "ignore_attributes") {
+		t.Errorf("expected error about ignore_attributes, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "must not be empty") {
+		t.Errorf("expected error about empty entry, got: %v", err)
+	}
+}
+
+func TestValidate_IgnoreAttributesValid(t *testing.T) {
+	cfg, err := LoadFile("testdata/ignore_attributes_valid.hcl")
+	if err != nil {
+		t.Fatalf("expected no error for valid ignore_attributes, got: %v", err)
+	}
+
+	if len(cfg.Defaults.IgnoreAttributes) != 2 {
+		t.Errorf("expected 2 ignore_attributes entries, got %d", len(cfg.Defaults.IgnoreAttributes))
+	}
+	if cfg.Defaults.IgnoreAttributes[0] != "tags" || cfg.Defaults.IgnoreAttributes[1] != "tags_all" {
+		t.Errorf("expected [tags, tags_all], got %v", cfg.Defaults.IgnoreAttributes)
+	}
+}
+
 func TestValidateWarnings_EmptyClassification_WithPlugin(t *testing.T) {
 	cfg := &Config{
 		Classifications: []ClassificationConfig{

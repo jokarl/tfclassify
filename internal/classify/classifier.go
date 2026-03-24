@@ -79,9 +79,11 @@ func (c *Classifier) Classify(changes []plan.ResourceChange) *Result {
 // classifyResource determines the classification for a single resource change.
 func (c *Classifier) classifyResource(change plan.ResourceChange) ResourceDecision {
 	decision := ResourceDecision{
-		Address:      change.Address,
-		ResourceType: change.Type,
-		Actions:      change.Actions,
+		Address:           change.Address,
+		ResourceType:      change.Type,
+		Actions:           change.Actions,
+		OriginalActions:   change.OriginalActions,
+		IgnoredAttributes: change.IgnoredAttributes,
 	}
 
 	// Try each classification in precedence order
@@ -150,9 +152,11 @@ func (c *Classifier) ExplainClassify(changes []plan.ResourceChange) *ExplainResu
 // explainResource traces every rule evaluation for a single resource.
 func (c *Classifier) explainResource(change plan.ResourceChange) ResourceExplanation {
 	explanation := ResourceExplanation{
-		Address:      change.Address,
-		ResourceType: change.Type,
-		Actions:      change.Actions,
+		Address:           change.Address,
+		ResourceType:      change.Type,
+		Actions:           change.Actions,
+		OriginalActions:   change.OriginalActions,
+		IgnoredAttributes: change.IgnoredAttributes,
 	}
 
 	// Track the best match (same logic as classifyResource, but evaluate all)

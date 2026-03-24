@@ -169,8 +169,9 @@ type RuleConfig struct {
 
 // DefaultsConfig contains default configuration values.
 type DefaultsConfig struct {
-	Unclassified        string `hcl:"unclassified"`
-	NoChanges           string `hcl:"no_changes"`
-	PluginTimeout       string `hcl:"plugin_timeout,optional"`
-	DriftClassification string `hcl:"drift_classification,optional"`
+	Unclassified        string   `hcl:"unclassified"`
+	NoChanges           string   `hcl:"no_changes"`
+	PluginTimeout       string   `hcl:"plugin_timeout,optional"`
+	DriftClassification string   `hcl:"drift_classification,optional"`
+	IgnoreAttributes    []string `hcl:"ignore_attributes,optional"`
 }

@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/gobwas/glob"
 )
@@ -47,6 +48,10 @@ func Validate(cfg *Config) error {
 	}
 
 	if err := validateTopology(cfg); err != nil {
+		return err
+	}
+
+	if err := validateIgnoreAttributes(cfg); err != nil {
 		return err
 	}
 
@@ -226,6 +231,19 @@ func validateSARIFLevels(cfg *Config) error {
 		if c.SARIFLevel != "" && !validSARIFLevels[c.SARIFLevel] {
 			return fmt.Errorf("classification %q: invalid sarif_level %q (valid: error, warning, note, none)",
 				c.Name, c.SARIFLevel)
+		}
+	}
+	return nil
+}
+
+// validateIgnoreAttributes checks that ignore_attributes entries are non-empty strings.
+func validateIgnoreAttributes(cfg *Config) error {
+	if cfg.Defaults == nil {
+		return nil
+	}
+	for i, attr := range cfg.Defaults.IgnoreAttributes {
+		if strings.TrimSpace(attr) == "" {
+			return fmt.Errorf("defaults.ignore_attributes[%d]: entry must not be empty", i)
 		}
 	}
 	return nil

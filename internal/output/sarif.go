@@ -99,6 +99,10 @@ func (f *Formatter) formatSARIF(result *classify.Result) error {
 		if msgText == "" {
 			msgText = fmt.Sprintf("Resource classified as %s", d.Classification)
 		}
+		if len(d.OriginalActions) > 0 {
+			msgText += fmt.Sprintf(" (originally %v, downgraded by ignore_attributes: %s)",
+				d.OriginalActions, strings.Join(d.IgnoredAttributes, ", "))
+		}
 
 		results = append(results, sarifResult{
 			RuleID:    d.Classification,
