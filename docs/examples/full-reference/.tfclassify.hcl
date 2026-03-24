@@ -331,6 +331,18 @@ defaults {
   # (e.g., "10s", "2m30s", "500ms"). If omitted or invalid, defaults to 30s.
   # Only relevant when external plugins are configured.
   plugin_timeout = "30s"
+
+  # Attributes to ignore when determining if a resource meaningfully changed.
+  # If ALL changed attributes on an "update" resource match these prefixes,
+  # the resource is reclassified as no-op before classification begins.
+  #
+  # Uses prefix-based dot-path matching:
+  #   "tags"      → covers tags, tags.env, tags.tf-module-l2 (but NOT tags_all)
+  #   "meta.tags" → covers meta.tags, meta.tags.env (but NOT meta.name)
+  #
+  # Common use case: module tagging conventions where version bumps cause
+  # widespread cosmetic changes (e.g., tf-module-l2 tag updates).
+  ignore_attributes = ["tags", "tags_all"]
 }
 
 # ─── Evidence ──────────────────────────────────────────────────────────────────

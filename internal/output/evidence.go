@@ -40,6 +40,8 @@ type EvidenceResource struct {
 	Classification            string   `json:"classification"`
 	ClassificationDescription string   `json:"classification_description,omitempty"`
 	MatchedRules              []string `json:"matched_rules"`
+	OriginalActions           []string `json:"original_actions,omitempty"`
+	IgnoredAttributes         []string `json:"ignored_attributes,omitempty"`
 }
 
 // EvidenceTrace represents a single trace entry in the evidence artifact.
@@ -97,6 +99,8 @@ func BuildEvidence(result *classify.Result, explainResult *classify.ExplainResul
 				Classification:            d.Classification,
 				ClassificationDescription: d.ClassificationDescription,
 				MatchedRules:              d.MatchedRules,
+				OriginalActions:           d.OriginalActions,
+				IgnoredAttributes:         d.IgnoredAttributes,
 			})
 		}
 		artifact.Resources = resources

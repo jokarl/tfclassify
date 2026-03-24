@@ -38,6 +38,10 @@ func (f *Formatter) formatExplainText(result *classify.ExplainResult) error {
 
 		fmt.Fprintf(&sb, "Resource: %s\n", res.Address)
 		fmt.Fprintf(&sb, "Actions:  %v\n", res.Actions)
+		if len(res.OriginalActions) > 0 {
+			fmt.Fprintf(&sb, "          Originally %v, downgraded by ignore_attributes: %s\n",
+				res.OriginalActions, strings.Join(res.IgnoredAttributes, ", "))
+		}
 		fmt.Fprintf(&sb, "Final:    %s (from %s)\n", res.FinalClassification, res.FinalSource)
 		sb.WriteString("\n  Evaluation trace:\n")
 
@@ -84,6 +88,8 @@ type ExplainJSONResource struct {
 	FinalSource         string             `json:"final_source"`
 	Trace               []ExplainJSONTrace `json:"trace"`
 	WinnerReason        string             `json:"winner_reason"`
+	OriginalActions     []string           `json:"original_actions,omitempty"`
+	IgnoredAttributes   []string           `json:"ignored_attributes,omitempty"`
 }
 
 // ExplainJSONTrace represents a single trace entry in explain JSON output.
@@ -110,6 +116,8 @@ func (f *Formatter) formatExplainJSON(result *classify.ExplainResult) error {
 			FinalSource:         res.FinalSource,
 			WinnerReason:        res.WinnerReason,
 			Trace:               make([]ExplainJSONTrace, 0, len(res.Trace)),
+			OriginalActions:     res.OriginalActions,
+			IgnoredAttributes:   res.IgnoredAttributes,
 		}
 
 		for _, entry := range res.Trace {

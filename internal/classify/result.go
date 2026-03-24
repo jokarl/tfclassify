@@ -21,6 +21,8 @@ type ResourceDecision struct {
 	ClassificationDescription string                 // description of the classification level
 	MatchedRules              []string               // descriptions of which rules matched
 	Metadata                  map[string]interface{} // plugin-provided metadata (optional)
+	OriginalActions           []string               // set when actions were rewritten by ignore_attributes
+	IgnoredAttributes         []string               // attribute paths covered by ignore_attributes
 }
 
 // ExplainResult contains full trace data for explain output.
@@ -38,6 +40,8 @@ type ResourceExplanation struct {
 	FinalSource         string // "core-rule", "builtin: <name>", "plugin: <plugin>/<analyzer>"
 	WinnerReason        string
 	Trace               []TraceEntry
+	OriginalActions     []string // set when actions were rewritten by ignore_attributes
+	IgnoredAttributes   []string // attribute paths covered by ignore_attributes
 }
 
 // TraceResult represents the evaluation outcome.
