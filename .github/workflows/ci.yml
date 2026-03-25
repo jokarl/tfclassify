@@ -124,3 +124,41 @@ jobs:
           go-version-file: go.mod
       - name: Classify committed plan fixtures
         run: bash testdata/e2e/run.sh --build --fixtures
+
+  e2e:
+    if: "contains(github.event.pull_request.labels.*.name, 'autorelease: pending')"
+    needs: [build, test, vet, lint, proto-check, vuln]
+    strategy:
+      fail-fast: false
+      matrix:
+        use-case:
+          - role-assignment-privileged
+          - route-table
+          - role-assignment-reader
+          - role-escalation-threshold
+          - role-exclusion
+          - data-plane-detection
+          - control-plane-patterns
+          - custom-role-cross-reference
+          - combined-role-aggregation
+          - modules-pluginless
+          - modules-plugin
+          - cis-azure-foundations
+          - blast-radius
+          - evidence-signing
+          - module-scoped-rules
+          - topology
+        include:
+          - use-case: custom-role-cross-reference
+            plan-only: true
+          - use-case: evidence-signing
+            plan-only: true
+            evidence: true
+    uses: ./.github/workflows/e2e.yml
+    with:
+      use-case: ${{ matrix.use-case }}
+      binary-source: build
+      plan-formats: both
+      plan-only: ${{ matrix.plan-only || false }}
+      evidence: ${{ matrix.evidence || false }}
+    secrets: inherit
