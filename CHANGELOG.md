@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.7.0](https://github.com/jokarl/tfclassify/compare/tfclassify-v0.6.0...tfclassify-v0.7.0) (2026-03-25)
+
+
+### Features
+
+* add ignore_attributes to exclude cosmetic changes from classifi… ([#138](https://github.com/jokarl/tfclassify/issues/138)) ([85af62c](https://github.com/jokarl/tfclassify/commit/85af62c97a80f880bac749c87bdb809d5b804ad2))
+
+
+### Bug Fixes
+
+* refresh Azure role data and action registry ([#70](https://github.com/jokarl/tfclassify/issues/70)) ([d0b9390](https://github.com/jokarl/tfclassify/commit/d0b9390b465997e654de70c27b8029948464ac07))
+* refresh Azure role data and action registry ([#98](https://github.com/jokarl/tfclassify/issues/98)) ([c3af999](https://github.com/jokarl/tfclassify/commit/c3af999d0b5694f8bf8113584869866995bcf306))
+* use unique scope in combined-role-aggregation e2e to prevent parallel CI collisions ([53e9c09](https://github.com/jokarl/tfclassify/commit/53e9c0949e0642f651676df7e216a8940dc4ca7e))
+
+
+### Dependencies
+
+* **deps:** bump github.com/zclconf/go-cty from 1.17.0 to 1.18.0 ([#67](https://github.com/jokarl/tfclassify/issues/67)) ([38bde0a](https://github.com/jokarl/tfclassify/commit/38bde0a0e84ee815a98ebfa6fb9f5e4860b50279))
+* **deps:** bump golang.org/x/sync from 0.19.0 to 0.20.0 ([#97](https://github.com/jokarl/tfclassify/issues/97)) ([6fabb0c](https://github.com/jokarl/tfclassify/commit/6fabb0cea89e394374d8348246b2c9c0ef5bc9dd))
+* **deps:** bump google.golang.org/grpc from 1.79.1 to 1.79.3 ([#137](https://github.com/jokarl/tfclassify/issues/137)) ([aa24c7c](https://github.com/jokarl/tfclassify/commit/aa24c7c12599da13ade0d839c456d3ea0abf0d38))
+* **deps:** bump google.golang.org/grpc from 1.79.1 to 1.79.3 in /sdk ([#136](https://github.com/jokarl/tfclassify/issues/136)) ([e90c7fc](https://github.com/jokarl/tfclassify/commit/e90c7fc91df295476f0e708cc2a1e9a475bd19ce))
+
 ## [0.6.0](https://github.com/jokarl/tfclassify/compare/tfclassify-v0.5.2...tfclassify-v0.6.0) (2026-02-26)
 
 

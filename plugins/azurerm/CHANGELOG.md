@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.4.0](https://github.com/jokarl/tfclassify/compare/tfclassify-plugin-azurerm-v0.3.0...tfclassify-plugin-azurerm-v0.4.0) (2026-03-25)
+
+
+### Features
+
+* add ignore_attributes to exclude cosmetic changes from classifi… ([#138](https://github.com/jokarl/tfclassify/issues/138)) ([85af62c](https://github.com/jokarl/tfclassify/commit/85af62c97a80f880bac749c87bdb809d5b804ad2))
+
+
+### Bug Fixes
+
+* refresh Azure role data and action registry ([#70](https://github.com/jokarl/tfclassify/issues/70)) ([d0b9390](https://github.com/jokarl/tfclassify/commit/d0b9390b465997e654de70c27b8029948464ac07))
+* refresh Azure role data and action registry ([#98](https://github.com/jokarl/tfclassify/issues/98)) ([c3af999](https://github.com/jokarl/tfclassify/commit/c3af999d0b5694f8bf8113584869866995bcf306))
+
 ## [0.3.0](https://github.com/jokarl/tfclassify/compare/tfclassify-plugin-azurerm-v0.2.2...tfclassify-plugin-azurerm-v0.3.0) (2026-02-26)
 
 
