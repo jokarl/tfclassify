@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0](https://github.com/jokarl/tfclassify/compare/tfclassify-v0.7.0...tfclassify-v0.8.0) (2026-03-25)
+
+
+### Features
+
+* auto-refresh e2e fixtures from nightly verify ([#140](https://github.com/jokarl/tfclassify/issues/140)) ([580469d](https://github.com/jokarl/tfclassify/commit/580469d13119e6ba185309f39e41db99dd025182))
+
 ## [0.7.0](https://github.com/jokarl/tfclassify/compare/tfclassify-v0.6.0...tfclassify-v0.7.0) (2026-03-25)
 
 
