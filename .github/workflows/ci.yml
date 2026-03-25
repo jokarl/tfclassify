@@ -125,40 +125,33 @@ jobs:
       - name: Classify committed plan fixtures
         run: bash testdata/e2e/run.sh --build --fixtures
 
-  e2e:
+  e2e-discover:
     if: "contains(github.event.pull_request.labels.*.name, 'autorelease: pending')"
-    needs: [build, test, vet, lint, proto-check, vuln]
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.discover.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Discover e2e scenarios
+        id: discover
+        run: |
+          matrix=$(jq -n '[ inputs | {
+            "use-case": input_filename | split("/")[-2],
+            "plan-only": (.plan_only // false),
+            "evidence": (.evidence // false)
+          }]' testdata/e2e/*/expected.json)
+          echo "matrix={\"include\":$matrix}" >> "$GITHUB_OUTPUT"
+
+  e2e:
+    needs: [e2e-discover, build, test, vet, lint, proto-check, vuln]
     strategy:
       fail-fast: false
-      matrix:
-        use-case:
-          - role-assignment-privileged
-          - route-table
-          - role-assignment-reader
-          - role-escalation-threshold
-          - role-exclusion
-          - data-plane-detection
-          - control-plane-patterns
-          - custom-role-cross-reference
-          - combined-role-aggregation
-          - modules-pluginless
-          - modules-plugin
-          - cis-azure-foundations
-          - blast-radius
-          - evidence-signing
-          - module-scoped-rules
-          - topology
-        include:
-          - use-case: custom-role-cross-reference
-            plan-only: true
-          - use-case: evidence-signing
-            plan-only: true
-            evidence: true
+      matrix: ${{ fromJson(needs.e2e-discover.outputs.matrix) }}
     uses: ./.github/workflows/e2e.yml
     with:
       use-case: ${{ matrix.use-case }}
       binary-source: build
       plan-formats: both
-      plan-only: ${{ matrix.plan-only || false }}
-      evidence: ${{ matrix.evidence || false }}
+      plan-only: ${{ matrix.plan-only }}
+      evidence: ${{ matrix.evidence }}
     secrets: inherit
