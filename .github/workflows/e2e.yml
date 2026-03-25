@@ -356,6 +356,18 @@ jobs:
             >> "$GITHUB_STEP_SUMMARY" 2>&1
           echo '```' >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Upload plan fixtures
+        if: always()
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: fixtures-${{ inputs.use-case }}
+          path: |
+            testdata/e2e/${{ inputs.use-case }}/create.json
+            testdata/e2e/${{ inputs.use-case }}/destroy.json
+          if-no-files-found: ignore
+          retention-days: 1
+
       - name: Cleanup
         if: always() && steps.apply.outcome != 'skipped'
         continue-on-error: true
