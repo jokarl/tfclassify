@@ -9,6 +9,8 @@
 #   ./testdata/e2e/run.sh --build --plan-only                      # Skip apply/destroy (faster)
 #   ./testdata/e2e/run.sh --build --evidence                       # Enable evidence signing
 #   ./testdata/e2e/run.sh --build -t route-table -t blast-radius   # Run specific tests only
+#   ./testdata/e2e/run.sh --build --capture                        # Run + save plan JSON fixtures
+#   ./testdata/e2e/run.sh --build --fixtures                       # Classify committed fixtures (no Azure)
 #
 set -euo pipefail
 
@@ -32,6 +34,8 @@ BUILD=false
 VERSION=""
 EVIDENCE=false
 PLAN_ONLY=false
+CAPTURE=false
+FIXTURES=false
 TESTS=()
 
 # --- Colors ---
@@ -55,6 +59,8 @@ Options:
   --version VERSION    Download released CLI at VERSION (e.g., 0.4.0)
   --evidence           Enable evidence signing and verification
   --plan-only          Skip apply/destroy for all scenarios (faster iteration)
+  --capture            Save plan JSON to fixtures/ after generation (for fixture-based tests)
+  --fixtures           Classify committed fixtures instead of running Terraform (no Azure needed)
   -t, --test NAME      Run only the named scenario (repeatable)
   -h, --help           Show this help message
 
@@ -68,6 +74,8 @@ Examples:
   $(basename "$0") --build -t route-table -t blast-radius
   $(basename "$0") --build --evidence
   $(basename "$0") --version 0.4.0 --plan-only -t blast-radius
+  $(basename "$0") --build --capture                        # refresh fixtures
+  $(basename "$0") --build --fixtures                       # fast, no Azure
 EOF
   exit 0
 }
@@ -79,12 +87,22 @@ while [[ $# -gt 0 ]]; do
     --version)   VERSION="$2"; shift 2 ;;
     --evidence)  EVIDENCE=true; shift ;;
     --plan-only) PLAN_ONLY=true; shift ;;
+    --capture)   CAPTURE=true; shift ;;
+    --fixtures)  FIXTURES=true; shift ;;
     -t|--test)   TESTS+=("$2"); shift 2 ;;
     -h|--help)   usage ;;
     *)           echo -e "${RED}Unknown option: $1${NC}" >&2; echo; usage ;;
   esac
 done
 
+if [[ "$FIXTURES" == true && -n "$VERSION" ]]; then
+  echo -e "${RED}Error: --fixtures and --version are mutually exclusive${NC}" >&2
+  exit 1
+fi
+if [[ "$FIXTURES" == true && "$BUILD" == false ]]; then
+  echo -e "${RED}Error: --fixtures requires --build${NC}" >&2
+  exit 1
+fi
 if [[ "$BUILD" == false && -z "$VERSION" ]]; then
   echo -e "${RED}Error: specify --build or --version VERSION${NC}" >&2
   exit 1
@@ -132,7 +150,9 @@ fi
 
 echo -e "${CYAN}Binary:${NC}    $TFCLASSIFY_BIN"
 "$TFCLASSIFY_BIN" --version 2>/dev/null || true
-echo -e "${CYAN}Terraform:${NC} $(terraform --version -json 2>/dev/null | jq -r .terraform_version 2>/dev/null || terraform --version | head -1)"
+if [[ "$FIXTURES" == false ]]; then
+  echo -e "${CYAN}Terraform:${NC} $(terraform --version -json 2>/dev/null | jq -r .terraform_version 2>/dev/null || terraform --version | head -1)"
+fi
 echo ""
 
 # --- Discover scenarios ---
@@ -155,8 +175,13 @@ else
 fi
 
 echo -e "${BOLD}Running ${#SCENARIOS[@]} scenario(s):${NC} ${SCENARIOS[*]}"
-if [[ "$PLAN_ONLY" == true ]]; then
+if [[ "$FIXTURES" == true ]]; then
+  echo -e "${YELLOW}Fixture mode: classifying committed plan fixtures (no Azure)${NC}"
+elif [[ "$PLAN_ONLY" == true ]]; then
   echo -e "${YELLOW}Plan-only mode: skipping apply/destroy for all scenarios${NC}"
+fi
+if [[ "$CAPTURE" == true ]]; then
+  echo -e "${YELLOW}Capture mode: saving plan JSON to fixtures/${NC}"
 fi
 echo ""
 
@@ -201,7 +226,9 @@ cleanup_all() {
     cleanup_scenario "$E2E_DIR/$scenario"
   done
 }
-trap cleanup_all EXIT
+if [[ "$FIXTURES" == false ]]; then
+  trap cleanup_all EXIT
+fi
 
 # --- Run a single scenario ---
 # Terraform output goes to $LOG_DIR/$name/terraform.log
@@ -258,6 +285,12 @@ run_scenario() {
   fi
   terraform -chdir="$scenario_dir" show -json create.tfplan \
     > "$scenario_dir/create.json" 2>> "$tf_log"
+
+  # Capture fixture if requested
+  if [[ "$CAPTURE" == true ]]; then
+    mkdir -p "$scenario_dir/fixtures"
+    cp "$scenario_dir/create.json" "$scenario_dir/fixtures/create.json"
+  fi
 
   local expected_create
   expected_create="$(jq -r '.create.exit_code' "$scenario_dir/expected.json")"
@@ -372,6 +405,12 @@ run_scenario() {
     terraform -chdir="$scenario_dir" show -json destroy.tfplan \
       > "$scenario_dir/destroy.json" 2>> "$tf_log"
 
+    # Capture fixture if requested
+    if [[ "$CAPTURE" == true ]]; then
+      mkdir -p "$scenario_dir/fixtures"
+      cp "$scenario_dir/destroy.json" "$scenario_dir/fixtures/destroy.json"
+    fi
+
     local expected_destroy
     expected_destroy="$(jq -r '.destroy.exit_code' "$scenario_dir/expected.json")"
 
@@ -475,6 +514,134 @@ run_scenario() {
   fi
 }
 
+# --- Run fixture-based scenario (no Terraform/Azure) ---
+run_fixture_scenario() {
+  local name="$1"
+  local scenario_dir="$E2E_DIR/$name"
+  local scenario_log_dir="$LOG_DIR/$name"
+  local results_log="$scenario_log_dir/results.log"
+  local use_evidence=false
+  local failed=false
+
+  mkdir -p "$scenario_log_dir"
+
+  if [[ ! -f "$scenario_dir/fixtures/create.json" ]]; then
+    echo "SKIP: no fixtures (run --capture to generate)" >> "$results_log"
+    echo "SKIP" > "$scenario_log_dir/status"
+    return
+  fi
+
+  # Enable evidence for evidence scenarios when --evidence is set
+  if [[ "$EVIDENCE" == true ]] && in_array "$name" "${EVIDENCE_SCENARIOS[@]}"; then
+    use_evidence=true
+    export TFCLASSIFY_SIGNING_KEY="$EVIDENCE_PRIVATE_KEY"
+  fi
+
+  # Validate config
+  if ! "$TFCLASSIFY_BIN" validate -c "$scenario_dir/.tfclassify.hcl" >> /dev/null 2>&1; then
+    echo "FAIL: config validation" >> "$results_log"
+    echo "FAIL" > "$scenario_log_dir/status"
+    return
+  fi
+
+  local expected_create
+  expected_create="$(jq -r '.create.exit_code' "$scenario_dir/expected.json")"
+
+  # Classify create (JSON)
+  local evidence_flag=""
+  if [[ "$use_evidence" == true ]]; then
+    evidence_flag="--evidence-file $scenario_log_dir/evidence-create-json.json"
+  fi
+
+  set +e
+  # shellcheck disable=SC2086
+  "$TFCLASSIFY_BIN" \
+    -p "$scenario_dir/fixtures/create.json" \
+    -c "$scenario_dir/.tfclassify.hcl" \
+    -o json --detailed-exitcode $evidence_flag \
+    > /dev/null 2>&1
+  local actual_create=$?
+  set -e
+
+  if [[ "$actual_create" != "$expected_create" ]]; then
+    echo "FAIL: create (JSON) expected exit $expected_create, got $actual_create" >> "$results_log"
+    failed=true
+  else
+    echo "PASS: create (JSON) exit code $actual_create" >> "$results_log"
+  fi
+
+  # Classify create (SARIF)
+  set +e
+  "$TFCLASSIFY_BIN" \
+    -p "$scenario_dir/fixtures/create.json" \
+    -c "$scenario_dir/.tfclassify.hcl" \
+    -o sarif --detailed-exitcode > /dev/null 2>&1
+  local actual_create_sarif=$?
+  set -e
+
+  if [[ "$actual_create_sarif" != "$expected_create" ]]; then
+    echo "FAIL: create (SARIF) expected exit $expected_create, got $actual_create_sarif" >> "$results_log"
+    failed=true
+  else
+    echo "PASS: create (SARIF) exit code $actual_create_sarif" >> "$results_log"
+  fi
+
+  # Verify evidence (create)
+  if [[ "$use_evidence" == true && -f "$scenario_log_dir/evidence-create-json.json" ]]; then
+    if "$TFCLASSIFY_BIN" verify \
+         --evidence-file "$scenario_log_dir/evidence-create-json.json" \
+         --public-key "$EVIDENCE_PUBLIC_KEY" > /dev/null 2>&1; then
+      echo "PASS: evidence verification (create)" >> "$results_log"
+    else
+      echo "FAIL: evidence verification (create)" >> "$results_log"
+      failed=true
+    fi
+  fi
+
+  # Classify destroy fixture if it exists
+  if [[ -f "$scenario_dir/fixtures/destroy.json" ]]; then
+    local expected_destroy
+    expected_destroy="$(jq -r '.destroy.exit_code' "$scenario_dir/expected.json")"
+
+    set +e
+    "$TFCLASSIFY_BIN" \
+      -p "$scenario_dir/fixtures/destroy.json" \
+      -c "$scenario_dir/.tfclassify.hcl" \
+      -o json --detailed-exitcode > /dev/null 2>&1
+    local actual_destroy=$?
+    set -e
+
+    if [[ "$actual_destroy" != "$expected_destroy" ]]; then
+      echo "FAIL: destroy (JSON) expected exit $expected_destroy, got $actual_destroy" >> "$results_log"
+      failed=true
+    else
+      echo "PASS: destroy (JSON) exit code $actual_destroy" >> "$results_log"
+    fi
+
+    # Classify destroy (SARIF)
+    set +e
+    "$TFCLASSIFY_BIN" \
+      -p "$scenario_dir/fixtures/destroy.json" \
+      -c "$scenario_dir/.tfclassify.hcl" \
+      -o sarif --detailed-exitcode > /dev/null 2>&1
+    local actual_destroy_sarif=$?
+    set -e
+
+    if [[ "$actual_destroy_sarif" != "$expected_destroy" ]]; then
+      echo "FAIL: destroy (SARIF) expected exit $expected_destroy, got $actual_destroy_sarif" >> "$results_log"
+      failed=true
+    else
+      echo "PASS: destroy (SARIF) exit code $actual_destroy_sarif" >> "$results_log"
+    fi
+  fi
+
+  if [[ "$failed" == true ]]; then
+    echo "FAIL" > "$scenario_log_dir/status"
+  else
+    echo "PASS" > "$scenario_log_dir/status"
+  fi
+}
+
 # --- Install plugins for released versions ---
 if [[ -n "$VERSION" ]]; then
   mkdir -p "$PLUGIN_DIR"
@@ -497,7 +664,11 @@ fi
 PIDS=()
 PID_SCENARIOS=()
 for scenario in "${SCENARIOS[@]}"; do
-  run_scenario "$scenario" &
+  if [[ "$FIXTURES" == true ]]; then
+    run_fixture_scenario "$scenario" &
+  else
+    run_scenario "$scenario" &
+  fi
   pid=$!
   PIDS+=($pid)
   PID_SCENARIOS+=("$pid:$scenario")
