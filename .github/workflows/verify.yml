@@ -2,7 +2,7 @@ name: Verify
 
 on:
   schedule:
-    - cron: '0 2 * * *'
+    - cron: '0 2 * * 1'
   workflow_dispatch:
 
 concurrency:
@@ -11,8 +11,10 @@ concurrency:
 
 permissions:
   id-token: write
-  contents: read
+  contents: write
+  pull-requests: write
   issues: write
+  security-events: write
 
 env:
   ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
@@ -89,3 +91,58 @@ jobs:
       evidence: ${{ matrix.evidence || false }}
       open-issue-on-failure: true
     secrets: inherit
+
+  refresh-fixtures:
+    needs: verify
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: fixtures-*
+          path: /tmp/fixtures
+
+      - name: Update fixture files
+        run: |
+          for dir in /tmp/fixtures/fixtures-*/; do
+            case_name=$(basename "$dir" | sed 's/^fixtures-//')
+            dest="testdata/e2e/$case_name/fixtures"
+            mkdir -p "$dest"
+            [ -f "$dir/testdata/e2e/$case_name/create.json" ] && \
+              cp "$dir/testdata/e2e/$case_name/create.json" "$dest/create.json"
+            [ -f "$dir/testdata/e2e/$case_name/destroy.json" ] && \
+              cp "$dir/testdata/e2e/$case_name/destroy.json" "$dest/destroy.json"
+          done
+
+      - name: Check for changes
+        id: diff
+        run: |
+          git add testdata/e2e/*/fixtures/*.json 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open PR with updated fixtures
+        if: steps.diff.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          BRANCH="chore/refresh-e2e-fixtures-$(date -u +%Y%m%d)"
+          git checkout -b "$BRANCH"
+          git commit -m "chore: refresh e2e plan fixtures"
+          git push origin "$BRANCH"
+          gh pr create \
+            --title "chore: refresh e2e plan fixtures" \
+            --body "$(cat <<'BODY'
+          Automated update from nightly verify workflow.
+
+          Plan JSON fixtures have drifted from live Azure plans.
+          This may be due to provider schema changes or new scenarios.
+          BODY
+          )"
