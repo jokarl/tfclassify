@@ -33,6 +33,14 @@ go test ./internal/classify/ -run TestClassifier_Deletion
 go test ./plugins/azurerm/ -run TestPrivilege
 ```
 
+**E2E fixture tests** (fast, no Azure needed):
+```bash
+bash testdata/e2e/run.sh --build --fixtures         # classify committed plan fixtures
+bash testdata/e2e/run.sh --build --capture          # refresh fixtures (requires Azure)
+```
+
+Fixture tests run against committed plan JSON files in `testdata/e2e/*/fixtures/`. CI runs fixtures on every PR. Live Azure e2e tests run nightly via `verify.yml`.
+
 **Protobuf code generation** (output in `sdk/pb/`):
 ```bash
 protoc --go_out=. --go-grpc_out=. proto/tfclassify.proto
@@ -124,11 +132,28 @@ Version negotiation: host checks `SDKVersionConstraints` against plugin's report
 
 ## E2E Tests
 
-E2E test scenarios live in `testdata/e2e/`. Each scenario has `main.tf`, `.tfclassify.hcl`, and `expected.json`. These run against real Azure infrastructure in CI.
+E2E test scenarios live in `testdata/e2e/`. Each scenario has `main.tf`, `.tfclassify.hcl`, and `expected.json`.
+
+**Two tiers:**
+
+1. **Fixture tests (fast, every PR):** Committed plan JSON fixtures in `testdata/e2e/*/fixtures/`. CI runs `run.sh --build --fixtures` which classifies fixtures and checks exit codes against `expected.json`. No Azure credentials needed.
+
+2. **Live e2e (slow, periodic):** Runs `terraform plan` against real Azure infrastructure via `verify.yml`. Tests both JSON and binary `.tfplan` formats. If plan shapes drift from committed fixtures, verify can detect the difference.
 
 E2E tests must be kept in sync with code changes. When modifying plugin analyzers, config parsing, or classification logic, check whether existing e2e scenarios need updating and whether new scenarios are needed. The CI matrix in `.github/workflows/ci.yml` must include all scenarios.
 
-**Run e2e locally** with `testdata/e2e/run.sh`. Use `--build` for development — it compiles both the CLI and azurerm plugin from source:
+**Run fixture tests locally:**
+```bash
+bash testdata/e2e/run.sh --build --fixtures               # fast, no Azure
+```
+
+**Refresh fixtures** (requires Azure credentials):
+```bash
+bash testdata/e2e/run.sh --build --capture                # all scenarios
+bash testdata/e2e/run.sh --build --capture -t route-table  # specific scenario
+```
+
+**Run live e2e locally** with `testdata/e2e/run.sh`. Use `--build` for development — it compiles both the CLI and azurerm plugin from source:
 ```bash
 bash testdata/e2e/run.sh --build --plan-only -t blast-radius -t role-assignment-privileged
 ```
@@ -138,15 +163,13 @@ Use `--version` to test against a published GitHub release. This downloads the C
 bash testdata/e2e/run.sh --version 0.4.0 --plan-only -t blast-radius
 ```
 
-The two flags are mutually exclusive. Add `--plan-only` to skip apply/destroy (faster iteration). Use `-t NAME` (repeatable) to run specific scenarios.
+Add `--plan-only` to skip apply/destroy (faster iteration). Use `-t NAME` (repeatable) to run specific scenarios.
 
 **Verify e2e in CI** by triggering the workflow on your branch:
 ```bash
 gh workflow run ci.yml --ref $(git branch --show-current)
 gh run watch    # watch the latest run
 ```
-
-E2E tests run both JSON and binary `.tfplan` formats. Each scenario runs create and destroy phases, comparing exit codes against `expected.json`.
 
 ## Governance
 

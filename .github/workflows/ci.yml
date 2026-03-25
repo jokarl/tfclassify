@@ -114,46 +114,13 @@ jobs:
       - run: go install golang.org/x/vuln/cmd/govulncheck@latest
       - run: govulncheck ./...
 
-  e2e:
+  e2e-fixtures:
     needs: [build, test, vet, lint, proto-check, vuln]
-    strategy:
-      fail-fast: false
-      matrix:
-        use-case:
-          - role-assignment-privileged
-          - route-table
-          - role-assignment-reader
-          - role-escalation-threshold
-          - role-exclusion
-          - data-plane-detection
-          - control-plane-patterns
-          - custom-role-cross-reference
-          - combined-role-aggregation
-          - modules-pluginless
-          - modules-plugin
-          - cis-azure-foundations
-          - blast-radius
-          - evidence-signing
-          - module-scoped-rules
-          - topology
-        include:
-          # custom-role-cross-reference creates an azurerm_role_definition, which
-          # requires Microsoft.Authorization/roleDefinitions/write — a permission
-          # the CI service principal does not have. Plan-only mode is sufficient
-          # because the test validates that tfclassify cross-references the custom
-          # role definition from the plan; apply/destroy adds no classification coverage.
-          - use-case: custom-role-cross-reference
-            plan-only: true
-          # evidence-signing only needs a plan to validate evidence generation
-          # and Ed25519 signature verification. No apply/destroy needed.
-          - use-case: evidence-signing
-            plan-only: true
-            evidence: true
-    uses: ./.github/workflows/e2e.yml
-    with:
-      use-case: ${{ matrix.use-case }}
-      binary-source: build
-      plan-formats: both
-      plan-only: ${{ matrix.plan-only || false }}
-      evidence: ${{ matrix.evidence || false }}
-    secrets: inherit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: Classify committed plan fixtures
+        run: bash testdata/e2e/run.sh --build --fixtures
