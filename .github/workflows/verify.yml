@@ -105,11 +105,11 @@ jobs:
           for dir in /tmp/fixtures/fixtures-*/; do
             case_name=$(basename "$dir" | sed 's/^fixtures-//')
             dest="testdata/e2e/$case_name/fixtures"
+            src="$dir/testdata/e2e/$case_name"
             mkdir -p "$dest"
-            [ -f "$dir/testdata/e2e/$case_name/create.json" ] && \
-              cp "$dir/testdata/e2e/$case_name/create.json" "$dest/create.json"
-            [ -f "$dir/testdata/e2e/$case_name/destroy.json" ] && \
-              cp "$dir/testdata/e2e/$case_name/destroy.json" "$dest/destroy.json"
+            for plan in create.json destroy.json; do
+              [ -f "$src/$plan" ] && cp "$src/$plan" "$dest/$plan" || true
+            done
           done
 
       - name: Check for changes
