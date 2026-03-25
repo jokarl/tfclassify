@@ -30,10 +30,21 @@ data "azurerm_resource_group" "lab" {
 # which allows the combined role aggregation pass to group by principal.
 data "azurerm_client_config" "current" {}
 
-# Reader role — only grants */read actions at resource group scope.
+# Unique scope target per run. Role assignments are scoped to this identity
+# instead of the shared resource group, preventing 409 conflicts when multiple
+# CI runs execute this scenario in parallel (same principal + same role + same
+# scope = Azure duplicate detection). The managed identity itself is not used
+# as the principal — only as a unique scope.
+resource "azurerm_user_assigned_identity" "scope" {
+  name                = "id-combined-role-scope-${random_id.suffix.hex}"
+  resource_group_name = data.azurerm_resource_group.lab.name
+  location            = data.azurerm_resource_group.lab.location
+}
+
+# Reader role — only grants */read actions.
 # Does NOT individually trigger the per-role "actions" pattern.
 resource "azurerm_role_assignment" "reader" {
-  scope                = data.azurerm_resource_group.lab.id
+  scope                = azurerm_user_assigned_identity.scope.id
   role_definition_name = "Reader"
   principal_id         = data.azurerm_client_config.current.object_id
 }
@@ -60,7 +71,7 @@ resource "azurerm_role_definition" "auth_writer" {
 }
 
 resource "azurerm_role_assignment" "auth_writer" {
-  scope              = data.azurerm_resource_group.lab.id
+  scope              = azurerm_user_assigned_identity.scope.id
   role_definition_id = azurerm_role_definition.auth_writer.role_definition_resource_id
   principal_id       = data.azurerm_client_config.current.object_id
 }
