@@ -57,38 +57,34 @@ jobs:
             [ "$pass" -lt 3 ] && sleep 15
           done
 
+  discover:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.discover.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Discover e2e scenarios
+        id: discover
+        run: |
+          matrix=$(jq -n '[ inputs | {
+            "use-case": input_filename | split("/")[-2],
+            "plan-only": (.plan_only // false),
+            "evidence": (.evidence // false)
+          }]' testdata/e2e/*/expected.json)
+          echo "matrix={\"include\":$matrix}" >> "$GITHUB_OUTPUT"
+
   verify:
-    needs: cleanup
+    needs: [cleanup, discover]
     strategy:
       fail-fast: false
-      matrix:
-        use-case:
-          - blast-radius
-          - cis-azure-foundations
-          - control-plane-patterns
-          - custom-role-cross-reference
-          - data-plane-detection
-          - evidence-signing
-          - modules-plugin
-          - modules-pluginless
-          - role-assignment-privileged
-          - role-assignment-reader
-          - role-escalation-threshold
-          - role-exclusion
-          - route-table
-        include:
-          - use-case: custom-role-cross-reference
-            plan-only: true
-          - use-case: evidence-signing
-            plan-only: true
-            evidence: true
+      matrix: ${{ fromJson(needs.discover.outputs.matrix) }}
     uses: ./.github/workflows/e2e.yml
     with:
       use-case: ${{ matrix.use-case }}
       binary-source: release
       plan-formats: json
-      plan-only: ${{ matrix.plan-only || false }}
-      evidence: ${{ matrix.evidence || false }}
+      plan-only: ${{ matrix.plan-only }}
+      evidence: ${{ matrix.evidence }}
       open-issue-on-failure: true
     secrets: inherit
 
@@ -109,11 +105,11 @@ jobs:
           for dir in /tmp/fixtures/fixtures-*/; do
             case_name=$(basename "$dir" | sed 's/^fixtures-//')
             dest="testdata/e2e/$case_name/fixtures"
+            src="$dir/testdata/e2e/$case_name"
             mkdir -p "$dest"
-            [ -f "$dir/testdata/e2e/$case_name/create.json" ] && \
-              cp "$dir/testdata/e2e/$case_name/create.json" "$dest/create.json"
-            [ -f "$dir/testdata/e2e/$case_name/destroy.json" ] && \
-              cp "$dir/testdata/e2e/$case_name/destroy.json" "$dest/destroy.json"
+            for plan in create.json destroy.json; do
+              [ -f "$src/$plan" ] && cp "$src/$plan" "$dest/$plan" || true
+            done
           done
 
       - name: Check for changes

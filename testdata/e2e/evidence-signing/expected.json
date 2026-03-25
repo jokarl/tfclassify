@@ -1,4 +1,6 @@
 {
   "create": { "exit_code": 1, "classification": "standard" },
-  "destroy": { "exit_code": 1, "classification": "standard" }
+  "destroy": { "exit_code": 1, "classification": "standard" },
+  "plan_only": true,
+  "evidence": true
 }
