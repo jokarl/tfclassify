@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.4.0](https://github.com/jokarl/tfclassify/compare/tfclassify-plugin-sdk-v0.3.0...tfclassify-plugin-sdk-v0.4.0) (2026-03-25)
+
+
+### Features
+
+* add ignore_attributes to exclude cosmetic changes from classifi… ([#138](https://github.com/jokarl/tfclassify/issues/138)) ([85af62c](https://github.com/jokarl/tfclassify/commit/85af62c97a80f880bac749c87bdb809d5b804ad2))
+
+
+### Dependencies
+
+* **deps:** bump google.golang.org/grpc from 1.79.1 to 1.79.3 in /sdk ([#136](https://github.com/jokarl/tfclassify/issues/136)) ([e90c7fc](https://github.com/jokarl/tfclassify/commit/e90c7fc91df295476f0e708cc2a1e9a475bd19ce))
+
 ## [0.3.0](https://github.com/jokarl/tfclassify/compare/tfclassify-plugin-sdk-v0.2.1...tfclassify-plugin-sdk-v0.3.0) (2026-02-26)
 
 
