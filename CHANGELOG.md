@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.1](https://github.com/jokarl/tfclassify/compare/tfclassify-v0.7.0...tfclassify-v0.7.1) (2026-03-26)
+
+
+### Bug Fixes
+
+* treat all-no-op plans as no_changes after cosmetic filtering ([#144](https://github.com/jokarl/tfclassify/issues/144)) ([ef539c2](https://github.com/jokarl/tfclassify/commit/ef539c2412e7bb8b5678f9b9efe8771bf3d9efb8))
+
 ## [0.7.0](https://github.com/jokarl/tfclassify/compare/tfclassify-v0.6.0...tfclassify-v0.7.0) (2026-03-25)
 
 
