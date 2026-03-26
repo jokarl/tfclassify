@@ -27,7 +27,7 @@ jobs:
       plugin_tag_name: ${{ steps.release.outputs['plugins/azurerm--tag_name'] }}
       plugin_version: ${{ steps.release.outputs['plugins/azurerm--version'] }}
     steps:
-      - uses: googleapis/release-please-action@v4
+      - uses: googleapis/release-please-action@16a9c90856f42705d54a6fda1823352bdc62cf38 # v4
         id: release
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -71,15 +71,15 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           fetch-depth: 0
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
         with:
           go-version-file: go.mod
       - name: Create local goreleaser tag
         run: git tag "v${{ needs.resolve.outputs.cli_version || needs.release-please.outputs.cli_version }}"
-      - uses: goreleaser/goreleaser-action@v7
+      - uses: goreleaser/goreleaser-action@ec59f474b9834571250b370d4735c50f8e2d1e29 # v7
         with:
           args: release --clean
         env:
@@ -114,15 +114,15 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           fetch-depth: 0
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
         with:
           go-version-file: go.mod
       - name: Create local goreleaser tag
         run: git tag "v${{ needs.resolve.outputs.plugin_version || needs.release-please.outputs.plugin_version }}"
-      - uses: goreleaser/goreleaser-action@v7
+      - uses: goreleaser/goreleaser-action@ec59f474b9834571250b370d4735c50f8e2d1e29 # v7
         with:
           workdir: plugins/azurerm
           args: release --clean
