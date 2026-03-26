@@ -280,6 +280,27 @@ func TestBlastRadius_NoOpExcludedFromDecisions(t *testing.T) {
 	}
 }
 
+func TestAllNoOp(t *testing.T) {
+	tests := []struct {
+		name    string
+		changes []plan.ResourceChange
+		want    bool
+	}{
+		{"empty", nil, false},
+		{"single no-op", []plan.ResourceChange{{Actions: []string{"no-op"}}}, true},
+		{"mixed", []plan.ResourceChange{{Actions: []string{"no-op"}}, {Actions: []string{"update"}}}, false},
+		{"all no-op", []plan.ResourceChange{{Actions: []string{"no-op"}}, {Actions: []string{"no-op"}}}, true},
+		{"single update", []plan.ResourceChange{{Actions: []string{"update"}}}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := allNoOp(tt.changes); got != tt.want {
+				t.Errorf("allNoOp() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestBlastRadius_NoChanges(t *testing.T) {
 	a := NewBlastRadiusAnalyzer([]config.ClassificationConfig{
 		{Name: "critical", BlastRadius: &config.BlastRadiusConfig{MaxChanges: intPtr(1)}},
