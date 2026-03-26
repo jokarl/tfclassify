@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.2](https://github.com/jokarl/tfclassify/compare/tfclassify-v0.7.1...tfclassify-v0.7.2) (2026-03-26)
+
+
+### Bug Fixes
+
+* show "No resource changes" instead of classification description ([9ba052b](https://github.com/jokarl/tfclassify/commit/9ba052bf2b7a5639583d05f7f10a2a1f74ee0579))
+
 ## [0.7.1](https://github.com/jokarl/tfclassify/compare/tfclassify-v0.7.0...tfclassify-v0.7.1) (2026-03-26)
 
 
