@@ -124,13 +124,15 @@ func (f *Formatter) formatText(result *classify.Result) error {
 
 	// Overall classification
 	fmt.Fprintf(&sb, "Classification: %s\n", result.Overall)
-	if f.verbose && result.OverallDescription != "" {
+	if result.NoChanges {
+		sb.WriteString("  No resource changes in plan.\n")
+	} else if f.verbose && result.OverallDescription != "" {
 		fmt.Fprintf(&sb, "  %s\n", result.OverallDescription)
 	}
 	fmt.Fprintf(&sb, "Exit code: %d\n", result.OverallExitCode)
 
 	if result.NoChanges {
-		sb.WriteString("No resource changes in plan.\n")
+		// already printed above
 	} else {
 		fmt.Fprintf(&sb, "Resources: %d\n", len(result.ResourceDecisions))
 		sb.WriteByte('\n')
