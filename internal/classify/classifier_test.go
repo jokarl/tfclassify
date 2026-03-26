@@ -906,6 +906,98 @@ func TestExplainClassify_ModuleMismatchReason(t *testing.T) {
 	}
 }
 
+func TestClassify_AllNoOpReportsNoChanges(t *testing.T) {
+	cfg := newTestConfig()
+	classifier, err := New(cfg)
+	if err != nil {
+		t.Fatalf("failed to create classifier: %v", err)
+	}
+
+	// All resources are no-op (simulates post-FilterCosmeticChanges state)
+	changes := []plan.ResourceChange{
+		{
+			Address:         "azurerm_search_service.this",
+			Type:            "azurerm_search_service",
+			Actions:         []string{"no-op"},
+			OriginalActions: []string{"update"},
+		},
+		{
+			Address: "azurerm_resource_group.rg",
+			Type:    "azurerm_resource_group",
+			Actions: []string{"no-op"},
+		},
+	}
+
+	result := classifier.Classify(changes)
+
+	if !result.NoChanges {
+		t.Error("expected NoChanges to be true when all resources are no-op")
+	}
+	if result.Overall != "auto" {
+		t.Errorf("expected overall 'auto' (no_changes default), got '%s'", result.Overall)
+	}
+	if result.OverallExitCode != 0 {
+		t.Errorf("expected exit code 0, got %d", result.OverallExitCode)
+	}
+	// Resource decisions should still be populated for visibility
+	if len(result.ResourceDecisions) != 2 {
+		t.Fatalf("expected 2 resource decisions, got %d", len(result.ResourceDecisions))
+	}
+}
+
+func TestClassify_MixedNoOpAndRealNotNoChanges(t *testing.T) {
+	cfg := newTestConfig()
+	classifier, err := New(cfg)
+	if err != nil {
+		t.Fatalf("failed to create classifier: %v", err)
+	}
+
+	changes := []plan.ResourceChange{
+		{
+			Address: "azurerm_search_service.this",
+			Type:    "azurerm_search_service",
+			Actions: []string{"no-op"},
+		},
+		{
+			Address: "azurerm_resource_group.rg",
+			Type:    "azurerm_resource_group",
+			Actions: []string{"update"},
+		},
+	}
+
+	result := classifier.Classify(changes)
+
+	if result.NoChanges {
+		t.Error("expected NoChanges to be false when some resources have real changes")
+	}
+}
+
+func TestExplainClassify_AllNoOpReportsNoChanges(t *testing.T) {
+	cfg := newTestConfig()
+	classifier, err := New(cfg)
+	if err != nil {
+		t.Fatalf("failed to create classifier: %v", err)
+	}
+
+	changes := []plan.ResourceChange{
+		{
+			Address: "azurerm_search_service.this",
+			Type:    "azurerm_search_service",
+			Actions: []string{"no-op"},
+		},
+	}
+
+	result := classifier.ExplainClassify(changes)
+
+	if !result.NoChanges {
+		t.Error("expected NoChanges to be true when all resources are no-op")
+	}
+	// Resources should still be in the trace for visibility
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource in trace, got %d", len(result.Resources))
+	}
+}
+
 func TestClassify_NotActions(t *testing.T) {
 	cfg := &config.Config{
 		Classifications: []config.ClassificationConfig{

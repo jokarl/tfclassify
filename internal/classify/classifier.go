@@ -72,6 +72,16 @@ func (c *Classifier) Classify(changes []plan.ResourceChange) *Result {
 		}
 	}
 
+	// All resources are no-op (e.g., after cosmetic filtering) — treat as no changes.
+	// Resource decisions are still populated above for output visibility.
+	if allNoOp(changes) {
+		result.NoChanges = true
+		result.Overall = c.config.Defaults.NoChanges
+		result.OverallDescription = c.descriptionMap[result.Overall]
+		result.OverallExitCode = c.getExitCode(result.Overall)
+		return result
+	}
+
 	result.OverallExitCode = c.getExitCode(result.Overall)
 	return result
 }
@@ -144,6 +154,10 @@ func (c *Classifier) ExplainClassify(changes []plan.ResourceChange) *ExplainResu
 	for _, change := range changes {
 		explanation := c.explainResource(change)
 		result.Resources = append(result.Resources, explanation)
+	}
+
+	if allNoOp(changes) {
+		result.NoChanges = true
 	}
 
 	return result
@@ -416,8 +430,8 @@ func (c *Classifier) AddPluginDecisions(result *Result, pluginDecisions []Resour
 		}
 	}
 
-	// Recalculate overall
-	if len(result.ResourceDecisions) > 0 {
+	// Recalculate overall (but not if all resources are no-op)
+	if !result.NoChanges && len(result.ResourceDecisions) > 0 {
 		highestPrecedence := -1
 		for _, decision := range result.ResourceDecisions {
 			precedence, known := c.precedenceMap[decision.Classification]

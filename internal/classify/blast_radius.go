@@ -161,3 +161,17 @@ func isNoOp(actions []string) bool {
 	}
 	return true
 }
+
+// allNoOp returns true if every resource change in the slice has only "no-op"
+// actions. Returns false for empty slices (callers handle that separately).
+func allNoOp(changes []plan.ResourceChange) bool {
+	if len(changes) == 0 {
+		return false
+	}
+	for _, change := range changes {
+		if !isNoOp(change.Actions) {
+			return false
+		}
+	}
+	return true
+}
