@@ -2,9 +2,9 @@
 id: "CR-0034"
 status: "implemented"
 date: 2026-03-24
-requestor: Daniel Grenemark
+requestor: Johan Karlsson
 stakeholders:
-  - Daniel Grenemark
+  - Johan Karlsson
 priority: "high"
 target-version: "0.5.0"
 ---
