@@ -120,6 +120,87 @@ func TestFormatText_NoChanges(t *testing.T) {
 	}
 }
 
+func TestFormatText_NoChangesWithDowngradedVerbose(t *testing.T) {
+	result := &classify.Result{
+		Overall:         "auto",
+		OverallExitCode: 0,
+		NoChanges:       true,
+		ResourceDecisions: []classify.ResourceDecision{
+			{
+				Address:           "azurerm_monitor_diagnostic_setting.this",
+				ResourceType:      "azurerm_monitor_diagnostic_setting",
+				Actions:           []string{"no-op"},
+				Classification:    "minor",
+				OriginalActions:   []string{"update"},
+				IgnoredAttributes: []string{"log_analytics_destination_type"},
+			},
+			{
+				Address:        "azurerm_resource_group.rg",
+				ResourceType:   "azurerm_resource_group",
+				Actions:        []string{"no-op"},
+				Classification: "minor",
+			},
+		},
+	}
+
+	var buf bytes.Buffer
+	formatter := NewFormatter(&buf, FormatText, true) // verbose
+	err := formatter.Format(result)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := buf.String()
+
+	if !strings.Contains(output, "No resource changes") {
+		t.Errorf("expected 'No resource changes', got:\n%s", output)
+	}
+	if !strings.Contains(output, "Downgraded to no-op by ignore_attributes") {
+		t.Errorf("expected downgraded section, got:\n%s", output)
+	}
+	if !strings.Contains(output, "azurerm_monitor_diagnostic_setting.this") {
+		t.Errorf("expected downgraded resource address, got:\n%s", output)
+	}
+	if !strings.Contains(output, "log_analytics_destination_type") {
+		t.Errorf("expected ignored attribute name, got:\n%s", output)
+	}
+	// Non-downgraded resource should NOT appear
+	if strings.Contains(output, "azurerm_resource_group.rg") {
+		t.Errorf("non-downgraded resource should not appear in downgraded section, got:\n%s", output)
+	}
+}
+
+func TestFormatText_NoChangesWithDowngradedNonVerbose(t *testing.T) {
+	result := &classify.Result{
+		Overall:         "auto",
+		OverallExitCode: 0,
+		NoChanges:       true,
+		ResourceDecisions: []classify.ResourceDecision{
+			{
+				Address:           "azurerm_monitor_diagnostic_setting.this",
+				ResourceType:      "azurerm_monitor_diagnostic_setting",
+				Actions:           []string{"no-op"},
+				OriginalActions:   []string{"update"},
+				IgnoredAttributes: []string{"log_analytics_destination_type"},
+			},
+		},
+	}
+
+	var buf bytes.Buffer
+	formatter := NewFormatter(&buf, FormatText, false) // non-verbose
+	err := formatter.Format(result)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := buf.String()
+
+	// Non-verbose should NOT show downgraded section
+	if strings.Contains(output, "Downgraded") {
+		t.Errorf("non-verbose should not show downgraded section, got:\n%s", output)
+	}
+}
+
 func TestFormatGitHub(t *testing.T) {
 	result := &classify.Result{
 		Overall:         "critical",

@@ -132,7 +132,23 @@ func (f *Formatter) formatText(result *classify.Result) error {
 	fmt.Fprintf(&sb, "Exit code: %d\n", result.OverallExitCode)
 
 	if result.NoChanges {
-		// already printed above
+		// Show resources that were downgraded to no-op by ignore_attributes
+		if f.verbose {
+			var downgraded []classify.ResourceDecision
+			for _, d := range result.ResourceDecisions {
+				if len(d.OriginalActions) > 0 {
+					downgraded = append(downgraded, d)
+				}
+			}
+			if len(downgraded) > 0 {
+				fmt.Fprintf(&sb, "Downgraded to no-op by ignore_attributes:\n")
+				for _, d := range downgraded {
+					fmt.Fprintf(&sb, "  - %s (%s)\n", d.Address, d.ResourceType)
+					fmt.Fprintf(&sb, "    Originally: %v (downgraded by ignore_attributes: %s)\n",
+						d.OriginalActions, strings.Join(d.IgnoredAttributes, ", "))
+				}
+			}
+		}
 	} else {
 		fmt.Fprintf(&sb, "Resources: %d\n", len(result.ResourceDecisions))
 		sb.WriteByte('\n')
