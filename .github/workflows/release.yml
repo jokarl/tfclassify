@@ -19,6 +19,8 @@ jobs:
   release-please:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     outputs:
       cli_release_created: ${{ steps.release.outputs.release_created }}
       cli_tag_name: ${{ steps.release.outputs.tag_name }}
