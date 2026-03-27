@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.3](https://github.com/jokarl/tfclassify/compare/tfclassify-v0.7.2...tfclassify-v0.7.3) (2026-03-27)
+
+
+### Bug Fixes
+
+* show downgraded resources in verbose no-changes output ([acba5e8](https://github.com/jokarl/tfclassify/commit/acba5e8ef78f758cf0173051e39d28a716d4a6c4))
+
 ## [0.7.2](https://github.com/jokarl/tfclassify/compare/tfclassify-v0.7.1...tfclassify-v0.7.2) (2026-03-26)
 
 
