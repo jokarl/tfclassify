@@ -150,7 +150,13 @@ func (f *Formatter) formatText(result *classify.Result) error {
 			}
 		}
 	} else {
-		fmt.Fprintf(&sb, "Resources: %d\n", len(result.ResourceDecisions))
+		activeCount := 0
+		for _, d := range result.ResourceDecisions {
+			if !isNoOpDecision(d) {
+				activeCount++
+			}
+		}
+		fmt.Fprintf(&sb, "Resources: %d\n", activeCount)
 		sb.WriteByte('\n')
 
 		if f.verbose {
@@ -165,14 +171,32 @@ func (f *Formatter) formatText(result *classify.Result) error {
 					byClassification[decision.Classification], decision)
 			}
 
+			totalNoOp := 0
 			for _, classification := range classificationOrder {
 				decisions := byClassification[classification]
-				fmt.Fprintf(&sb, "[%s] (%d resources)\n", classification, len(decisions))
-				// Show classification description if available (from first decision)
-				if len(decisions) > 0 && decisions[0].ClassificationDescription != "" {
-					fmt.Fprintf(&sb, "  %s\n", decisions[0].ClassificationDescription)
+
+				// Separate active changes from no-ops
+				var active, noop []classify.ResourceDecision
+				for _, d := range decisions {
+					if isNoOpDecision(d) {
+						noop = append(noop, d)
+					} else {
+						active = append(active, d)
+					}
 				}
-				for _, decision := range decisions {
+				totalNoOp += len(noop)
+
+				// Skip classifications that contain only no-op resources
+				if len(active) == 0 {
+					continue
+				}
+
+				fmt.Fprintf(&sb, "[%s] (%d resources)\n", classification, len(active))
+				// Show classification description if available (from first decision)
+				if active[0].ClassificationDescription != "" {
+					fmt.Fprintf(&sb, "  %s\n", active[0].ClassificationDescription)
+				}
+				for _, decision := range active {
 					fmt.Fprintf(&sb, "  - %s (%s) %v\n",
 						decision.Address, decision.ResourceType, decision.Actions)
 					if len(decision.OriginalActions) > 0 {
@@ -185,17 +209,38 @@ func (f *Formatter) formatText(result *classify.Result) error {
 				}
 				sb.WriteByte('\n')
 			}
+			if totalNoOp > 0 {
+				fmt.Fprintf(&sb, "(%d no-op resources hidden)\n", totalNoOp)
+			}
 		} else {
-			// Compact output
+			// Compact output — skip no-op resources
+			noopCount := 0
 			for _, decision := range result.ResourceDecisions {
+				if isNoOpDecision(decision) {
+					noopCount++
+					continue
+				}
 				fmt.Fprintf(&sb, "  [%s] %s\n",
 					decision.Classification, decision.Address)
+			}
+			if noopCount > 0 {
+				fmt.Fprintf(&sb, "  (%d no-op resources hidden)\n", noopCount)
 			}
 		}
 	}
 
 	_, err := io.WriteString(f.writer, sb.String())
 	return err
+}
+
+// isNoOpDecision returns true if the decision's actions consist only of "no-op".
+func isNoOpDecision(d classify.ResourceDecision) bool {
+	for _, a := range d.Actions {
+		if a != "no-op" {
+			return false
+		}
+	}
+	return true
 }
 
 func (f *Formatter) formatGitHub(result *classify.Result) error {
