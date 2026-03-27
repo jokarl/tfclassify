@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.4](https://github.com/jokarl/tfclassify/compare/tfclassify-v0.7.3...tfclassify-v0.7.4) (2026-03-27)
+
+
+### Bug Fixes
+
+* hide no-op resources in text output, show only active changes ([351bc74](https://github.com/jokarl/tfclassify/commit/351bc7462b44f8df6b8862fd79b35c675bb13cec))
+
 ## [0.7.3](https://github.com/jokarl/tfclassify/compare/tfclassify-v0.7.2...tfclassify-v0.7.3) (2026-03-27)
 
 
