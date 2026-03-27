@@ -114,7 +114,7 @@ Defined in `proto/tfclassify.proto`, generated code in `sdk/pb/`. Two services:
 
 ## Configuration
 
-HCL format (`.tfclassify.hcl`), parsed by `internal/config/` using `hashicorp/hcl/v2`. Key blocks: `classification` (rules with resource/not_resource glob + actions/not_actions + module/not_module, blast_radius thresholds, topology thresholds), `plugin` (source, version, enabled, config), `precedence` list, `defaults` (unclassified, no_changes, drift_classification), `evidence` (artifact output with optional Ed25519 signing).
+HCL format (`.tfclassify.hcl`), parsed by `internal/config/` using `hashicorp/hcl/v2`. Key blocks: `classification` (rules with resource/not_resource glob + actions/not_actions + module/not_module, blast_radius thresholds, topology thresholds), `plugin` (source, version, enabled, config), `precedence` list, `defaults` (unclassified, no_changes, drift_classification, ignore_attributes), `evidence` (artifact output with optional Ed25519 signing).
 
 ## Plugin System
 

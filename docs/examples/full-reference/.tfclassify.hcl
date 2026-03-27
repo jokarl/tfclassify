@@ -337,11 +337,11 @@ defaults {
   # the resource is reclassified as no-op before classification begins.
   #
   # Uses prefix-based dot-path matching:
-  #   "tags"      → covers tags, tags.env, tags.tf-module-l2 (but NOT tags_all)
+  #   "tags"      → covers tags, tags.env, tags.team (but NOT tags_all)
   #   "meta.tags" → covers meta.tags, meta.tags.env (but NOT meta.name)
   #
   # Common use case: module tagging conventions where version bumps cause
-  # widespread cosmetic changes (e.g., tf-module-l2 tag updates).
+  # widespread cosmetic changes (e.g., provenance tag updates).
   ignore_attributes = ["tags", "tags_all"]
 }
 

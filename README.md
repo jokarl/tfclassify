@@ -21,6 +21,7 @@ Classify Terraform plan changes based on organization-defined rules. tfclassify 
   - [Rule Fields](#rule-fields)
   - [Precedence](#precedence)
   - [Defaults](#defaults)
+  - [Ignore Attributes](#ignore-attributes)
   - [Blast Radius](#blast-radius)
   - [Topology](#topology)
   - [Plugin Declarations](#plugin-declarations)
@@ -122,7 +123,7 @@ precedence = ["critical", "standard", "auto"]
 
 defaults {
   unclassified = "standard"   # Resources matching no rule
-  no_changes   = "auto"       # Plans with zero resource changes
+  no_changes   = "auto"       # Plans with zero changes (or all filtered to no-op)
 }
 ```
 
@@ -169,7 +170,7 @@ tfclassify [flags]
 |------|-------|---------|-------------|
 | `--plan` | `-p` | (required) | Path to Terraform plan file (JSON or binary) |
 | `--config` | `-c` | auto-discover | Path to `.tfclassify.hcl` config file |
-| `--output` | `-o` | `text` | Output format: `text`, `json`, `github` |
+| `--output` | `-o` | `text` | Output format: `text`, `json`, `github`, `sarif` |
 | `--verbose` | `-v` | `false` | Show per-resource rule match details |
 | `--detailed-exitcode` | `-d` | `false` | Use classification-based exit codes (see below) |
 | `--evidence-file` | | | Write evidence artifact to file (see [Evidence](#evidence)) |
@@ -273,7 +274,7 @@ tfclassify verify --evidence-file evidence.json --public-key signing.pub
 
 ### Output Formats
 
-**Text** (default) — human-readable summary. With `-v`, groups resources by classification and shows matched rules.
+**Text** (default) — human-readable summary. With `-v`, groups resources by classification and shows matched rules. When all resources are no-op, shows "No resource changes in plan." and lists any resources downgraded by `ignore_attributes`.
 
 **JSON** — machine-readable output for CI/CD integration:
 
@@ -297,6 +298,8 @@ tfclassify verify --evidence-file evidence.json --public-key signing.pub
 ```
 
 **GitHub** — sets GitHub Actions output variables (`classification`, `exit_code`, `no_changes`, `resource_count`) in `GITHUB_OUTPUT` file format.
+
+**SARIF** — [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html) output for integration with GitHub Code Scanning and other SARIF-compatible tools. Each classified resource becomes a SARIF result. Use `sarif_level` in classification blocks to control severity mapping.
 
 ## Configuration
 
@@ -423,15 +426,52 @@ defaults {
   no_changes           = "auto"       # Plans with zero resource changes
   drift_classification = "standard"   # Drift-corrected resources (optional)
   plugin_timeout       = "30s"        # Timeout for external plugin execution
+  ignore_attributes    = ["tags", "tags_all"]  # Cosmetic attributes to filter out
 }
 ```
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `unclassified` | string | Classification for resources matching no rule. Must reference a name in `precedence`. |
-| `no_changes` | string | Classification when the plan has zero resource changes. Must reference a name in `precedence`. |
+| `no_changes` | string | Classification when the plan has zero resource changes. Also applies when all resources are no-op after `ignore_attributes` filtering. Always produces exit code 0. |
 | `drift_classification` | string | Optional. Classification for resources whose changes are drift corrections (actual state diverged from config outside Terraform). Must reference a name in `precedence`. |
 | `plugin_timeout` | string | Timeout for external plugin execution. Go duration string (e.g. `"10s"`, `"2m30s"`). Default: `"30s"`. |
+| `ignore_attributes` | list of strings | Optional. Attribute prefixes to ignore when determining if a resource meaningfully changed. If ALL changed attributes on an `["update"]` resource match these prefixes, the resource is downgraded to `["no-op"]`. Uses prefix-based dot-path matching: `"tags"` covers `tags.env` but not `tags_all`. See [Ignore Attributes](#ignore-attributes). |
+
+### Ignore Attributes
+
+The optional `ignore_attributes` list in `defaults {}` filters out cosmetic-only changes before classification begins. When ALL changed attributes on an `["update"]` resource are covered by the ignore list, the resource is downgraded to `["no-op"]`.
+
+```hcl
+defaults {
+  ignore_attributes = ["tags", "tags_all"]
+}
+```
+
+This is useful when tagging conventions cause widespread cosmetic changes that inflate blast radius counts and trigger classification rules meant for meaningful infrastructure changes.
+
+**Prefix-based matching:** entries are matched as dot-delimited prefixes against the changed attribute paths.
+
+| Config entry | Matches | Does NOT match |
+|---|---|---|
+| `"tags"` | `tags`, `tags.environment`, `tags.team` | `tags_all`, `name` |
+| `"tags_all"` | `tags_all`, `tags_all.env` | `tags` |
+| `"meta.tags"` | `meta.tags`, `meta.tags.env` | `meta.name`, `meta` |
+
+**Output visibility:** when `--verbose` is set, downgraded resources are shown with their original actions and the specific attributes that were filtered:
+
+```
+Classification: auto
+  No resource changes in plan.
+Exit code: 0
+Downgraded to no-op by ignore_attributes:
+  - azurerm_monitor_diagnostic_setting.this (azurerm_monitor_diagnostic_setting)
+    Originally: [update] (downgraded by ignore_attributes: log_analytics_destination_type)
+```
+
+**No-changes detection:** when ALL resources in a plan are no-op (either natively or after `ignore_attributes` filtering), the overall classification uses the `no_changes` default with exit code 0.
+
+Only `["update"]` actions are evaluated — creates, deletes, and replacements are never affected.
 
 ### Blast Radius
 
@@ -627,7 +667,10 @@ The [e2e test scenarios](testdata/e2e/) serve as a progressive learning path fro
 | Role exclusions | [role-exclusion](testdata/e2e/role-exclusion/) | `exclude` list bypasses plugin detection |
 | Module support | [modules-pluginless](testdata/e2e/modules-pluginless/) | Resources inside Terraform modules |
 | Module-scoped rules | [module-scoped-rules](testdata/e2e/module-scoped-rules/) | `module` field filters rules by module path |
+| Blast radius | [blast-radius](testdata/e2e/blast-radius/) | Plan-wide change count thresholds |
 | Change topology | [topology](testdata/e2e/topology/) | Dependency graph fan-out thresholds |
+| Role aggregation | [combined-role-aggregation](testdata/e2e/combined-role-aggregation/) | `merge_principal_roles` per-principal evaluation |
+| Evidence signing | [evidence-signing](testdata/e2e/evidence-signing/) | Ed25519 signed evidence artifacts |
 | CIS benchmark mapping | [cis-azure-foundations](testdata/e2e/cis-azure-foundations/) | Classifications named after CIS controls |
 
 ## E2E Test Scenarios
@@ -642,6 +685,7 @@ These scenarios demonstrate real-world classification behavior across all three 
 |----------|--------|---------------|
 | [route-table](testdata/e2e/route-table/) | Glob rules only, no plugins | Baseline: route table + route classified as `standard` by `resource = ["*"]` catch-all. No plugin involvement. |
 | [role-assignment-reader](testdata/e2e/role-assignment-reader/) | Glob rules only, no plugins | Reader role assignment classified as `standard` on create (catch-all), `critical` on destroy (matches `*_role_*` + `delete`). |
+| [blast-radius](testdata/e2e/blast-radius/) | `blast_radius { max_changes = 3 }` on critical | Plans exceeding the change count threshold trigger `critical` for all resources via the blast radius analyzer. |
 
 ### Deep Inspection: Privilege Escalation
 
@@ -658,6 +702,7 @@ These scenarios demonstrate real-world classification behavior across all three 
 |----------|--------|---------------|
 | [data-plane-detection](testdata/e2e/data-plane-detection/) | `data_actions = ["Microsoft.Storage/*"]` on critical | **CR-0027.** Storage Blob Data Owner triggers `critical` via data-plane pattern matching (`Microsoft.Storage/*/blobs/*` matches `Microsoft.Storage/*`). Reader (no data actions) falls through to `standard` via control-plane `*/read` pattern. |
 | [control-plane-patterns](testdata/e2e/control-plane-patterns/) | `actions = ["Microsoft.Authorization/*", "*"]` on critical, `actions = ["*/read"]` on standard | **CR-0028.** User Access Administrator (has `Microsoft.Authorization/*`) triggers `critical`. Reader (only `*/read`) triggers `standard`. Demonstrates pattern-based control-plane detection. |
+| [combined-role-aggregation](testdata/e2e/combined-role-aggregation/) | `merge_principal_roles = true` on critical | Per-principal evaluation: groups role assignments by principal, computes union of effective permissions, and evaluates the merged set against action patterns. |
 
 ### Module Support
 
@@ -678,6 +723,12 @@ These scenarios demonstrate real-world classification behavior across all three 
 | Scenario | Config | What It Tests |
 |----------|--------|---------------|
 | [cis-azure-foundations](testdata/e2e/cis-azure-foundations/) | `privilege_escalation` across CIS-named classifications | Classifications named after CIS Azure Foundations Benchmark sections. Demonstrates mapping CIS 1.23 (no privileged role assignments) to tfclassify analyzers. No special compliance feature needed — classification and rule names carry the CIS references directly. |
+
+### Evidence Signing
+
+| Scenario | Config | What It Tests |
+|----------|--------|---------------|
+| [evidence-signing](testdata/e2e/evidence-signing/) | `evidence { signing_key = ... }` | Ed25519 signed evidence artifacts. Generates a key pair, classifies with `--evidence-file`, then verifies the signature with `tfclassify verify`. |
 
 ### How E2E Tests Run
 
@@ -761,7 +812,7 @@ tfclassify/
 ├── internal/
 │   ├── classify/          # Core classification engine (Layer 1 + 2)
 │   ├── config/            # HCL config loading, validation, discovery
-│   ├── output/            # Output formatters (text, json, github)
+│   ├── output/            # Output formatters (text, json, github, sarif)
 │   ├── plan/              # Terraform plan JSON/binary parsing
 │   └── plugin/            # Plugin discovery, installation, lifecycle
 ├── sdk/                   # Plugin SDK — see sdk/README.md
