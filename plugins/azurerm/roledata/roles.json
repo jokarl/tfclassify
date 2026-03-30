@@ -1447,6 +1447,26 @@
           "Microsoft.AwsConnector/appSyncGraphqlApis/write",
           "Microsoft.AwsConnector/autoScalingAutoScalingGroups/delete",
           "Microsoft.AwsConnector/autoScalingAutoScalingGroups/write",
+          "Microsoft.AwsConnector/bedrockAgentAliases/delete",
+          "Microsoft.AwsConnector/bedrockAgentAliases/write",
+          "Microsoft.AwsConnector/bedrockAgents/delete",
+          "Microsoft.AwsConnector/bedrockAgents/write",
+          "Microsoft.AwsConnector/bedrockApplicationInferenceProfiles/delete",
+          "Microsoft.AwsConnector/bedrockApplicationInferenceProfiles/write",
+          "Microsoft.AwsConnector/bedrockBlueprints/delete",
+          "Microsoft.AwsConnector/bedrockBlueprints/write",
+          "Microsoft.AwsConnector/bedrockDataAutomationProjects/delete",
+          "Microsoft.AwsConnector/bedrockDataAutomationProjects/write",
+          "Microsoft.AwsConnector/bedrockDataSources/delete",
+          "Microsoft.AwsConnector/bedrockDataSources/write",
+          "Microsoft.AwsConnector/bedrockFlowAliases/delete",
+          "Microsoft.AwsConnector/bedrockFlowAliases/write",
+          "Microsoft.AwsConnector/bedrockGuardrails/delete",
+          "Microsoft.AwsConnector/bedrockGuardrails/write",
+          "Microsoft.AwsConnector/bedrockKnowledgeBases/delete",
+          "Microsoft.AwsConnector/bedrockKnowledgeBases/write",
+          "Microsoft.AwsConnector/bedrockPrompts/delete",
+          "Microsoft.AwsConnector/bedrockPrompts/write",
           "Microsoft.AwsConnector/cloudFormationStacks/delete",
           "Microsoft.AwsConnector/cloudFormationStacks/write",
           "Microsoft.AwsConnector/cloudFormationStackSets/delete",
@@ -4279,7 +4299,7 @@
           "Microsoft.DeviceRegistry/schemaRegistries/read",
           "Microsoft.DeviceRegistry/schemaRegistries/write",
           "Microsoft.Authorization/*/read",
-          "Microsoft.Authorization/*/write",
+          "Microsoft.Authorization/roleAssignments/write",
           "Microsoft.Insights/alertRules/*",
           "Microsoft.Resources/deployments/*",
           "Microsoft.Resources/subscriptions/resourceGroups/read",
@@ -5478,6 +5498,9 @@
           "Microsoft.Dashboard/grafana/managedPrivateEndpoints/delete",
           "Microsoft.Dashboard/grafana/integrationFabrics/write",
           "Microsoft.Dashboard/grafana/integrationFabrics/delete",
+          "Microsoft.Dashboard/grafana/grafanaDefinitions/read",
+          "Microsoft.Dashboard/grafana/grafanaDefinitions/write",
+          "Microsoft.Dashboard/grafana/grafanaDefinitions/delete",
           "Microsoft.Authorization/*/read",
           "Microsoft.Insights/AlertRules/Write",
           "Microsoft.Insights/AlertRules/Delete",
@@ -5495,6 +5518,54 @@
           "Microsoft.Resources/deployments/exportTemplate/action",
           "Microsoft.Resources/deployments/operations/read",
           "Microsoft.Resources/deployments/operationstatuses/read",
+          "Microsoft.Resources/subscriptions/resourceGroups/read"
+        ],
+        "notActions": [],
+        "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "3015e5ed-6856-4ab3-b2f0-b8492aa30ca6",
+    "roleName": "Azure Managed Redis Contributor",
+    "description": "Lets you manage Azure Managed Redis resources, but not access the data stored in them.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.Authorization/*/read",
+          "Microsoft.Cache/locations/operationsStatus/read",
+          "Microsoft.Cache/locations/checknameavailability/action",
+          "Microsoft.Cache/operations/read",
+          "Microsoft.Cache/redisEnterprise/*",
+          "Microsoft.Insights/alertRules/*",
+          "Microsoft.ResourceHealth/availabilityStatuses/read",
+          "Microsoft.Resources/deployments/*",
+          "Microsoft.Resources/subscriptions/resourceGroups/read"
+        ],
+        "notActions": [],
+        "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "f287ba2f-f923-4464-a5bd-721c3951d32d",
+    "roleName": "Azure Managed Redis Reader",
+    "description": "Lets you view Azure Managed Redis resources, but not modify them or access keys or access to the data stored in them.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.Authorization/*/read",
+          "Microsoft.Cache/locations/operationsStatus/read",
+          "Microsoft.Cache/operations/read",
+          "Microsoft.Cache/redisEnterprise/read",
+          "Microsoft.Cache/redisEnterprise/*/read",
+          "Microsoft.Insights/alertRules/*",
+          "Microsoft.ResourceHealth/availabilityStatuses/read",
+          "Microsoft.Resources/deployments/*",
           "Microsoft.Resources/subscriptions/resourceGroups/read"
         ],
         "notActions": [],
@@ -12350,7 +12421,8 @@
           "Microsoft.operationalinsights/workspaces/write",
           "Microsoft.operationalinsights/workspaces/query/read",
           "Microsoft.operationalinsights/workspaces/tables/write",
-          "Microsoft.operationalinsights/workspaces/tables/delete"
+          "Microsoft.operationalinsights/workspaces/tables/delete",
+          "Microsoft.operationalinsights/workspaces/sharedkeys/action"
         ],
         "notActions": [],
         "dataActions": [],
@@ -15893,6 +15965,7 @@
       {
         "actions": [
           "Microsoft.HybridConnectivity/endpoints/listIngressGatewayCredentials/action",
+          "Microsoft.HybridConnectivity/Locations/OperationStatuses/write",
           "Microsoft.HybridConnectivity/publicCloudConnectors/delete",
           "Microsoft.HybridConnectivity/publicCloudConnectors/testPermissions/action",
           "Microsoft.HybridConnectivity/publicCloudConnectors/write",
@@ -16976,7 +17049,9 @@
           "Microsoft.Datadog/subscriptionStatuses/read",
           "Microsoft.Datadog/operations/read",
           "Microsoft.Datadog/monitors/getDefaultApplicationKey/action",
-          "Microsoft.Datadog/monitors/manageSreAgentConnectors/action"
+          "Microsoft.Datadog/monitors/manageSreAgentConnectors/action",
+          "Microsoft.Datadog/monitors/latestLinkedSaaS/action",
+          "Microsoft.Datadog/monitors/linkSaaS/action"
         ],
         "notActions": [],
         "dataActions": [],
@@ -17037,7 +17112,8 @@
           "Dynatrace.Observability/monitors/tagRules/write",
           "Dynatrace.Observability/registeredSubscriptions/read",
           "Dynatrace.Observability/operations/read",
-          "Dynatrace.Observability/monitors/manageSreAgentConnectors/action"
+          "Dynatrace.Observability/monitors/manageSreAgentConnectors/action",
+          "Dynatrace.Observability/monitors/latestLinkedSaaS/action"
         ],
         "notActions": [],
         "dataActions": [],
@@ -17967,6 +18043,22 @@
         ],
         "notActions": [],
         "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "8ec773c5-7ce6-4b78-91d1-182f8faa536d",
+    "roleName": "Microsoft Discovery Bookshelf Index Data Reader - Preview",
+    "description": "Grants query access to search and retrieve data from Microsoft Discovery Bookshelf knowledge bases. This is the minimum role required to use the retrieve action when linking a knowledge base to an agent. This role is in preview and subject to change.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [],
+        "notActions": [],
+        "dataActions": [
+          "Microsoft.Discovery/bookshelf/knowledgeBaseVersions/search"
+        ],
         "notDataActions": []
       }
     ]
@@ -19135,6 +19227,37 @@
       {
         "actions": [
           "Microsoft.NetworkCloud/*"
+        ],
+        "notActions": [],
+        "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "63342533-d951-495d-a3c3-a459aa02362b",
+    "roleName": "Oracle Database DbSystems Administrator",
+    "description": "Grants full access to manage DbSystems resources",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Oracle.Database/dbSystems/*/read",
+          "Oracle.Database/dbSystems/*/write",
+          "Oracle.Database/dbSystems/*/delete",
+          "Oracle.Database/Locations/*/read",
+          "Oracle.Database/Locations/*/write",
+          "Oracle.Database/Operations/read",
+          "Oracle.Database/oracleSubscriptions/*/read",
+          "Oracle.Database/resourceAnchors/*",
+          "Oracle.Database/networkAnchors/*",
+          "Microsoft.Network/virtualNetworks/read",
+          "Microsoft.Network/virtualNetworks/subnets/read",
+          "Microsoft.Network/virtualNetworks/subnets/write",
+          "Microsoft.Network/locations/operations/read",
+          "Microsoft.Compute/sshPublicKeys/read",
+          "Microsoft.Compute/sshPublicKeys/write",
+          "Microsoft.Compute/sshPublicKeys/generateKeyPair/action"
         ],
         "notActions": [],
         "dataActions": [],
@@ -21459,6 +21582,8 @@
           "Microsoft.ServicesHub/connectors/read",
           "Microsoft.ServicesHub/connectors/delete",
           "Microsoft.ServicesHub/connectors/checkAssessmentEntitlement/action",
+          "Microsoft.ServicesHub/connectors/*",
+          "Microsoft.ServicesHub/*",
           "Microsoft.ServicesHub/supportOfferingEntitlement/read",
           "Microsoft.ServicesHub/workspaces/read"
         ],
