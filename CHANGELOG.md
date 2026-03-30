@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.5](https://github.com/jokarl/tfclassify/compare/tfclassify-v0.7.4...tfclassify-v0.7.5) (2026-03-30)
+
+
+### Bug Fixes
+
+* refresh Azure role data and action registry ([#152](https://github.com/jokarl/tfclassify/issues/152)) ([baad7f8](https://github.com/jokarl/tfclassify/commit/baad7f81b24b511262fdc7733c3fc8bd89ecfd35))
+
 ## [0.7.4](https://github.com/jokarl/tfclassify/compare/tfclassify-v0.7.3...tfclassify-v0.7.4) (2026-03-27)
 
 
