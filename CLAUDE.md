@@ -129,6 +129,7 @@ Version negotiation: host checks `SDKVersionConstraints` against plugin's report
 - `tfclassify validate` — Check `.tfclassify.hcl` for errors without a plan. Exits 0 if valid (warnings to stderr), exits 1 on errors. Accepts `--config` / `-c` flag.
 - `tfclassify explain --plan <file>` — Trace classification decisions for each resource through the full pipeline (core rules, builtin analyzers, plugins). Accepts `--resource` / `-r` (repeatable) to filter, `--output` / `-o` for json/text, `--config` / `-c`.
 - `tfclassify verify --evidence-file <file> --public-key <file>` — Verify the Ed25519 signature of an evidence artifact. Exits 0 if valid, 1 if invalid.
+- `tfclassify scaffold` — Generate a starter `.tfclassify.hcl` from `terraform state list` output. Reads from stdin (`terraform state list | tfclassify scaffold`). Use `-o <path>` to write to a file, `--force` to overwrite.
 
 ## E2E Tests
 
