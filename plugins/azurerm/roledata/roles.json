@@ -3870,7 +3870,8 @@
       {
         "actions": [
           "microsoft.deviceregistry/namespaces/credentials/*",
-          "microsoft.deviceregistry/namespaces/credentials/policies/*"
+          "microsoft.deviceregistry/namespaces/credentials/policies/*",
+          "microsoft.deviceregistry/namespaces/devices/revoke/action"
         ],
         "notActions": [],
         "dataActions": [],
@@ -3892,7 +3893,8 @@
           "Microsoft.DeviceRegistry/namespaces/credentials/*",
           "Microsoft.DeviceRegistry/namespaces/credentials/policies/*",
           "Microsoft.Devices/iothubs/*",
-          "Microsoft.Devices/provisioningServices/*"
+          "Microsoft.Devices/provisioningServices/*",
+          "microsoft.deviceregistry/namespaces/devices/revoke/action"
         ],
         "notActions": [],
         "dataActions": [
@@ -5563,9 +5565,9 @@
           "Microsoft.Cache/operations/read",
           "Microsoft.Cache/redisEnterprise/read",
           "Microsoft.Cache/redisEnterprise/*/read",
-          "Microsoft.Insights/alertRules/*",
+          "Microsoft.Insights/alertRules/read",
           "Microsoft.ResourceHealth/availabilityStatuses/read",
-          "Microsoft.Resources/deployments/*",
+          "Microsoft.Resources/deployments/read",
           "Microsoft.Resources/subscriptions/resourceGroups/read"
         ],
         "notActions": [],
@@ -6320,7 +6322,16 @@
           "Microsoft.Network/natGateways/read",
           "Microsoft.Network/natGateways/join/action",
           "Microsoft.Network/networkSecurityGroups/read",
-          "Microsoft.Network/networkSecurityGroups/join/action"
+          "Microsoft.Network/networkSecurityGroups/join/action",
+          "Microsoft.Network/loadBalancers/backendAddressPools/read",
+          "Microsoft.Network/loadBalancers/backendAddressPools/write",
+          "Microsoft.Network/loadBalancers/read",
+          "Microsoft.Network/loadBalancers/write",
+          "Microsoft.Network/privateDnsZones/virtualNetworkLinks/read",
+          "Microsoft.Network/privateDnsZones/virtualNetworkLinks/write",
+          "Microsoft.Network/virtualNetworks/join/action",
+          "Microsoft.Network/virtualNetworks/joinLoadBalancer/action",
+          "Microsoft.Network/virtualNetworks/subnets/join/action"
         ],
         "notActions": [],
         "dataActions": [],
@@ -10180,7 +10191,6 @@
           "Microsoft.Mission/virtualEnclaves/workloads/read",
           "Microsoft.Authorization/*/read",
           "Microsoft.Insights/alertRules/*",
-          "Microsoft.Resources/deployments/*",
           "Microsoft.Resources/subscriptions/read",
           "Microsoft.Resources/subscriptions/resourceGroups/read",
           "Microsoft.Resources/subscriptions/resourcegroups/deployments/read",
@@ -11791,7 +11801,20 @@
           "Microsoft.ApiManagement/service/apiVersionSets/read",
           "Microsoft.ApiManagement/service/apis/diagnostics/read",
           "Microsoft.ApiManagement/service/apis/diagnostics/write",
-          "Microsoft.ApiManagement/service/apis/diagnostics/delete"
+          "Microsoft.ApiManagement/service/apis/diagnostics/delete",
+          "Microsoft.ApiManagement/service/apis/policies/read",
+          "Microsoft.ApiManagement/service/backends/read",
+          "Microsoft.ApiManagement/service/workspaces/read",
+          "Microsoft.ApiManagement/service/workspaces/apis/read",
+          "Microsoft.ApiManagement/service/workspaces/apis/operations/read",
+          "Microsoft.ApiManagement/service/workspaces/apiVersionSets/read",
+          "Microsoft.ApiManagement/service/workspaces/apis/diagnostics/read",
+          "Microsoft.ApiManagement/service/workspaces/apis/diagnostics/write",
+          "Microsoft.ApiManagement/service/workspaces/apis/diagnostics/delete",
+          "Microsoft.ApiManagement/service/workspaces/apis/policies/read",
+          "Microsoft.ApiManagement/service/workspaces/backends/read",
+          "Microsoft.ApiManagement/gateways/configConnections/read",
+          "Microsoft.ApiManagement/service/workspaceLinks/read"
         ],
         "notActions": [],
         "dataActions": [],
@@ -12024,7 +12047,9 @@
           "Microsoft.Features/providers/features/read",
           "Microsoft.Features/providers/features/register/action",
           "Microsoft.Security/pricings/securityoperators/read",
-          "Microsoft.Security/securityOperators/read"
+          "Microsoft.Security/securityOperators/read",
+          "Microsoft.Authorization/policyAssignments/read",
+          "Microsoft.Authorization/policySetDefinitions/read"
         ],
         "notActions": [],
         "dataActions": [],
@@ -13105,6 +13130,25 @@
         ],
         "notActions": [],
         "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "c24cf47c-5077-412d-a19c-45202126392c",
+    "roleName": "Dev Compute SandboxGroup Data Owner",
+    "description": "Ownership of all SandboxGroup data.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [],
+        "notActions": [],
+        "dataActions": [
+          "Microsoft.App/sandboxGroups/*/read",
+          "Microsoft.App/sandboxGroups/*/write",
+          "Microsoft.App/sandboxGroups/*/delete",
+          "Microsoft.App/sandboxGroups/*/action"
+        ],
         "notDataActions": []
       }
     ]
@@ -15967,9 +16011,11 @@
           "Microsoft.HybridConnectivity/endpoints/listIngressGatewayCredentials/action",
           "Microsoft.HybridConnectivity/Locations/OperationStatuses/write",
           "Microsoft.HybridConnectivity/publicCloudConnectors/delete",
+          "Microsoft.HybridConnectivity/publicCloudConnectors/read",
           "Microsoft.HybridConnectivity/publicCloudConnectors/testPermissions/action",
           "Microsoft.HybridConnectivity/publicCloudConnectors/write",
           "Microsoft.HybridConnectivity/solutionConfigurations/delete",
+          "Microsoft.HybridConnectivity/solutionConfigurations/read",
           "Microsoft.HybridConnectivity/solutionConfigurations/syncNow/action",
           "Microsoft.HybridConnectivity/solutionConfigurations/write"
         ],
@@ -19927,7 +19973,12 @@
           "Microsoft.Hardware/register/action",
           "Microsoft.Hardware/orderPreview/action",
           "Microsoft.Hardware/orders/read",
-          "Microsoft.Hardware/orders/write"
+          "Microsoft.Hardware/orders/write",
+          "Microsoft.Hardware/orders/delete",
+          "Microsoft.Hardware/returnPreview/action",
+          "Microsoft.Hardware/returns/read",
+          "Microsoft.Hardware/returns/write",
+          "Microsoft.Hardware/returns/delete"
         ],
         "notActions": [],
         "dataActions": [],
@@ -21588,6 +21639,30 @@
           "Microsoft.ServicesHub/workspaces/read"
         ],
         "notActions": [],
+        "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "4417a88f-3e58-4cf2-a4e9-112cf414254c",
+    "roleName": "Services Hub User",
+    "description": "Services Hub User allows you to perform all read, write, and deletion operations related to Services Hub Connectors except create/delete connector and managing law.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.Authorization/*/read",
+          "Microsoft.Resources/deployments/*",
+          "Microsoft.ServicesHub/connectors/read",
+          "Microsoft.ServicesHub/connectors/*",
+          "Microsoft.ServicesHub/*",
+          "Microsoft.ServicesHub/workspaces/read"
+        ],
+        "notActions": [
+          "Microsoft.ServicesHub/connectors/write",
+          "Microsoft.ServicesHub/connectors/delete"
+        ],
         "dataActions": [],
         "notDataActions": []
       }

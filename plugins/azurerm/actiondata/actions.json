@@ -5365,6 +5365,7 @@
       "Microsoft.DeviceRegistry/schemaRegistries/write",
       "microsoft.deviceregistry/namespaces/credentials/policies/read",
       "microsoft.deviceregistry/namespaces/credentials/read",
+      "microsoft.deviceregistry/namespaces/devices/revoke/action",
       "microsoft.deviceregistry/namespaces/read"
     ],
     "microsoft.devices": [
@@ -6743,9 +6744,14 @@
     ],
     "microsoft.hardware": [
       "Microsoft.Hardware/orderPreview/action",
+      "Microsoft.Hardware/orders/delete",
       "Microsoft.Hardware/orders/read",
       "Microsoft.Hardware/orders/write",
-      "Microsoft.Hardware/register/action"
+      "Microsoft.Hardware/register/action",
+      "Microsoft.Hardware/returnPreview/action",
+      "Microsoft.Hardware/returns/delete",
+      "Microsoft.Hardware/returns/read",
+      "Microsoft.Hardware/returns/write"
     ],
     "microsoft.hdinsight": [
       "MICROSOFT.HDINSIGHT/CLUSTERS/APPLICATIONS/DELETE",
@@ -15483,6 +15489,10 @@
       "Microsoft.App/containerApps/logstream/action",
       "Microsoft.App/jobs/exec/action",
       "Microsoft.App/jobs/logstream/action",
+      "Microsoft.App/sandboxGroups/*/action",
+      "Microsoft.App/sandboxGroups/*/delete",
+      "Microsoft.App/sandboxGroups/*/read",
+      "Microsoft.App/sandboxGroups/*/write",
       "Microsoft.App/sessionPools/*/read",
       "Microsoft.App/sessionPools/executions/action",
       "Microsoft.App/sessionPools/executions/read",
