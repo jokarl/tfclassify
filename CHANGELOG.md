@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.8.0](https://github.com/jokarl/tfclassify/compare/tfclassify-v0.7.5...tfclassify-v0.8.0) (2026-04-08)
+
+
+### Features
+
+* add scaffold command to generate starter config from terraform state ([c82a3df](https://github.com/jokarl/tfclassify/commit/c82a3dfa4c049d7d833102094c103e77037bd4cb))
+
+
+### Bug Fixes
+
+* **ci:** use compact output flag for jq matrix discovery ([bea5824](https://github.com/jokarl/tfclassify/commit/bea5824c4308aaa81885661ead1f42ba339e9d32))
+* refresh Azure role data and action registry ([#155](https://github.com/jokarl/tfclassify/issues/155)) ([cd3fb84](https://github.com/jokarl/tfclassify/commit/cd3fb8455f18c4f79a8bfebcaf452cc08568efc3))
+
 ## [0.7.5](https://github.com/jokarl/tfclassify/compare/tfclassify-v0.7.4...tfclassify-v0.7.5) (2026-03-30)
 
 
