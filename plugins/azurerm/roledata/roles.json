@@ -13540,6 +13540,24 @@
     ]
   },
   {
+    "id": "64375caa-ac3e-48b3-9492-da4d60aba7bb",
+    "roleName": "Diagnostics Operator",
+    "description": "Role allows users to collect diagnostic information regarding their Virtual Machine",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.Compute/virtualMachines/DiagnosticRunCommands/write",
+          "Microsoft.Compute/virtualMachines/DiagnosticRunCommands/read",
+          "Microsoft.Compute/virtualMachines/DiagnosticRunCommands/delete"
+        ],
+        "notActions": [],
+        "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
     "id": "3e5e47e6-65f7-47ef-90b5-e5dd4d455f24",
     "roleName": "Disk Backup Reader",
     "description": "Provides permission to backup vault to perform disk backup.",
@@ -14512,7 +14530,7 @@
           "Microsoft.Authorization/*/read",
           "Microsoft.EventGrid/*/read",
           "Microsoft.Insights/alertRules/*",
-          "Microsoft.Resources/deployments/*",
+          "Microsoft.Resources/deployments/read",
           "Microsoft.Resources/subscriptions/resourceGroups/read"
         ],
         "notActions": [],
@@ -14534,7 +14552,7 @@
           "Microsoft.Authorization/*/read",
           "Microsoft.EventGrid/*/read",
           "Microsoft.Insights/alertRules/*",
-          "Microsoft.Resources/deployments/*",
+          "Microsoft.Resources/deployments/read",
           "Microsoft.Resources/subscriptions/resourceGroups/read"
         ],
         "notActions": [],
@@ -15279,6 +15297,22 @@
         ],
         "notActions": [],
         "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "0e91b552-ae32-49ea-9898-317af306aa4b",
+    "roleName": "Genome EndUser",
+    "description": "Full access to Genome data plane operations only",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [],
+        "notActions": [],
+        "dataActions": [
+          "Microsoft.Genome/*"
+        ],
         "notDataActions": []
       }
     ]
@@ -18103,7 +18137,7 @@
         "actions": [],
         "notActions": [],
         "dataActions": [
-          "Microsoft.Discovery/bookshelf/knowledgeBaseVersions/search"
+          "Microsoft.Discovery/bookshelf/knowledgeBaseVersions/query/action"
         ],
         "notDataActions": []
       }
@@ -21628,6 +21662,7 @@
         "actions": [
           "Microsoft.Authorization/*/read",
           "Microsoft.Resources/subscriptions/resourceGroups/read",
+          "Microsoft.Resources/subscriptions/read",
           "Microsoft.Resources/deployments/*",
           "Microsoft.ServicesHub/connectors/write",
           "Microsoft.ServicesHub/connectors/read",
@@ -21653,6 +21688,8 @@
       {
         "actions": [
           "Microsoft.Authorization/*/read",
+          "Microsoft.Resources/subscriptions/resourceGroups/read",
+          "Microsoft.Resources/subscriptions/read",
           "Microsoft.Resources/deployments/*",
           "Microsoft.ServicesHub/connectors/read",
           "Microsoft.ServicesHub/connectors/*",
