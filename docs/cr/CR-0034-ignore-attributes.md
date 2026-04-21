@@ -11,9 +11,9 @@ target-version: "0.7.0"
 
 # Ignore Attributes: Exclude Cosmetic Changes from Classification
 
-> **Follow-up (2026-04-21):** See **CR-0035** — the interaction between the
+> **Follow-up (2026-04-21):** See **CR-0036** — the interaction between the
 > action rewriting introduced here and the rule engine produced misleading
-> Overall classifications for mixed plans. CR-0035 short-circuits rule
+> Overall classifications for mixed plans. CR-0036 short-circuits rule
 > evaluation for `["no-op"]` resources so they bypass matching entirely and
 > inherit `defaults.no_changes`. Rule authors no longer need to add
 > `not_actions = ["no-op"]` or a catch-all `actions = ["no-op"]` rule.

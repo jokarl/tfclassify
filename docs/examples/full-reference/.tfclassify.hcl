@@ -257,7 +257,7 @@ classification "standard" {
   rule {
     description  = "All infrastructure changes not covered above"
     not_resource = ["*_monitor_*", "*_log_*", "*_diagnostic_*"]
-    # No need for `not_actions = ["no-op"]` — CR-0035 short-circuits no-op
+    # No need for `not_actions = ["no-op"]` — CR-0036 short-circuits no-op
     # resources to defaults.no_changes before rule evaluation runs.
     #
     # In practice, resources already matched by "critical" or "high" above
@@ -280,7 +280,7 @@ classification "auto" {
   sarif_level = "none"
 
   # No rules — the classification named by defaults.no_changes absorbs all
-  # no-op resources via short-circuit (CR-0035). Rule evaluation is skipped
+  # no-op resources via short-circuit (CR-0036). Rule evaluation is skipped
   # entirely for resources whose actions are exactly ["no-op"]; they receive
   # this classification with a synthetic rule description explaining why.
 }

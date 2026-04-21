@@ -1,5 +1,5 @@
 ---
-id: "CR-0035"
+id: "CR-0036"
 status: "implemented"
 date: 2026-04-21
 requestor: Johan Karlsson
@@ -132,7 +132,7 @@ flowchart LR
 * `internal/output/formatter.go` — No-op breakdown by classification (applied as interim fix; consolidated here)
 * `internal/output/formatter_test.go` — Tests for the breakdown
 * `testdata/e2e/*/.tfclassify.hcl` — Remove the universal `rule { resource = ["*"], actions = ["no-op"] }` workaround from all 16 scenarios
-* `docs/cr/CR-0034-ignore-attributes.md` — Follow-up note that CR-0035 removes the need for explicit no-op rules
+* `docs/cr/CR-0034-ignore-attributes.md` — Follow-up note that CR-0036 removes the need for explicit no-op rules
 * `docs/examples/full-reference/.tfclassify.hcl` — Remove the workaround if present
 * `README.md` — Document that no-op resources bypass rule evaluation
 
@@ -217,7 +217,7 @@ Already applied as interim fix. Consolidate and document:
 1. Remove the `rule { resource = ["*"], actions = ["no-op"] }` block from all 16 e2e configs
 2. Remove the corresponding rule from `newTestConfig` in `classifier_test.go`
 3. Verify all e2e fixtures and unit tests still pass
-4. Append a follow-up note to CR-0034 pointing to CR-0035
+4. Append a follow-up note to CR-0034 pointing to CR-0036
 5. Update `README.md` section on ignore_attributes to state no-op resources bypass rule evaluation
 
 ### Implementation Flow
@@ -365,7 +365,7 @@ Then the output contains a line of the form "(N no-op resources hidden — <clas
 
 ### Documentation
 
-- [ ] CR-0034 updated with a follow-up note referencing CR-0035
+- [ ] CR-0034 updated with a follow-up note referencing CR-0036
 - [ ] README section on `ignore_attributes` updated to mention the short-circuit
 - [ ] Synthetic rule strings documented alongside the short-circuit code
 
@@ -469,4 +469,4 @@ classification "auto" {
 }
 ```
 
-The fact that every e2e config needs it — in a codebase maintained by the tool's author — is strong evidence that this is not configuration but mental-model overhead imposed by an accidental semantics. CR-0035 fixes the semantics so the workaround becomes unnecessary across the codebase and for downstream users.
+The fact that every e2e config needs it — in a codebase maintained by the tool's author — is strong evidence that this is not configuration but mental-model overhead imposed by an accidental semantics. CR-0036 fixes the semantics so the workaround becomes unnecessary across the codebase and for downstream users.

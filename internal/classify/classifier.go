@@ -105,7 +105,7 @@ func (c *Classifier) classifyResource(change plan.ResourceChange) ResourceDecisi
 
 	// A resource whose only action is "no-op" does nothing. Running classification
 	// rules over something that will not happen is incoherent, so short-circuit to
-	// defaults.no_changes with a synthetic rule explaining why. See CR-0035.
+	// defaults.no_changes with a synthetic rule explaining why. See CR-0036.
 	if isNoOp(change.Actions) {
 		decision.Classification = c.config.Defaults.NoChanges
 		decision.ClassificationDescription = c.descriptionMap[decision.Classification]
@@ -205,7 +205,7 @@ func (c *Classifier) explainResource(change plan.ResourceChange) ResourceExplana
 	}
 
 	// No-op resources bypass rule iteration — emit a single synthetic trace
-	// entry describing the short-circuit. See CR-0035.
+	// entry describing the short-circuit. See CR-0036.
 	if isNoOp(change.Actions) {
 		explanation.Trace = append(explanation.Trace, TraceEntry{
 			Classification: c.config.Defaults.NoChanges,

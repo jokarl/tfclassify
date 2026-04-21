@@ -420,7 +420,7 @@ func isCatchAllRule(rule RuleConfig) bool {
 
 // warnEmptyClassifications warns when a classification has no rules and no plugin
 // analyzer blocks, meaning it can never match anything. The classification
-// referenced by defaults.no_changes is exempt — CR-0035 routes no-op resources
+// referenced by defaults.no_changes is exempt — CR-0036 routes no-op resources
 // to it via short-circuit, so it does not need rules.
 func warnEmptyClassifications(cfg *Config) []Warning {
 	var noChanges string

@@ -29,7 +29,7 @@ func newTestConfig() *config.Config {
 				Name:        "auto",
 				Description: "Auto-approved",
 				// No rules — no-op resources short-circuit to defaults.no_changes;
-				// the workaround rule from before CR-0035 is no longer needed.
+				// the workaround rule from before CR-0036 is no longer needed.
 			},
 		},
 		Precedence: []string{"critical", "standard", "auto"},
@@ -436,7 +436,7 @@ func TestExplainClassify_AllRulesEvaluated(t *testing.T) {
 	}
 
 	// newTestConfig defines rules for "critical" and "standard" only;
-	// "auto" carries no rules post-CR-0035 (no-op resources short-circuit).
+	// "auto" carries no rules post-CR-0036 (no-op resources short-circuit).
 	res := result.Resources[0]
 	if len(res.Trace) != 2 {
 		t.Fatalf("expected 2 trace entries (one per rule), got %d", len(res.Trace))
@@ -963,7 +963,7 @@ func TestClassify_MixedNoOpAndRealNotNoChanges(t *testing.T) {
 	}
 }
 
-// CR-0035: a no-op resource whose type would match a higher-precedence rule
+// CR-0036: a no-op resource whose type would match a higher-precedence rule
 // must NOT be classified by that rule. Short-circuit assigns defaults.no_changes
 // and records a synthetic rule that describes the ignore_attributes downgrade.
 func TestClassifyResource_NoOpShortCircuit(t *testing.T) {
@@ -1024,7 +1024,7 @@ func TestClassifyResource_NoOpShortCircuit(t *testing.T) {
 	}
 }
 
-// CR-0035: a Terraform-native no-op (no OriginalActions) gets the
+// CR-0036: a Terraform-native no-op (no OriginalActions) gets the
 // "no-op (no change)" synthetic description.
 func TestClassifyResource_NativeNoOp(t *testing.T) {
 	cfg := &config.Config{
@@ -1057,7 +1057,7 @@ func TestClassifyResource_NativeNoOp(t *testing.T) {
 	}
 }
 
-// CR-0035: explain must emit exactly one synthetic trace entry for a no-op
+// CR-0036: explain must emit exactly one synthetic trace entry for a no-op
 // resource — the whole point is to NOT evaluate rules.
 func TestExplainClassify_NoOpSingleTraceEntry(t *testing.T) {
 	cfg := &config.Config{
