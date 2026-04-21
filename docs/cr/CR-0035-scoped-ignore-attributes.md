@@ -1,6 +1,6 @@
 ---
 id: "CR-0035"
-status: "proposed"
+status: "implemented"
 date: 2026-04-21
 requestor: Johan Karlsson
 stakeholders:
@@ -446,9 +446,9 @@ Chosen approach: repeatable `ignore_attribute "name" { … }` blocks on `default
 ## Implementation Status
 
 * **Started:** 2026-04-21
-* **Completed:** TBD
+* **Completed:** 2026-04-21
 * **Deployed to Production:** TBD
-* **Notes:** Branch `feat/scoped-ignore-attributes` from `main` HEAD.
+* **Notes:** Branch `feat/scoped-ignore-attributes` from `main` HEAD. All AC covered by unit + e2e tests. `make ci` green locally (build, test, vet, lint, govulncheck).
 
 ## Related Items
 

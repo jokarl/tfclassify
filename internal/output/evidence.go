@@ -13,6 +13,7 @@ import (
 
 	"github.com/jokarl/tfclassify/internal/classify"
 	"github.com/jokarl/tfclassify/internal/config"
+	"github.com/jokarl/tfclassify/internal/plan"
 )
 
 // EvidenceArtifact is the JSON structure written as the evidence file.
@@ -34,14 +35,15 @@ type EvidenceArtifact struct {
 
 // EvidenceResource represents a single resource in the evidence artifact.
 type EvidenceResource struct {
-	Address                   string   `json:"address"`
-	Type                      string   `json:"type"`
-	Actions                   []string `json:"actions"`
-	Classification            string   `json:"classification"`
-	ClassificationDescription string   `json:"classification_description,omitempty"`
-	MatchedRules              []string `json:"matched_rules"`
-	OriginalActions           []string `json:"original_actions,omitempty"`
-	IgnoredAttributes         []string `json:"ignored_attributes,omitempty"`
+	Address                   string                 `json:"address"`
+	Type                      string                 `json:"type"`
+	Actions                   []string               `json:"actions"`
+	Classification            string                 `json:"classification"`
+	ClassificationDescription string                 `json:"classification_description,omitempty"`
+	MatchedRules              []string               `json:"matched_rules"`
+	OriginalActions           []string               `json:"original_actions,omitempty"`
+	IgnoredAttributes         []string               `json:"ignored_attributes,omitempty"`
+	IgnoreRuleMatches         []plan.IgnoreRuleMatch `json:"ignore_rule_matches,omitempty"`
 }
 
 // EvidenceTrace represents a single trace entry in the evidence artifact.
@@ -101,6 +103,7 @@ func BuildEvidence(result *classify.Result, explainResult *classify.ExplainResul
 				MatchedRules:              d.MatchedRules,
 				OriginalActions:           d.OriginalActions,
 				IgnoredAttributes:         d.IgnoredAttributes,
+				IgnoreRuleMatches:         d.IgnoreRuleMatches,
 			})
 		}
 		artifact.Resources = resources
