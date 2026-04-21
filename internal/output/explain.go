@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/jokarl/tfclassify/internal/classify"
+	"github.com/jokarl/tfclassify/internal/plan"
 )
 
 // FormatExplain outputs the explain result in the configured format.
@@ -41,6 +42,9 @@ func (f *Formatter) formatExplainText(result *classify.ExplainResult) error {
 		if len(res.OriginalActions) > 0 {
 			fmt.Fprintf(&sb, "          Originally %v, downgraded by ignore_attributes: %s\n",
 				res.OriginalActions, strings.Join(res.IgnoredAttributes, ", "))
+			for _, m := range res.IgnoreRuleMatches {
+				fmt.Fprintf(&sb, "          Matched rule %q: %s\n", m.Name, m.Description)
+			}
 		}
 		fmt.Fprintf(&sb, "Final:    %s (from %s)\n", res.FinalClassification, res.FinalSource)
 		sb.WriteString("\n  Evaluation trace:\n")
@@ -81,15 +85,16 @@ type ExplainJSONOutput struct {
 
 // ExplainJSONResource represents a single resource in explain JSON output.
 type ExplainJSONResource struct {
-	Address             string             `json:"address"`
-	Type                string             `json:"type"`
-	Actions             []string           `json:"actions"`
-	FinalClassification string             `json:"final_classification"`
-	FinalSource         string             `json:"final_source"`
-	Trace               []ExplainJSONTrace `json:"trace"`
-	WinnerReason        string             `json:"winner_reason"`
-	OriginalActions     []string           `json:"original_actions,omitempty"`
-	IgnoredAttributes   []string           `json:"ignored_attributes,omitempty"`
+	Address             string                 `json:"address"`
+	Type                string                 `json:"type"`
+	Actions             []string               `json:"actions"`
+	FinalClassification string                 `json:"final_classification"`
+	FinalSource         string                 `json:"final_source"`
+	Trace               []ExplainJSONTrace     `json:"trace"`
+	WinnerReason        string                 `json:"winner_reason"`
+	OriginalActions     []string               `json:"original_actions,omitempty"`
+	IgnoredAttributes   []string               `json:"ignored_attributes,omitempty"`
+	IgnoreRuleMatches   []plan.IgnoreRuleMatch `json:"ignore_rule_matches,omitempty"`
 }
 
 // ExplainJSONTrace represents a single trace entry in explain JSON output.
@@ -118,6 +123,7 @@ func (f *Formatter) formatExplainJSON(result *classify.ExplainResult) error {
 			Trace:               make([]ExplainJSONTrace, 0, len(res.Trace)),
 			OriginalActions:     res.OriginalActions,
 			IgnoredAttributes:   res.IgnoredAttributes,
+			IgnoreRuleMatches:   res.IgnoreRuleMatches,
 		}
 
 		for _, entry := range res.Trace {

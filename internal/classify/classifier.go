@@ -94,6 +94,7 @@ func (c *Classifier) classifyResource(change plan.ResourceChange) ResourceDecisi
 		Actions:           change.Actions,
 		OriginalActions:   change.OriginalActions,
 		IgnoredAttributes: change.IgnoredAttributes,
+		IgnoreRuleMatches: change.IgnoreRuleMatches,
 	}
 
 	// Try each classification in precedence order
@@ -171,6 +172,7 @@ func (c *Classifier) explainResource(change plan.ResourceChange) ResourceExplana
 		Actions:           change.Actions,
 		OriginalActions:   change.OriginalActions,
 		IgnoredAttributes: change.IgnoredAttributes,
+		IgnoreRuleMatches: change.IgnoreRuleMatches,
 	}
 
 	// Track the best match (same logic as classifyResource, but evaluate all)

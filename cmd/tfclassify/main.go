@@ -164,9 +164,11 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	// Preprocess: downgrade cosmetic-only updates (e.g., tag-only changes) to no-op
-	if cfg.Defaults != nil && len(cfg.Defaults.IgnoreAttributes) > 0 {
-		classify.FilterCosmeticChanges(planResult.Changes, cfg.Defaults.IgnoreAttributes)
+	ignoreRules, err := classify.CompileIgnoreRules(cfg.Defaults)
+	if err != nil {
+		return fmt.Errorf("failed to compile ignore rules: %w", err)
 	}
+	classify.FilterCosmeticChanges(planResult.Changes, ignoreRules)
 
 	// Create classifier
 	classifier, err := classify.New(cfg)
@@ -326,9 +328,11 @@ func runExplain(cmd *cobra.Command, args []string) error {
 	}
 
 	// Preprocess: downgrade cosmetic-only updates (e.g., tag-only changes) to no-op
-	if cfg.Defaults != nil && len(cfg.Defaults.IgnoreAttributes) > 0 {
-		classify.FilterCosmeticChanges(planResult.Changes, cfg.Defaults.IgnoreAttributes)
+	ignoreRules, err := classify.CompileIgnoreRules(cfg.Defaults)
+	if err != nil {
+		return fmt.Errorf("failed to compile ignore rules: %w", err)
 	}
+	classify.FilterCosmeticChanges(planResult.Changes, ignoreRules)
 
 	// Create classifier
 	classifier, err := classify.New(cfg)

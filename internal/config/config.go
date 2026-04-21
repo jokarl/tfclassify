@@ -169,9 +169,24 @@ type RuleConfig struct {
 
 // DefaultsConfig contains default configuration values.
 type DefaultsConfig struct {
-	Unclassified        string   `hcl:"unclassified"`
-	NoChanges           string   `hcl:"no_changes"`
-	PluginTimeout       string   `hcl:"plugin_timeout,optional"`
-	DriftClassification string   `hcl:"drift_classification,optional"`
-	IgnoreAttributes    []string `hcl:"ignore_attributes,optional"`
+	Unclassified         string                `hcl:"unclassified"`
+	NoChanges            string                `hcl:"no_changes"`
+	PluginTimeout        string                `hcl:"plugin_timeout,optional"`
+	DriftClassification  string                `hcl:"drift_classification,optional"`
+	IgnoreAttributes     []string              `hcl:"ignore_attributes,optional"`
+	IgnoreAttributeRules []IgnoreAttributeRule `hcl:"ignore_attribute,block"`
+}
+
+// IgnoreAttributeRule is a scoped ignore rule that applies only to resources
+// matching its resource/module filters. Attributes support per-segment globs
+// (e.g. "properties.*.createdAt"). Introduced by CR-0035; see CR-0034 for the
+// unscoped global list that this extends.
+type IgnoreAttributeRule struct {
+	Name        string   `hcl:"name,label"`
+	Description string   `hcl:"description"`
+	Resource    []string `hcl:"resource,optional"`
+	NotResource []string `hcl:"not_resource,optional"`
+	Module      []string `hcl:"module,optional"`
+	NotModule   []string `hcl:"not_module,optional"`
+	Attributes  []string `hcl:"attributes"`
 }

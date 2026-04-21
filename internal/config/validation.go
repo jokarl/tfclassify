@@ -236,7 +236,10 @@ func validateSARIFLevels(cfg *Config) error {
 	return nil
 }
 
-// validateIgnoreAttributes checks that ignore_attributes entries are non-empty strings.
+// validateIgnoreAttributes checks that ignore_attributes entries are non-empty
+// strings and that scoped ignore_attribute blocks are well-formed (required
+// description, non-empty attributes, unique names, compilable globs on resource,
+// module, and attribute fields).
 func validateIgnoreAttributes(cfg *Config) error {
 	if cfg.Defaults == nil {
 		return nil
@@ -244,6 +247,59 @@ func validateIgnoreAttributes(cfg *Config) error {
 	for i, attr := range cfg.Defaults.IgnoreAttributes {
 		if strings.TrimSpace(attr) == "" {
 			return fmt.Errorf("defaults.ignore_attributes[%d]: entry must not be empty", i)
+		}
+	}
+
+	seen := make(map[string]struct{}, len(cfg.Defaults.IgnoreAttributeRules))
+	for i, rule := range cfg.Defaults.IgnoreAttributeRules {
+		if rule.Name == "" {
+			return fmt.Errorf("defaults.ignore_attribute[%d]: label is required", i)
+		}
+		if _, dup := seen[rule.Name]; dup {
+			return fmt.Errorf("defaults.ignore_attribute[%d]: duplicate name %q", i, rule.Name)
+		}
+		seen[rule.Name] = struct{}{}
+
+		if strings.TrimSpace(rule.Description) == "" {
+			return fmt.Errorf("defaults.ignore_attribute %q: description must not be empty", rule.Name)
+		}
+		if len(rule.Attributes) == 0 {
+			return fmt.Errorf("defaults.ignore_attribute %q: attributes must not be empty", rule.Name)
+		}
+		for j, attr := range rule.Attributes {
+			if strings.TrimSpace(attr) == "" {
+				return fmt.Errorf("defaults.ignore_attribute %q: attributes[%d] must not be empty", rule.Name, j)
+			}
+			for seg, segment := range strings.Split(attr, ".") {
+				if _, err := glob.Compile(segment); err != nil {
+					return fmt.Errorf("defaults.ignore_attribute %q: attributes[%d] segment %d %q: invalid glob: %w",
+						rule.Name, j, seg, segment, err)
+				}
+			}
+		}
+		for j, pattern := range rule.Resource {
+			if _, err := glob.Compile(pattern); err != nil {
+				return fmt.Errorf("defaults.ignore_attribute %q: invalid resource pattern %q at index %d: %w",
+					rule.Name, pattern, j, err)
+			}
+		}
+		for j, pattern := range rule.NotResource {
+			if _, err := glob.Compile(pattern); err != nil {
+				return fmt.Errorf("defaults.ignore_attribute %q: invalid not_resource pattern %q at index %d: %w",
+					rule.Name, pattern, j, err)
+			}
+		}
+		for j, pattern := range rule.Module {
+			if _, err := glob.Compile(pattern, '.'); err != nil {
+				return fmt.Errorf("defaults.ignore_attribute %q: invalid module pattern %q at index %d: %w",
+					rule.Name, pattern, j, err)
+			}
+		}
+		for j, pattern := range rule.NotModule {
+			if _, err := glob.Compile(pattern, '.'); err != nil {
+				return fmt.Errorf("defaults.ignore_attribute %q: invalid not_module pattern %q at index %d: %w",
+					rule.Name, pattern, j, err)
+			}
 		}
 	}
 	return nil

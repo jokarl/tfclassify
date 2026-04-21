@@ -22,6 +22,18 @@ type ResourceChange struct {
 	// IgnoredAttributes lists the specific attribute paths that were filtered
 	// by ignore_attributes (e.g., ["tags.tf-module-l2"]).
 	IgnoredAttributes []string
+	// IgnoreRuleMatches records scoped ignore_attribute blocks (CR-0035) that
+	// covered at least one changed path on this resource. The global
+	// ignore_attributes list does not appear here — only named scoped rules do.
+	IgnoreRuleMatches []IgnoreRuleMatch
+}
+
+// IgnoreRuleMatch identifies a scoped ignore_attribute rule that contributed
+// to downgrading a resource to no-op. Populated by the filter preprocessing.
+type IgnoreRuleMatch struct {
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Paths       []string `json:"paths,omitempty"`
 }
 
 // ParseResult contains the parsed plan data.

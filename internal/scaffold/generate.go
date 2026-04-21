@@ -183,5 +183,14 @@ defaults {
 
   # Uncomment to ignore cosmetic attribute changes:
   # ignore_attributes = ["tags", "tags_all"]
+
+  # Scoped ignore rules (CR-0035) — apply only when resource/module globs match.
+  # Useful when an attribute should be ignored for one provider but not others,
+  # e.g. azapi_resource.output (a computed read-back, not a user change):
+  # ignore_attribute "azapi_output" {
+  #   description = "azapi computed refresh"
+  #   resource    = ["azapi_resource"]
+  #   attributes  = ["output"]
+  # }
 }
 `
