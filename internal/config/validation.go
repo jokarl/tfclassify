@@ -419,10 +419,20 @@ func isCatchAllRule(rule RuleConfig) bool {
 }
 
 // warnEmptyClassifications warns when a classification has no rules and no plugin
-// analyzer blocks, meaning it can never match anything.
+// analyzer blocks, meaning it can never match anything. The classification
+// referenced by defaults.no_changes is exempt — CR-0035 routes no-op resources
+// to it via short-circuit, so it does not need rules.
 func warnEmptyClassifications(cfg *Config) []Warning {
+	var noChanges string
+	if cfg.Defaults != nil {
+		noChanges = cfg.Defaults.NoChanges
+	}
+
 	var warnings []Warning
 	for _, c := range cfg.Classifications {
+		if c.Name == noChanges {
+			continue
+		}
 		if len(c.Rules) == 0 && !hasPluginAnalyzers(c) && c.BlastRadius == nil && c.Topology == nil {
 			warnings = append(warnings, Warning{
 				Classification: c.Name,

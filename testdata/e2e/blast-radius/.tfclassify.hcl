@@ -19,11 +19,6 @@ classification "standard" {
 classification "auto" {
   description = "Auto-approved"
   sarif_level = "none"
-
-  rule {
-    resource = ["*"]
-    actions  = ["no-op"]
-  }
 }
 
 precedence = ["critical", "standard", "auto"]

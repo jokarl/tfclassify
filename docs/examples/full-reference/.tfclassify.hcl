@@ -257,10 +257,8 @@ classification "standard" {
   rule {
     description  = "All infrastructure changes not covered above"
     not_resource = ["*_monitor_*", "*_log_*", "*_diagnostic_*"]
-    not_actions  = ["no-op"]
-    # "not_actions" is the inverse of "actions". This rule matches everything
-    # EXCEPT no-op actions. Cannot combine "actions" and "not_actions" in the
-    # same rule. Valid values: "create", "update", "delete", "read", "no-op".
+    # No need for `not_actions = ["no-op"]` — CR-0035 short-circuits no-op
+    # resources to defaults.no_changes before rule evaluation runs.
     #
     # In practice, resources already matched by "critical" or "high" above
     # will never reach this rule due to precedence-ordered evaluation.
@@ -281,12 +279,10 @@ classification "auto" {
   description = "No approval needed"
   sarif_level = "none"
 
-  # No-op only: Terraform evaluated the resource but found no changes.
-  rule {
-    description = "No actual changes detected"
-    resource    = ["*"]
-    actions     = ["no-op"]
-  }
+  # No rules — the classification named by defaults.no_changes absorbs all
+  # no-op resources via short-circuit (CR-0035). Rule evaluation is skipped
+  # entirely for resources whose actions are exactly ["no-op"]; they receive
+  # this classification with a synthetic rule description explaining why.
 }
 
 # ─── Precedence ───────────────────────────────────────────────────────────────

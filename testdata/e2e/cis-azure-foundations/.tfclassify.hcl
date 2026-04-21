@@ -50,11 +50,6 @@ classification "standard" {
 
 classification "auto" {
   description = "No approval needed"
-
-  rule {
-    resource = ["*"]
-    actions  = ["no-op"]
-  }
 }
 
 # Precedence maps to exit codes:
