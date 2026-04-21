@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.1](https://github.com/jokarl/tfclassify/compare/tfclassify-plugin-sdk-v0.4.0...tfclassify-plugin-sdk-v0.4.1) (2026-04-21)
+
+
+### Dependencies
+
+* **deps:** bump github.com/hashicorp/go-version from 1.8.0 to 1.9.0 ([#163](https://github.com/jokarl/tfclassify/issues/163)) ([d368a0e](https://github.com/jokarl/tfclassify/commit/d368a0e5c928ed948e82364d3a0222bc1b7d2627))
+* **deps:** bump google.golang.org/grpc from 1.79.3 to 1.80.0 in /sdk ([#162](https://github.com/jokarl/tfclassify/issues/162)) ([0014dd9](https://github.com/jokarl/tfclassify/commit/0014dd9f369bdf7e891abe994025d812b5396e4e))
+
 ## [0.4.0](https://github.com/jokarl/tfclassify/compare/tfclassify-plugin-sdk-v0.3.0...tfclassify-plugin-sdk-v0.4.0) (2026-03-25)
 
 
