@@ -11,6 +11,13 @@ target-version: "0.7.0"
 
 # Ignore Attributes: Exclude Cosmetic Changes from Classification
 
+> **Follow-up (2026-04-21):** See **CR-0035** — the interaction between the
+> action rewriting introduced here and the rule engine produced misleading
+> Overall classifications for mixed plans. CR-0035 short-circuits rule
+> evaluation for `["no-op"]` resources so they bypass matching entirely and
+> inherit `defaults.no_changes`. Rule authors no longer need to add
+> `not_actions = ["no-op"]` or a catch-all `actions = ["no-op"]` rule.
+
 ## Change Summary
 
 Terraform plans frequently include resources whose only changes are to cosmetic attributes like provenance tags (e.g., `tf-module-l2` version bumps). These changes are semantically irrelevant but currently count as full "update" actions, inflating blast radius thresholds and triggering classification rules meant for meaningful infrastructure changes. This CR introduces a global `ignore_attributes` configuration that preprocesses the plan to downgrade cosmetic-only updates to `no-op`, making them invisible to blast radius counting and core rule matching while remaining visible in output with clear attribution.

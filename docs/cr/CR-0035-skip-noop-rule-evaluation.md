@@ -1,12 +1,12 @@
 ---
 id: "CR-0035"
-status: "proposed"
+status: "implemented"
 date: 2026-04-21
 requestor: Johan Karlsson
 stakeholders:
   - Johan Karlsson
 priority: "high"
-target-version: "0.8.0"
+target-version: "0.9.0"
 ---
 
 # Skip Classification Rule Evaluation for No-Op Resource Changes
@@ -445,9 +445,9 @@ Alternative approaches either required rule authors to learn the workaround (sta
 ## Implementation Status
 
 * **Started:** 2026-04-21
-* **Completed:** {to be filled in on implementation}
+* **Completed:** 2026-04-21
 * **Deployed to Production:** {to be filled in on release}
-* **Notes:** Interim fixes (Overall skip + text output breakdown) were applied to the worktree ahead of this CR while diagnosing the original bug report. This CR consolidates those fixes with the primary change (short-circuit in `classifyResource`) and the workaround cleanup.
+* **Notes:** All four implementation phases landed in a single worktree branch. Phase 1 (short-circuit in `classifyResource` and `explainResource`) is the load-bearing change. Phase 2 (Overall skip) was applied first as an interim fix during initial diagnosis; it remains as defense in depth for plugin decisions on no-op resources. Phase 3 (text output breakdown by classification) and Phase 4 (e2e config cleanup, CR-0034 follow-up note, README update, validator exemption for the `defaults.no_changes` classification) completed together. `make ci` passes; all 16 e2e fixture scenarios pass after removing the workaround rule from each.
 
 ## Related Items
 
