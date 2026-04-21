@@ -165,11 +165,29 @@ func (f *Formatter) formatText(result *classify.Result) error {
 		fmt.Fprintf(&sb, "Resources: %d\n", activeCount)
 		sb.WriteByte('\n')
 
+		// Partition decisions into three buckets: active (real changes),
+		// downgraded (no-op via ignore_attributes — OriginalActions set), and
+		// native no-ops (no-op from Terraform itself).
+		var downgraded, nativeNoOp []classify.ResourceDecision
+		for _, d := range result.ResourceDecisions {
+			if !isNoOpDecision(d) {
+				continue
+			}
+			if len(d.OriginalActions) > 0 {
+				downgraded = append(downgraded, d)
+			} else {
+				nativeNoOp = append(nativeNoOp, d)
+			}
+		}
+
 		if f.verbose {
-			// Group by classification
+			// Group active decisions by classification
 			byClassification := make(map[string][]classify.ResourceDecision)
 			classificationOrder := make([]string, 0)
 			for _, decision := range result.ResourceDecisions {
+				if isNoOpDecision(decision) {
+					continue
+				}
 				if _, seen := byClassification[decision.Classification]; !seen {
 					classificationOrder = append(classificationOrder, decision.Classification)
 				}
@@ -177,64 +195,61 @@ func (f *Formatter) formatText(result *classify.Result) error {
 					byClassification[decision.Classification], decision)
 			}
 
-			totalNoOp := 0
 			for _, classification := range classificationOrder {
-				decisions := byClassification[classification]
-
-				// Separate active changes from no-ops
-				var active, noop []classify.ResourceDecision
-				for _, d := range decisions {
-					if isNoOpDecision(d) {
-						noop = append(noop, d)
-					} else {
-						active = append(active, d)
-					}
-				}
-				totalNoOp += len(noop)
-
-				// Skip classifications that contain only no-op resources
-				if len(active) == 0 {
-					continue
-				}
-
+				active := byClassification[classification]
 				fmt.Fprintf(&sb, "[%s] (%d resources)\n", classification, len(active))
-				// Show classification description if available (from first decision)
 				if active[0].ClassificationDescription != "" {
 					fmt.Fprintf(&sb, "  %s\n", active[0].ClassificationDescription)
 				}
 				for _, decision := range active {
 					fmt.Fprintf(&sb, "  - %s (%s) %v\n",
 						decision.Address, decision.ResourceType, decision.Actions)
-					if len(decision.OriginalActions) > 0 {
-						fmt.Fprintf(&sb, "    Originally: %v (downgraded by ignore_attributes: %s)\n",
-							decision.OriginalActions, strings.Join(decision.IgnoredAttributes, ", "))
-						for _, m := range decision.IgnoreRuleMatches {
-							fmt.Fprintf(&sb, "    Matched rule %q: %s\n", m.Name, m.Description)
-						}
-					}
+					// Note: post-CR-0036, active decisions never have OriginalActions
+					// (any resource with Actions=["no-op"] short-circuits and lands in
+					// the Downgraded section below). Keep the output here strictly
+					// about the real matched rule.
 					for _, rule := range decision.MatchedRules {
 						fmt.Fprintf(&sb, "    Rule: %s\n", rule)
 					}
 				}
 				sb.WriteByte('\n')
 			}
-			if totalNoOp > 0 {
-				fmt.Fprintf(&sb, "(%d no-op resources hidden)\n", totalNoOp)
+
+			// Always show downgraded resources in full, so users can diagnose
+			// which attributes the ignore_attributes filter absorbed and which
+			// synthetic rule each resource matched. This is the primary
+			// diagnostic surface for cosmetic-filter behavior.
+			if len(downgraded) > 0 {
+				fmt.Fprintf(&sb, "Downgraded to no-op by ignore_attributes (%d):\n", len(downgraded))
+				for _, d := range downgraded {
+					fmt.Fprintf(&sb, "  - %s (%s)\n", d.Address, d.ResourceType)
+					fmt.Fprintf(&sb, "    Originally: %v  (ignored: %s)\n",
+						d.OriginalActions, strings.Join(d.IgnoredAttributes, ", "))
+					for _, m := range d.IgnoreRuleMatches {
+						fmt.Fprintf(&sb, "    Matched ignore rule %q: %s\n", m.Name, m.Description)
+					}
+					for _, rule := range d.MatchedRules {
+						fmt.Fprintf(&sb, "    Rule: %s\n", rule)
+					}
+				}
+				sb.WriteByte('\n')
+			}
+
+			if len(nativeNoOp) > 0 {
+				fmt.Fprintf(&sb, "(%d native no-op resources hidden)\n", len(nativeNoOp))
 			}
 		} else {
-			// Compact output — skip no-op resources
-			noopCount := 0
+			// Compact output — one line per active resource, then a count split
+			// between downgraded and native no-ops so CI logs still surface the
+			// downgrade footprint without being flooded with per-resource detail.
 			for _, decision := range result.ResourceDecisions {
 				if isNoOpDecision(decision) {
-					noopCount++
 					continue
 				}
 				fmt.Fprintf(&sb, "  [%s] %s\n",
 					decision.Classification, decision.Address)
 			}
-			if noopCount > 0 {
-				fmt.Fprintf(&sb, "  (%d no-op resources hidden)\n", noopCount)
-			}
+			writeHiddenNoOpCount(&sb, "  ", len(downgraded), len(nativeNoOp))
 		}
 	}
 
@@ -250,6 +265,27 @@ func isNoOpDecision(d classify.ResourceDecision) bool {
 		}
 	}
 	return true
+}
+
+// writeHiddenNoOpCount prints the "N no-op resources hidden" line for compact
+// output, split between ignore_attributes downgrades and Terraform-native
+// no-ops so a reader can see whether the filter is doing the work.
+func writeHiddenNoOpCount(sb *strings.Builder, indent string, downgraded, native int) {
+	total := downgraded + native
+	if total == 0 {
+		return
+	}
+
+	switch {
+	case downgraded > 0 && native > 0:
+		fmt.Fprintf(sb, "%s(%d no-op resources hidden — %d downgraded by ignore_attributes, %d native; rerun with -v for detail)\n",
+			indent, total, downgraded, native)
+	case downgraded > 0:
+		fmt.Fprintf(sb, "%s(%d no-op resources hidden — downgraded by ignore_attributes; rerun with -v for detail)\n",
+			indent, downgraded)
+	default:
+		fmt.Fprintf(sb, "%s(%d no-op resources hidden — native)\n", indent, native)
+	}
 }
 
 func (f *Formatter) formatGitHub(result *classify.Result) error {

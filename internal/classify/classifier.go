@@ -4,6 +4,7 @@ package classify
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/jokarl/tfclassify/internal/config"
 	"github.com/jokarl/tfclassify/internal/plan"
@@ -57,13 +58,19 @@ func (c *Classifier) Classify(changes []plan.ResourceChange) *Result {
 		return result
 	}
 
-	// Classify each resource
+	// Classify each resource. Resources downgraded to no-op by
+	// FilterCosmeticChanges keep their classification for per-resource visibility
+	// but do NOT contribute to Overall — otherwise Overall can report e.g. "major"
+	// while every major-classified resource is hidden from the text output.
 	highestPrecedence := -1
 	for _, change := range changes {
 		decision := c.classifyResource(change)
 		result.ResourceDecisions = append(result.ResourceDecisions, decision)
 
-		// Track highest precedence classification
+		if isNoOp(change.Actions) {
+			continue
+		}
+
 		precedence := c.precedenceMap[decision.Classification]
 		if highestPrecedence == -1 || precedence < highestPrecedence {
 			highestPrecedence = precedence
@@ -97,6 +104,16 @@ func (c *Classifier) classifyResource(change plan.ResourceChange) ResourceDecisi
 		IgnoreRuleMatches: change.IgnoreRuleMatches,
 	}
 
+	// A resource whose only action is "no-op" does nothing. Running classification
+	// rules over something that will not happen is incoherent, so short-circuit to
+	// defaults.no_changes with a synthetic rule explaining why. See CR-0036.
+	if isNoOp(change.Actions) {
+		decision.Classification = c.config.Defaults.NoChanges
+		decision.ClassificationDescription = c.descriptionMap[decision.Classification]
+		decision.MatchedRules = []string{noOpRuleDescription(change)}
+		return decision
+	}
+
 	// Try each classification in precedence order
 	for _, classificationName := range c.config.Precedence {
 		rules := c.matchers[classificationName]
@@ -116,6 +133,20 @@ func (c *Classifier) classifyResource(change plan.ResourceChange) ResourceDecisi
 	decision.ClassificationDescription = c.descriptionMap[decision.Classification]
 	decision.MatchedRules = []string{"default (no rule matched)"}
 	return decision
+}
+
+// noOpRuleDescription builds the synthetic rule string attached to no-op
+// resources. Distinguishes ignore_attributes downgrades from native no-ops so
+// the output can surface which ignored paths absorbed the change.
+func noOpRuleDescription(change plan.ResourceChange) string {
+	if len(change.OriginalActions) == 0 {
+		return "no-op (no change)"
+	}
+	if len(change.IgnoredAttributes) == 0 {
+		return "no-op (downgraded by ignore_attributes)"
+	}
+	return fmt.Sprintf("no-op (downgraded by ignore_attributes: %s)",
+		strings.Join(change.IgnoredAttributes, ", "))
 }
 
 // getExitCode returns the exit code for a classification.
@@ -173,6 +204,21 @@ func (c *Classifier) explainResource(change plan.ResourceChange) ResourceExplana
 		OriginalActions:   change.OriginalActions,
 		IgnoredAttributes: change.IgnoredAttributes,
 		IgnoreRuleMatches: change.IgnoreRuleMatches,
+	}
+
+	// No-op resources bypass rule iteration — emit a single synthetic trace
+	// entry describing the short-circuit. See CR-0036.
+	if isNoOp(change.Actions) {
+		explanation.Trace = append(explanation.Trace, TraceEntry{
+			Classification: c.config.Defaults.NoChanges,
+			Source:         "core-rule",
+			Rule:           noOpRuleDescription(change),
+			Result:         TraceMatch,
+			Reason:         "no-op short-circuit (rules not evaluated)",
+		})
+		explanation.FinalClassification = c.config.Defaults.NoChanges
+		explanation.FinalSource = "core-rule"
+		return explanation
 	}
 
 	// Track the best match (same logic as classifyResource, but evaluate all)
@@ -432,10 +478,15 @@ func (c *Classifier) AddPluginDecisions(result *Result, pluginDecisions []Resour
 		}
 	}
 
-	// Recalculate overall (but not if all resources are no-op)
+	// Recalculate overall (but not if all resources are no-op). Skip no-op
+	// decisions so cosmetic-only resources do not elevate Overall — same
+	// rationale as in Classify().
 	if !result.NoChanges && len(result.ResourceDecisions) > 0 {
 		highestPrecedence := -1
 		for _, decision := range result.ResourceDecisions {
+			if isNoOp(decision.Actions) {
+				continue
+			}
 			precedence, known := c.precedenceMap[decision.Classification]
 			if !known {
 				continue

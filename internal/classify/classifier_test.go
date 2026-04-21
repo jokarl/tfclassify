@@ -1,6 +1,7 @@
 package classify
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/jokarl/tfclassify/internal/config"
@@ -27,9 +28,8 @@ func newTestConfig() *config.Config {
 			{
 				Name:        "auto",
 				Description: "Auto-approved",
-				Rules: []config.RuleConfig{
-					{Resource: []string{"*"}, Actions: []string{"no-op"}},
-				},
+				// No rules — no-op resources short-circuit to defaults.no_changes;
+				// the workaround rule from before CR-0036 is no longer needed.
 			},
 		},
 		Precedence: []string{"critical", "standard", "auto"},
@@ -435,18 +435,18 @@ func TestExplainClassify_AllRulesEvaluated(t *testing.T) {
 		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 
-	// Should have trace entries for all 3 rules (critical, standard, auto)
+	// newTestConfig defines rules for "critical" and "standard" only;
+	// "auto" carries no rules post-CR-0036 (no-op resources short-circuit).
 	res := result.Resources[0]
-	if len(res.Trace) != 3 {
-		t.Fatalf("expected 3 trace entries (one per rule), got %d", len(res.Trace))
+	if len(res.Trace) != 2 {
+		t.Fatalf("expected 2 trace entries (one per rule), got %d", len(res.Trace))
 	}
 
-	// Verify all classifications appear
 	classifications := make(map[string]bool)
 	for _, entry := range res.Trace {
 		classifications[entry.Classification] = true
 	}
-	for _, name := range []string{"critical", "standard", "auto"} {
+	for _, name := range []string{"critical", "standard"} {
 		if !classifications[name] {
 			t.Errorf("expected trace entry for classification %q", name)
 		}
@@ -477,15 +477,6 @@ func TestExplainClassify_SkipReasons(t *testing.T) {
 	}
 	if res.Trace[0].Reason != "resource mismatch" {
 		t.Errorf("expected 'resource mismatch' reason, got %q", res.Trace[0].Reason)
-	}
-
-	// Auto rule should skip with action mismatch
-	autoEntry := res.Trace[2]
-	if autoEntry.Result != TraceSkip {
-		t.Errorf("expected auto rule to skip, got %s", autoEntry.Result)
-	}
-	if autoEntry.Reason == "" || autoEntry.Reason == "resource mismatch" {
-		t.Errorf("expected action mismatch reason, got %q", autoEntry.Reason)
 	}
 }
 
@@ -969,6 +960,205 @@ func TestClassify_MixedNoOpAndRealNotNoChanges(t *testing.T) {
 
 	if result.NoChanges {
 		t.Error("expected NoChanges to be false when some resources have real changes")
+	}
+}
+
+// CR-0036: a no-op resource whose type would match a higher-precedence rule
+// must NOT be classified by that rule. Short-circuit assigns defaults.no_changes
+// and records a synthetic rule that describes the ignore_attributes downgrade.
+func TestClassifyResource_NoOpShortCircuit(t *testing.T) {
+	cfg := &config.Config{
+		Classifications: []config.ClassificationConfig{
+			{
+				Name:        "major",
+				Description: "Core services",
+				Rules: []config.RuleConfig{
+					{Resource: []string{"azurerm_key_vault_key"}, Description: "Encryption keys"},
+				},
+			},
+			{
+				Name:        "minor",
+				Description: "Plumbing",
+			},
+		},
+		Precedence: []string{"major", "minor"},
+		Defaults: &config.DefaultsConfig{
+			Unclassified: "major",
+			NoChanges:    "minor",
+		},
+	}
+
+	classifier, err := New(cfg)
+	if err != nil {
+		t.Fatalf("failed to create classifier: %v", err)
+	}
+
+	change := plan.ResourceChange{
+		Address:           "azurerm_key_vault_key.cmk",
+		Type:              "azurerm_key_vault_key",
+		Actions:           []string{"no-op"},
+		OriginalActions:   []string{"update"},
+		IgnoredAttributes: []string{"tags.tf-module-l2"},
+	}
+
+	result := classifier.Classify([]plan.ResourceChange{change})
+
+	if len(result.ResourceDecisions) != 1 {
+		t.Fatalf("expected 1 decision, got %d", len(result.ResourceDecisions))
+	}
+	d := result.ResourceDecisions[0]
+	if d.Classification != "minor" {
+		t.Errorf("expected Classification = defaults.no_changes (minor), got %q", d.Classification)
+	}
+	if len(d.MatchedRules) != 1 {
+		t.Fatalf("expected 1 matched rule, got %d: %v", len(d.MatchedRules), d.MatchedRules)
+	}
+	if !strings.Contains(d.MatchedRules[0], "ignore_attributes") {
+		t.Errorf("expected synthetic rule to reference ignore_attributes, got %q", d.MatchedRules[0])
+	}
+	if !strings.Contains(d.MatchedRules[0], "tags.tf-module-l2") {
+		t.Errorf("expected synthetic rule to list the ignored attribute path, got %q", d.MatchedRules[0])
+	}
+	if strings.Contains(d.MatchedRules[0], "Encryption keys") {
+		t.Errorf("synthetic rule must not reference the major rule that would have matched the type, got %q", d.MatchedRules[0])
+	}
+}
+
+// CR-0036: a Terraform-native no-op (no OriginalActions) gets the
+// "no-op (no change)" synthetic description.
+func TestClassifyResource_NativeNoOp(t *testing.T) {
+	cfg := &config.Config{
+		Classifications: []config.ClassificationConfig{
+			{Name: "major", Rules: []config.RuleConfig{{Resource: []string{"*"}}}},
+			{Name: "minor"},
+		},
+		Precedence: []string{"major", "minor"},
+		Defaults:   &config.DefaultsConfig{Unclassified: "major", NoChanges: "minor"},
+	}
+	classifier, err := New(cfg)
+	if err != nil {
+		t.Fatalf("failed to create classifier: %v", err)
+	}
+
+	change := plan.ResourceChange{
+		Address: "azurerm_resource_group.rg",
+		Type:    "azurerm_resource_group",
+		Actions: []string{"no-op"},
+	}
+
+	result := classifier.Classify([]plan.ResourceChange{change})
+	d := result.ResourceDecisions[0]
+
+	if d.Classification != "minor" {
+		t.Errorf("expected Classification = defaults.no_changes (minor), got %q", d.Classification)
+	}
+	if len(d.MatchedRules) != 1 || d.MatchedRules[0] != "no-op (no change)" {
+		t.Errorf("expected [\"no-op (no change)\"], got %v", d.MatchedRules)
+	}
+}
+
+// CR-0036: explain must emit exactly one synthetic trace entry for a no-op
+// resource — the whole point is to NOT evaluate rules.
+func TestExplainClassify_NoOpSingleTraceEntry(t *testing.T) {
+	cfg := &config.Config{
+		Classifications: []config.ClassificationConfig{
+			{Name: "major", Rules: []config.RuleConfig{{Resource: []string{"azurerm_key_vault_key"}}}},
+			{Name: "minor", Rules: []config.RuleConfig{{Resource: []string{"*"}}}},
+		},
+		Precedence: []string{"major", "minor"},
+		Defaults:   &config.DefaultsConfig{Unclassified: "major", NoChanges: "minor"},
+	}
+	classifier, err := New(cfg)
+	if err != nil {
+		t.Fatalf("failed to create classifier: %v", err)
+	}
+
+	change := plan.ResourceChange{
+		Address:           "azurerm_key_vault_key.cmk",
+		Type:              "azurerm_key_vault_key",
+		Actions:           []string{"no-op"},
+		OriginalActions:   []string{"update"},
+		IgnoredAttributes: []string{"tags.tf-module-l2"},
+	}
+
+	result := classifier.ExplainClassify([]plan.ResourceChange{change})
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
+	}
+	exp := result.Resources[0]
+	if len(exp.Trace) != 1 {
+		t.Fatalf("expected 1 trace entry (short-circuit), got %d: %v", len(exp.Trace), exp.Trace)
+	}
+	entry := exp.Trace[0]
+	if entry.Result != TraceMatch {
+		t.Errorf("expected TraceMatch, got %q", entry.Result)
+	}
+	if entry.Classification != "minor" {
+		t.Errorf("expected trace classification = minor, got %q", entry.Classification)
+	}
+	if !strings.Contains(entry.Rule, "ignore_attributes") {
+		t.Errorf("expected synthetic rule to reference ignore_attributes, got %q", entry.Rule)
+	}
+	if exp.FinalClassification != "minor" {
+		t.Errorf("expected FinalClassification = minor, got %q", exp.FinalClassification)
+	}
+}
+
+// A no-op decision (post FilterCosmeticChanges) must not elevate Overall above
+// the real changes in the plan. Otherwise the text output says "major" while
+// all major-classified resources are hidden as no-op, forcing a rule author to
+// discover the `not_actions = ["no-op"]` workaround.
+func TestClassify_NoOpDoesNotElevateOverall(t *testing.T) {
+	cfg := &config.Config{
+		Classifications: []config.ClassificationConfig{
+			{
+				Name:        "major",
+				Description: "Core services",
+				Rules: []config.RuleConfig{
+					{Resource: []string{"azurerm_key_vault_key"}, Description: "Encryption keys"},
+				},
+			},
+			{
+				Name:        "minor",
+				Description: "Plumbing",
+				Rules: []config.RuleConfig{
+					{Resource: []string{"*"}, Actions: []string{"read"}, Description: "Data reads"},
+				},
+			},
+		},
+		Precedence: []string{"major", "minor"},
+		Defaults: &config.DefaultsConfig{
+			Unclassified: "major",
+			NoChanges:    "minor",
+		},
+	}
+
+	classifier, err := New(cfg)
+	if err != nil {
+		t.Fatalf("failed to create classifier: %v", err)
+	}
+
+	// A key_vault_key tag-only update that FilterCosmeticChanges downgraded to no-op,
+	// alongside a single data-source read.
+	changes := []plan.ResourceChange{
+		{
+			Address:           "azurerm_key_vault_key.cmk",
+			Type:              "azurerm_key_vault_key",
+			Actions:           []string{"no-op"},
+			OriginalActions:   []string{"update"},
+			IgnoredAttributes: []string{"tags.tf-module-l2"},
+		},
+		{
+			Address: "data.azapi_resource_action.account_keys[0]",
+			Type:    "azapi_resource_action",
+			Actions: []string{"read"},
+		},
+	}
+
+	result := classifier.Classify(changes)
+
+	if result.Overall != "minor" {
+		t.Errorf("expected Overall 'minor' (real change is the data read) — a no-op-downgraded resource should not elevate Overall; got %q", result.Overall)
 	}
 }
 

@@ -471,6 +471,8 @@ Downgraded to no-op by ignore_attributes:
 
 **No-changes detection:** when ALL resources in a plan are no-op (either natively or after `ignore_attributes` filtering), the overall classification uses the `no_changes` default with exit code 0.
 
+**Rule evaluation:** no-op resources bypass rule evaluation entirely. They receive the `defaults.no_changes` classification with a synthetic rule description referencing `ignore_attributes` (for downgraded resources) or `"no-op (no change)"` (for native Terraform no-ops). No-op resources do not contribute to the overall classification precedence. Rule authors therefore do NOT need to add `not_actions = ["no-op"]` to any rule — the short-circuit handles it uniformly.
+
 Only `["update"]` actions are evaluated — creates, deletes, and replacements are never affected.
 
 ### Blast Radius

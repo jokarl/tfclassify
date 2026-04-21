@@ -21,11 +21,6 @@ classification "standard" {
 
 classification "auto" {
   description = "Auto-approved"
-
-  rule {
-    resource = ["*"]
-    actions  = ["no-op"]
-  }
 }
 
 precedence = ["critical", "standard", "auto"]
