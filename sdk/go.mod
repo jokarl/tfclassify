@@ -1,6 +1,6 @@
 module github.com/jokarl/tfclassify/sdk
 
-go 1.25.8
+go 1.25.9
 
 require (
 	github.com/hashicorp/go-plugin v1.7.0
