@@ -1,0 +1,102 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.13.0",
+  "resource_changes": [
+    {
+      "address": "azurerm_resource_group.tagged",
+      "mode": "managed",
+      "type": "azurerm_resource_group",
+      "name": "tagged",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["update"],
+        "before": {
+          "name": "rg-demo",
+          "location": "westeurope",
+          "tags": {
+            "environment": "prod",
+            "managedBy": "terraform"
+          }
+        },
+        "after": {
+          "name": "rg-demo",
+          "location": "westeurope",
+          "tags": {
+            "environment": "prod",
+            "managedBy": "terraform",
+            "tf-module-l2": "L2:aiwz:3.0.9"
+          }
+        },
+        "after_unknown": {},
+        "before_sensitive": {"tags": {}},
+        "after_sensitive": {"tags": {}}
+      }
+    },
+    {
+      "address": "azapi_resource.cognitive",
+      "mode": "managed",
+      "type": "azapi_resource",
+      "name": "cognitive",
+      "provider_name": "registry.terraform.io/azure/azapi",
+      "change": {
+        "actions": ["update"],
+        "before": {
+          "name": "cog-demo",
+          "type": "Microsoft.CognitiveServices/accounts@2025-06-01",
+          "tags": {
+            "environment": "prod",
+            "managedBy": "terraform"
+          },
+          "output": {
+            "id": "/subscriptions/xxx/resourceGroups/rg-demo/providers/Microsoft.CognitiveServices/accounts/cog-demo",
+            "properties": {
+              "provisioningState": "Succeeded",
+              "endpoint": "https://cog-demo.openai.azure.com/"
+            }
+          }
+        },
+        "after": {
+          "name": "cog-demo",
+          "type": "Microsoft.CognitiveServices/accounts@2025-06-01",
+          "tags": {
+            "environment": "prod",
+            "managedBy": "terraform",
+            "tf-module-l2": "L2:aiwz:3.0.9"
+          },
+          "output": null
+        },
+        "after_unknown": {"output": true},
+        "before_sensitive": {"tags": {}},
+        "after_sensitive": {"tags": {}}
+      }
+    },
+    {
+      "address": "azurerm_storage_account.real",
+      "mode": "managed",
+      "type": "azurerm_storage_account",
+      "name": "real",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["update"],
+        "before": {
+          "name": "stdemo001",
+          "account_replication_type": "LRS",
+          "tags": {
+            "environment": "prod"
+          }
+        },
+        "after": {
+          "name": "stdemo001",
+          "account_replication_type": "GRS",
+          "tags": {
+            "environment": "prod",
+            "tf-module-l2": "L2:aiwz:3.0.9"
+          }
+        },
+        "after_unknown": {},
+        "before_sensitive": {"tags": {}},
+        "after_sensitive": {"tags": {}}
+      }
+    }
+  ]
+}

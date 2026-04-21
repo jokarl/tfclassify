@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/jokarl/tfclassify/internal/classify"
+	"github.com/jokarl/tfclassify/internal/plan"
 )
 
 // Format represents the output format type.
@@ -82,14 +83,15 @@ type JSONOutput struct {
 
 // JSONResource represents a single resource in JSON output.
 type JSONResource struct {
-	Address                   string   `json:"address"`
-	Type                      string   `json:"type"`
-	Actions                   []string `json:"actions"`
-	Classification            string   `json:"classification"`
-	ClassificationDescription string   `json:"classification_description,omitempty"`
-	MatchedRules              []string `json:"matched_rules"`
-	OriginalActions           []string `json:"original_actions,omitempty"`
-	IgnoredAttributes         []string `json:"ignored_attributes,omitempty"`
+	Address                   string                 `json:"address"`
+	Type                      string                 `json:"type"`
+	Actions                   []string               `json:"actions"`
+	Classification            string                 `json:"classification"`
+	ClassificationDescription string                 `json:"classification_description,omitempty"`
+	MatchedRules              []string               `json:"matched_rules"`
+	OriginalActions           []string               `json:"original_actions,omitempty"`
+	IgnoredAttributes         []string               `json:"ignored_attributes,omitempty"`
+	IgnoreRuleMatches         []plan.IgnoreRuleMatch `json:"ignore_rule_matches,omitempty"`
 }
 
 func (f *Formatter) formatJSON(result *classify.Result) error {
@@ -111,6 +113,7 @@ func (f *Formatter) formatJSON(result *classify.Result) error {
 			MatchedRules:              decision.MatchedRules,
 			OriginalActions:           decision.OriginalActions,
 			IgnoredAttributes:         decision.IgnoredAttributes,
+			IgnoreRuleMatches:         decision.IgnoreRuleMatches,
 		})
 	}
 
@@ -146,6 +149,9 @@ func (f *Formatter) formatText(result *classify.Result) error {
 					fmt.Fprintf(&sb, "  - %s (%s)\n", d.Address, d.ResourceType)
 					fmt.Fprintf(&sb, "    Originally: %v (downgraded by ignore_attributes: %s)\n",
 						d.OriginalActions, strings.Join(d.IgnoredAttributes, ", "))
+					for _, m := range d.IgnoreRuleMatches {
+						fmt.Fprintf(&sb, "    Matched rule %q: %s\n", m.Name, m.Description)
+					}
 				}
 			}
 		}
@@ -198,6 +204,10 @@ func (f *Formatter) formatText(result *classify.Result) error {
 				for _, decision := range active {
 					fmt.Fprintf(&sb, "  - %s (%s) %v\n",
 						decision.Address, decision.ResourceType, decision.Actions)
+					// Note: post-CR-0036, active decisions never have OriginalActions
+					// (any resource with Actions=["no-op"] short-circuits and lands in
+					// the Downgraded section below). Keep the output here strictly
+					// about the real matched rule.
 					for _, rule := range decision.MatchedRules {
 						fmt.Fprintf(&sb, "    Rule: %s\n", rule)
 					}
@@ -215,6 +225,9 @@ func (f *Formatter) formatText(result *classify.Result) error {
 					fmt.Fprintf(&sb, "  - %s (%s)\n", d.Address, d.ResourceType)
 					fmt.Fprintf(&sb, "    Originally: %v  (ignored: %s)\n",
 						d.OriginalActions, strings.Join(d.IgnoredAttributes, ", "))
+					for _, m := range d.IgnoreRuleMatches {
+						fmt.Fprintf(&sb, "    Matched ignore rule %q: %s\n", m.Name, m.Description)
+					}
 					for _, rule := range d.MatchedRules {
 						fmt.Fprintf(&sb, "    Rule: %s\n", rule)
 					}

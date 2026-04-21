@@ -329,16 +329,32 @@ defaults {
   plugin_timeout = "30s"
 
   # Attributes to ignore when determining if a resource meaningfully changed.
-  # If ALL changed attributes on an "update" resource match these prefixes,
+  # If ALL changed attributes on an "update" resource match these patterns,
   # the resource is reclassified as no-op before classification begins.
   #
-  # Uses prefix-based dot-path matching:
-  #   "tags"      → covers tags, tags.env, tags.team (but NOT tags_all)
-  #   "meta.tags" → covers meta.tags, meta.tags.env (but NOT meta.name)
+  # Uses dot-path glob matching (per-segment * and ?):
+  #   "tags"                      → covers tags, tags.env, tags.team (but NOT tags_all)
+  #   "meta.tags"                 → covers meta.tags, meta.tags.env
+  #   "tags.temp_*"               → covers tags.temp_foo, tags.temp_bar (not tags.keep)
+  #   "properties.*.createdAt"    → covers properties.rule1.createdAt (not properties.createdAt)
   #
   # Common use case: module tagging conventions where version bumps cause
   # widespread cosmetic changes (e.g., provenance tag updates).
   ignore_attributes = ["tags", "tags_all"]
+
+  # Scoped ignore rules (CR-0035). Each block is an additional ignore rule
+  # that only applies to resources whose resource/module globs match. Combine
+  # with the flat `ignore_attributes` list above for precise control — e.g.,
+  # ignore azapi's computed `output` refresh on azapi_resource only, without
+  # hiding `output` changes on any other provider.
+  #
+  # Required: label (unique), description, attributes.
+  # Optional: resource / not_resource / module / not_module (globs).
+  ignore_attribute "azapi_output" {
+    description = "azapi_resource.output is a computed read-back of the API response; not a user-authored change."
+    resource    = ["azapi_resource"]
+    attributes  = ["output"]
+  }
 }
 
 # ─── Evidence ──────────────────────────────────────────────────────────────────

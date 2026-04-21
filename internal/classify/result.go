@@ -1,7 +1,11 @@
 // Package classify provides the core classification engine.
 package classify
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/jokarl/tfclassify/internal/plan"
+)
 
 // Result contains the classification results for a plan.
 type Result struct {
@@ -23,6 +27,7 @@ type ResourceDecision struct {
 	Metadata                  map[string]interface{} // plugin-provided metadata (optional)
 	OriginalActions           []string               // set when actions were rewritten by ignore_attributes
 	IgnoredAttributes         []string               // attribute paths covered by ignore_attributes
+	IgnoreRuleMatches         []plan.IgnoreRuleMatch // scoped ignore_attribute rules (CR-0035) that contributed
 }
 
 // ExplainResult contains full trace data for explain output.
@@ -40,8 +45,9 @@ type ResourceExplanation struct {
 	FinalSource         string // "core-rule", "builtin: <name>", "plugin: <plugin>/<analyzer>"
 	WinnerReason        string
 	Trace               []TraceEntry
-	OriginalActions     []string // set when actions were rewritten by ignore_attributes
-	IgnoredAttributes   []string // attribute paths covered by ignore_attributes
+	OriginalActions     []string               // set when actions were rewritten by ignore_attributes
+	IgnoredAttributes   []string               // attribute paths covered by ignore_attributes
+	IgnoreRuleMatches   []plan.IgnoreRuleMatch // scoped ignore_attribute rules (CR-0035) that contributed
 }
 
 // TraceResult represents the evaluation outcome.

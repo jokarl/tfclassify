@@ -661,6 +661,62 @@ func TestValidate_IgnoreAttributesValid(t *testing.T) {
 	}
 }
 
+func TestValidate_IgnoreAttributeScopedValid(t *testing.T) {
+	cfg, err := LoadFile("testdata/ignore_attribute_scoped_valid.hcl")
+	if err != nil {
+		t.Fatalf("expected no error for valid scoped ignore_attribute blocks, got: %v", err)
+	}
+	if len(cfg.Defaults.IgnoreAttributeRules) != 2 {
+		t.Fatalf("expected 2 scoped rules, got %d", len(cfg.Defaults.IgnoreAttributeRules))
+	}
+	if cfg.Defaults.IgnoreAttributeRules[0].Name != "azapi_output" {
+		t.Errorf("first rule name: got %q", cfg.Defaults.IgnoreAttributeRules[0].Name)
+	}
+	if cfg.Defaults.IgnoreAttributeRules[1].Attributes[0] != "properties.*.createdAt" {
+		t.Errorf("second rule first attribute: got %q", cfg.Defaults.IgnoreAttributeRules[1].Attributes[0])
+	}
+}
+
+func TestValidate_IgnoreAttributeMissingDescription(t *testing.T) {
+	_, err := LoadFile("testdata/ignore_attribute_missing_description.hcl")
+	if err == nil {
+		t.Fatal("expected error for missing description, got nil")
+	}
+	if !strings.Contains(err.Error(), "description") {
+		t.Errorf("expected error to mention description, got: %v", err)
+	}
+}
+
+func TestValidate_IgnoreAttributeDuplicateName(t *testing.T) {
+	_, err := LoadFile("testdata/ignore_attribute_duplicate_name.hcl")
+	if err == nil {
+		t.Fatal("expected error for duplicate block name, got nil")
+	}
+	if !strings.Contains(err.Error(), "duplicate") {
+		t.Errorf("expected error to mention duplicate, got: %v", err)
+	}
+}
+
+func TestValidate_IgnoreAttributeEmptyAttributes(t *testing.T) {
+	_, err := LoadFile("testdata/ignore_attribute_empty_attributes.hcl")
+	if err == nil {
+		t.Fatal("expected error for empty attributes list, got nil")
+	}
+	if !strings.Contains(err.Error(), "attributes") {
+		t.Errorf("expected error to mention attributes, got: %v", err)
+	}
+}
+
+func TestValidate_IgnoreAttributeInvalidGlob(t *testing.T) {
+	_, err := LoadFile("testdata/ignore_attribute_invalid_glob.hcl")
+	if err == nil {
+		t.Fatal("expected error for invalid glob, got nil")
+	}
+	if !strings.Contains(err.Error(), "invalid glob") {
+		t.Errorf("expected error to mention invalid glob, got: %v", err)
+	}
+}
+
 func TestValidateWarnings_EmptyClassification_WithPlugin(t *testing.T) {
 	cfg := &Config{
 		Classifications: []ClassificationConfig{

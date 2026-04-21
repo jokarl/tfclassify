@@ -454,6 +454,7 @@ Alternative approaches either required rule authors to learn the workaround (sta
 ## Related Items
 
 * **CR-0034** — `ignore_attributes` (introduced `FilterCosmeticChanges`); this CR is its direct follow-up
+* **CR-0035** — scoped `ignore_attribute` blocks; adds `plan.ResourceChange.IgnoreRuleMatches` which the Downgraded section surfaces alongside the flat `IgnoredAttributes` list
 * **CR-0032** — `not_actions` rule field; the generic mechanism the current workaround relies on; unchanged by this CR
 * **CR-0030** — blast radius analyzer; already correctly skips no-op resources and requires no change
 * Original bug report: "the output lied" — the motivating scenario is a plan containing `azurerm_key_vault_key` tag-only updates plus a single data-source read, which produced `Classification: major` with one minor resource visible

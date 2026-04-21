@@ -101,6 +101,7 @@ func (c *Classifier) classifyResource(change plan.ResourceChange) ResourceDecisi
 		Actions:           change.Actions,
 		OriginalActions:   change.OriginalActions,
 		IgnoredAttributes: change.IgnoredAttributes,
+		IgnoreRuleMatches: change.IgnoreRuleMatches,
 	}
 
 	// A resource whose only action is "no-op" does nothing. Running classification
@@ -202,6 +203,7 @@ func (c *Classifier) explainResource(change plan.ResourceChange) ResourceExplana
 		Actions:           change.Actions,
 		OriginalActions:   change.OriginalActions,
 		IgnoredAttributes: change.IgnoredAttributes,
+		IgnoreRuleMatches: change.IgnoreRuleMatches,
 	}
 
 	// No-op resources bypass rule iteration — emit a single synthetic trace

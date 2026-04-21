@@ -68,6 +68,8 @@ defaults {
 }
 ```
 
+The Downgraded section also surfaces scoped `ignore_attribute` rule matches (CR-0035) alongside the flat `IgnoredAttributes` list — so when a resource is absorbed by a named scoped rule rather than the global `ignore_attributes` list, the reader sees both the rule name and its description.
+
 Verbose output against a plan with one real data-source read, two tag-only downgrades, and one native no-op:
 
 ```
