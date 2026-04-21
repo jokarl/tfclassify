@@ -6555,7 +6555,13 @@
           "Microsoft.AzureResilienceManagement/recoveryPlans/*/action",
           "Microsoft.AzureResilienceManagement/recoveryPlans/*/delete",
           "Microsoft.AzureResilienceManagement/recoveryPlans/*/read",
-          "Microsoft.AzureResilienceManagement/recoveryPlans/*/write"
+          "Microsoft.AzureResilienceManagement/recoveryPlans/*/write",
+          "Microsoft.AzureResilienceManagement/usagePlans/delete",
+          "Microsoft.AzureResilienceManagement/usagePlans/read",
+          "Microsoft.AzureResilienceManagement/usagePlans/write",
+          "Microsoft.AzureResilienceManagement/usagePlans/enrollments/delete",
+          "Microsoft.AzureResilienceManagement/usagePlans/enrollments/read",
+          "Microsoft.AzureResilienceManagement/usagePlans/enrollments/write"
         ],
         "notActions": [],
         "dataActions": [],
@@ -6688,7 +6694,13 @@
           "Microsoft.AzureResilienceManagement/recoveryPlans/*/action",
           "Microsoft.AzureResilienceManagement/recoveryPlans/*/delete",
           "Microsoft.AzureResilienceManagement/recoveryPlans/*/read",
-          "Microsoft.AzureResilienceManagement/recoveryPlans/*/write"
+          "Microsoft.AzureResilienceManagement/recoveryPlans/*/write",
+          "Microsoft.AzureResilienceManagement/usagePlans/delete",
+          "Microsoft.AzureResilienceManagement/usagePlans/read",
+          "Microsoft.AzureResilienceManagement/usagePlans/write",
+          "Microsoft.AzureResilienceManagement/usagePlans/enrollments/delete",
+          "Microsoft.AzureResilienceManagement/usagePlans/enrollments/read",
+          "Microsoft.AzureResilienceManagement/usagePlans/enrollments/write"
         ],
         "notActions": [],
         "dataActions": [],
@@ -6714,7 +6726,11 @@
           "Microsoft.Monitor/accounts/read",
           "Microsoft.Monitor/slis/read",
           "Microsoft.Resources/deployments/*",
-          "Microsoft.Resources/subscriptions/resourceGroups/read"
+          "Microsoft.Resources/subscriptions/resourceGroups/read",
+          "Microsoft.AzureResilienceManagement/usagePlans/read",
+          "Microsoft.AzureResilienceManagement/usagePlans/write",
+          "Microsoft.AzureResilienceManagement/usagePlans/enrollments/read",
+          "Microsoft.AzureResilienceManagement/usagePlans/enrollments/write"
         ],
         "notActions": [],
         "dataActions": [],
@@ -6738,7 +6754,9 @@
           "Microsoft.AzureResilienceManagement/drills/drillRuns/read",
           "Microsoft.AzureResilienceManagement/drills/drillRuns/drillRunChildJobs/read",
           "Microsoft.AzureResilienceManagement/drills/drillRuns/drillRunResources/read",
-          "Microsoft.AzureResilienceManagement/drills/read"
+          "Microsoft.AzureResilienceManagement/drills/read",
+          "Microsoft.AzureResilienceManagement/usagePlans/read",
+          "Microsoft.AzureResilienceManagement/usagePlans/enrollments/read"
         ],
         "notActions": [],
         "dataActions": [],
@@ -6819,11 +6837,21 @@
           "Microsoft.Authorization/*/read",
           "Microsoft.Management/ServiceGroups/read",
           "Microsoft.Relationships/ServiceGroupMember/read",
-          "Microsoft.AzureResilienceManagement/goalTemplates/*",
-          "Microsoft.AzureResilienceManagement/goalAssignments/*",
-          "Microsoft.AzureResilienceManagement/goalAssignments/goalResources/*",
+          "Microsoft.AzureResilienceManagement/goalTemplates/delete",
+          "Microsoft.AzureResilienceManagement/goalTemplates/read",
+          "Microsoft.AzureResilienceManagement/goalTemplates/write",
+          "Microsoft.AzureResilienceManagement/goalAssignments/delete",
+          "Microsoft.AzureResilienceManagement/goalAssignments/read",
+          "Microsoft.AzureResilienceManagement/goalAssignments/write",
+          "Microsoft.AzureResilienceManagement/goalAssignments/goalResources/read",
           "Microsoft.AzureResilienceManagement/locations/operationStatuses/read",
-          "Microsoft.AzureResilienceManagement/operations/read"
+          "Microsoft.AzureResilienceManagement/operations/read",
+          "Microsoft.AzureResilienceManagement/usagePlans/delete",
+          "Microsoft.AzureResilienceManagement/usagePlans/read",
+          "Microsoft.AzureResilienceManagement/usagePlans/write",
+          "Microsoft.AzureResilienceManagement/usagePlans/enrollments/delete",
+          "Microsoft.AzureResilienceManagement/usagePlans/enrollments/read",
+          "Microsoft.AzureResilienceManagement/usagePlans/enrollments/write"
         ],
         "notActions": [],
         "dataActions": [],
@@ -6842,11 +6870,21 @@
           "Microsoft.Authorization/*/read",
           "Microsoft.Management/ServiceGroups/read",
           "Microsoft.Relationships/ServiceGroupMember/read",
-          "Microsoft.AzureResilienceManagement/goalTemplates/*",
-          "Microsoft.AzureResilienceManagement/goalAssignments/*",
-          "Microsoft.AzureResilienceManagement/goalAssignments/goalResources/*",
+          "Microsoft.AzureResilienceManagement/goalTemplates/delete",
+          "Microsoft.AzureResilienceManagement/goalTemplates/read",
+          "Microsoft.AzureResilienceManagement/goalTemplates/write",
+          "Microsoft.AzureResilienceManagement/goalAssignments/delete",
+          "Microsoft.AzureResilienceManagement/goalAssignments/read",
+          "Microsoft.AzureResilienceManagement/goalAssignments/write",
+          "Microsoft.AzureResilienceManagement/goalAssignments/goalResources/read",
           "Microsoft.AzureResilienceManagement/locations/operationStatuses/read",
-          "Microsoft.AzureResilienceManagement/operations/read"
+          "Microsoft.AzureResilienceManagement/operations/read",
+          "Microsoft.AzureResilienceManagement/usagePlans/delete",
+          "Microsoft.AzureResilienceManagement/usagePlans/read",
+          "Microsoft.AzureResilienceManagement/usagePlans/write",
+          "Microsoft.AzureResilienceManagement/usagePlans/enrollments/delete",
+          "Microsoft.AzureResilienceManagement/usagePlans/enrollments/read",
+          "Microsoft.AzureResilienceManagement/usagePlans/enrollments/write"
         ],
         "notActions": [],
         "dataActions": [],
@@ -6869,7 +6907,9 @@
           "Microsoft.AzureResilienceManagement/locations/operationStatuses/read",
           "Microsoft.AzureResilienceManagement/operations/read",
           "Microsoft.Management/ServiceGroups/read",
-          "Microsoft.Relationships/ServiceGroupMember/read"
+          "Microsoft.Relationships/ServiceGroupMember/read",
+          "Microsoft.AzureResilienceManagement/usagePlans/read",
+          "Microsoft.AzureResilienceManagement/usagePlans/enrollments/read"
         ],
         "notActions": [],
         "dataActions": [],
@@ -6897,7 +6937,13 @@
           "Microsoft.Relationships/ServiceGroupMember/read",
           "Microsoft.Relationships/ServiceGroupMember/write",
           "Microsoft.Resources/deployments/*",
-          "Microsoft.Resources/subscriptions/resourceGroups/read"
+          "Microsoft.Resources/subscriptions/resourceGroups/read",
+          "Microsoft.AzureResilienceManagement/usagePlans/delete",
+          "Microsoft.AzureResilienceManagement/usagePlans/read",
+          "Microsoft.AzureResilienceManagement/usagePlans/write",
+          "Microsoft.AzureResilienceManagement/usagePlans/enrollments/delete",
+          "Microsoft.AzureResilienceManagement/usagePlans/enrollments/read",
+          "Microsoft.AzureResilienceManagement/usagePlans/enrollments/write"
         ],
         "notActions": [],
         "dataActions": [],
@@ -6925,7 +6971,13 @@
           "Microsoft.Relationships/ServiceGroupMember/read",
           "Microsoft.Relationships/ServiceGroupMember/write",
           "Microsoft.Resources/deployments/*",
-          "Microsoft.Resources/subscriptions/resourceGroups/read"
+          "Microsoft.Resources/subscriptions/resourceGroups/read",
+          "Microsoft.AzureResilienceManagement/usagePlans/delete",
+          "Microsoft.AzureResilienceManagement/usagePlans/read",
+          "Microsoft.AzureResilienceManagement/usagePlans/write",
+          "Microsoft.AzureResilienceManagement/usagePlans/enrollments/delete",
+          "Microsoft.AzureResilienceManagement/usagePlans/enrollments/read",
+          "Microsoft.AzureResilienceManagement/usagePlans/enrollments/write"
         ],
         "notActions": [],
         "dataActions": [],
@@ -6949,7 +7001,9 @@
           "Microsoft.Management/ServiceGroups/read",
           "Microsoft.Relationships/ServiceGroupMember/read",
           "Microsoft.Resources/deployments/*",
-          "Microsoft.Resources/subscriptions/resourceGroups/read"
+          "Microsoft.Resources/subscriptions/resourceGroups/read",
+          "Microsoft.AzureResilienceManagement/usagePlans/read",
+          "Microsoft.AzureResilienceManagement/usagePlans/enrollments/read"
         ],
         "notActions": [],
         "dataActions": [],
@@ -6972,7 +7026,71 @@
           "Microsoft.Management/ServiceGroups/read",
           "Microsoft.Relationships/ServiceGroupMember/read",
           "Microsoft.Resources/deployments/*/read",
-          "Microsoft.Resources/subscriptions/resourceGroups/read"
+          "Microsoft.Resources/subscriptions/resourceGroups/read",
+          "Microsoft.AzureResilienceManagement/usagePlans/read",
+          "Microsoft.AzureResilienceManagement/usagePlans/enrollments/read"
+        ],
+        "notActions": [],
+        "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "b66c1f7c-c685-40d6-b8b8-64b8230febf4",
+    "roleName": "Azure Resilience Management Usage Administrator",
+    "description": "Administrator Role of Azure Resilience Management Usage",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.Authorization/*/read",
+          "Microsoft.AzureResilienceManagement/usagePlans/delete",
+          "Microsoft.AzureResilienceManagement/usagePlans/read",
+          "Microsoft.AzureResilienceManagement/usagePlans/write",
+          "Microsoft.AzureResilienceManagement/usagePlans/enrollments/delete",
+          "Microsoft.AzureResilienceManagement/usagePlans/enrollments/read",
+          "Microsoft.AzureResilienceManagement/usagePlans/enrollments/write"
+        ],
+        "notActions": [],
+        "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "5ca51376-e049-4302-abcc-64c588049c59",
+    "roleName": "Azure Resilience Management Usage Contributor",
+    "description": "Contributor Role of Azure Resilience Management Usage",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.Authorization/*/read",
+          "Microsoft.AzureResilienceManagement/usagePlans/delete",
+          "Microsoft.AzureResilienceManagement/usagePlans/read",
+          "Microsoft.AzureResilienceManagement/usagePlans/write",
+          "Microsoft.AzureResilienceManagement/usagePlans/enrollments/delete",
+          "Microsoft.AzureResilienceManagement/usagePlans/enrollments/read",
+          "Microsoft.AzureResilienceManagement/usagePlans/enrollments/write"
+        ],
+        "notActions": [],
+        "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "b130f7de-5374-4e3d-ada8-bae6e49114b9",
+    "roleName": "Azure Resilience Management Usage Reader",
+    "description": "Reader Role of Azure Resilience Management Usage",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.Authorization/*/read",
+          "Microsoft.AzureResilienceManagement/usagePlans/read",
+          "Microsoft.AzureResilienceManagement/usagePlans/enrollments/read"
         ],
         "notActions": [],
         "dataActions": [],
@@ -12300,10 +12418,10 @@
           "Microsoft.Storage/storageAccounts/blobServices/read",
           "Microsoft.Storage/storageAccounts/blobServices/write"
         ],
-        "notActions": [
+        "notActions": [],
+        "dataActions": [
           "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/delete"
         ],
-        "dataActions": [],
         "notDataActions": []
       }
     ]
@@ -12319,7 +12437,8 @@
           "Microsoft.Storage/storageAccounts/blobServices/containers/read",
           "Microsoft.Storage/storageAccounts/fileServices/shares/read"
         ],
-        "notActions": [
+        "notActions": [],
+        "dataActions": [
           "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read",
           "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/tags/write",
           "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/tags/read",
@@ -12327,7 +12446,6 @@
           "Microsoft.Storage/storageAccounts/fileServices/readFileBackupSemantics/action",
           "Microsoft.EventGrid/events/send/action"
         ],
-        "dataActions": [],
         "notDataActions": []
       }
     ]
