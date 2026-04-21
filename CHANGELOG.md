@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.9.0](https://github.com/jokarl/tfclassify/compare/tfclassify-v0.8.1...tfclassify-v0.9.0) (2026-04-21)
+
+
+### Features
+
+* scoped ignore attributes ([#167](https://github.com/jokarl/tfclassify/issues/167)) ([2ce7d08](https://github.com/jokarl/tfclassify/commit/2ce7d08093aed6f31079d9db59c1c070f8547d2d))
+* skip no-op rule evaluation ([#168](https://github.com/jokarl/tfclassify/issues/168)) ([3a8f040](https://github.com/jokarl/tfclassify/commit/3a8f0404c200eeec0a7bba75248115fa2cb274f3))
+
+
+### Bug Fixes
+
+* refresh Azure role data and action registry ([#165](https://github.com/jokarl/tfclassify/issues/165)) ([ebb5cc5](https://github.com/jokarl/tfclassify/commit/ebb5cc59f3d57132f34b194ee4f95b9f7c02bd85))
+
+
+### Dependencies
+
+* **deps:** bump github.com/hashicorp/go-version from 1.8.0 to 1.9.0 ([#163](https://github.com/jokarl/tfclassify/issues/163)) ([d368a0e](https://github.com/jokarl/tfclassify/commit/d368a0e5c928ed948e82364d3a0222bc1b7d2627))
+* **deps:** bump google.golang.org/grpc from 1.79.3 to 1.80.0 ([#164](https://github.com/jokarl/tfclassify/issues/164)) ([8ce328b](https://github.com/jokarl/tfclassify/commit/8ce328bc1e516863056e87cd2c91e0005aa25491))
+* **deps:** bump google.golang.org/grpc from 1.79.3 to 1.80.0 in /sdk ([#162](https://github.com/jokarl/tfclassify/issues/162)) ([0014dd9](https://github.com/jokarl/tfclassify/commit/0014dd9f369bdf7e891abe994025d812b5396e4e))
+
 ## [0.8.1](https://github.com/jokarl/tfclassify/compare/tfclassify-v0.8.0...tfclassify-v0.8.1) (2026-04-13)
 
 
