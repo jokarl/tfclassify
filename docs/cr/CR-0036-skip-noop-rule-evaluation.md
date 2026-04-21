@@ -116,7 +116,9 @@ flowchart LR
 7. The system **MUST** exclude no-op resources from the `Overall` precedence calculation in `Classify`
 8. The system **MUST** exclude no-op resources from the `Overall` precedence recalculation in `AddPluginDecisions`
 9. The `tfclassify explain` command **MUST** emit a single synthetic trace entry for no-op resources instead of evaluating each rule against them
-10. The text output **MUST** present the hidden no-op count broken down by classification so rule authors can see what the filter absorbed
+10. The verbose text output (`--verbose`) **MUST** render a dedicated "Downgraded to no-op by ignore_attributes" section listing each downgraded resource with its address, original actions, ignored attribute paths, and the synthetic matched rule — users **MUST** be able to diagnose which rule matched and why without invoking `tfclassify explain`
+11. The compact text output **MUST** split the hidden no-op count between `ignore_attributes` downgrades and Terraform-native no-ops so CI logs surface the downgrade footprint
+12. The compact text output **MUST** include a hint directing users to `--verbose` when downgrades are present
 
 ### Non-Functional Requirements
 

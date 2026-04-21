@@ -201,11 +201,10 @@ func TestFormatText_NoChangesWithDowngradedNonVerbose(t *testing.T) {
 	}
 }
 
-// Mixed real + no-op resources: the "hidden" line must break the no-op count
-// down by classification so the reader can see what ignore_attributes filtered
-// out. Without this, an output showing `Classification: minor` next to an opaque
-// "(95 no-op resources hidden)" forces the reader to guess what matched.
-func TestFormatText_MixedNoOpBreakdownVerbose(t *testing.T) {
+// Verbose output must show downgraded resources in full — address, original
+// action, ignored attribute paths, and synthetic matched rule — so users can
+// diagnose which rule matched and why without running `explain`.
+func TestFormatText_DowngradedSectionVerbose(t *testing.T) {
 	result := &classify.Result{
 		Overall:         "minor",
 		OverallExitCode: 0,
@@ -224,15 +223,15 @@ func TestFormatText_MixedNoOpBreakdownVerbose(t *testing.T) {
 				Actions:           []string{"no-op"},
 				OriginalActions:   []string{"update"},
 				IgnoredAttributes: []string{"tags.tf-module-l2"},
-				Classification:    "major",
+				Classification:    "auto",
+				MatchedRules:      []string{"no-op (downgraded by ignore_attributes: tags.tf-module-l2)"},
 			},
 			{
-				Address:           "azurerm_resource_group.rg",
-				ResourceType:      "azurerm_resource_group",
-				Actions:           []string{"no-op"},
-				OriginalActions:   []string{"update"},
-				IgnoredAttributes: []string{"tags.tf-module-l2"},
-				Classification:    "minor",
+				Address:        "azurerm_storage_account.refreshed",
+				ResourceType:   "azurerm_storage_account",
+				Actions:        []string{"no-op"},
+				Classification: "auto",
+				MatchedRules:   []string{"no-op (no change)"},
 			},
 		},
 	}
@@ -245,8 +244,119 @@ func TestFormatText_MixedNoOpBreakdownVerbose(t *testing.T) {
 
 	output := buf.String()
 
-	if !strings.Contains(output, "(2 no-op resources hidden — minor: 1, major: 1)") {
-		t.Errorf("expected breakdown of hidden no-op resources by classification, got:\n%s", output)
+	if !strings.Contains(output, "Downgraded to no-op by ignore_attributes (1):") {
+		t.Errorf("expected Downgraded section header, got:\n%s", output)
+	}
+	if !strings.Contains(output, "azurerm_key_vault_key.cmk") {
+		t.Errorf("expected downgraded resource address in output, got:\n%s", output)
+	}
+	if !strings.Contains(output, "ignored: tags.tf-module-l2") {
+		t.Errorf("expected ignored attribute paths in output, got:\n%s", output)
+	}
+	if !strings.Contains(output, "Rule: no-op (downgraded by ignore_attributes: tags.tf-module-l2)") {
+		t.Errorf("expected synthetic matched rule in output, got:\n%s", output)
+	}
+	// Native no-op should be summarized as a count, not listed per-resource.
+	if !strings.Contains(output, "(1 native no-op resources hidden)") {
+		t.Errorf("expected native no-op count line, got:\n%s", output)
+	}
+	if strings.Contains(output, "azurerm_storage_account.refreshed") {
+		t.Errorf("native no-op resource should not be listed per-resource in verbose output, got:\n%s", output)
+	}
+}
+
+// When only downgrades are hidden, the compact line must still flag the
+// ignore_attributes filter and direct the user to --verbose.
+func TestFormatText_HiddenCountOnlyDowngradedCompact(t *testing.T) {
+	result := &classify.Result{
+		Overall:         "minor",
+		OverallExitCode: 0,
+		NoChanges:       false,
+		ResourceDecisions: []classify.ResourceDecision{
+			{Address: "data.r.x", Actions: []string{"read"}, Classification: "minor"},
+			{Address: "azurerm_key_vault_key.cmk", Actions: []string{"no-op"},
+				OriginalActions: []string{"update"}, Classification: "auto"},
+		},
+	}
+	var buf bytes.Buffer
+	if err := NewFormatter(&buf, FormatText, false).Format(result); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	output := buf.String()
+	if !strings.Contains(output, "(1 no-op resources hidden — downgraded by ignore_attributes; rerun with -v for detail)") {
+		t.Errorf("expected downgrade-only compact line with rerun hint, got:\n%s", output)
+	}
+}
+
+// When only native no-ops are hidden, the compact line must not imply
+// ignore_attributes is doing the work and must not direct users to -v
+// (there's nothing to diagnose).
+func TestFormatText_HiddenCountOnlyNativeCompact(t *testing.T) {
+	result := &classify.Result{
+		Overall:         "minor",
+		OverallExitCode: 0,
+		NoChanges:       false,
+		ResourceDecisions: []classify.ResourceDecision{
+			{Address: "data.r.x", Actions: []string{"read"}, Classification: "minor"},
+			{Address: "azurerm_storage_account.refreshed", Actions: []string{"no-op"}, Classification: "auto"},
+		},
+	}
+	var buf bytes.Buffer
+	if err := NewFormatter(&buf, FormatText, false).Format(result); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	output := buf.String()
+	if !strings.Contains(output, "(1 no-op resources hidden — native)") {
+		t.Errorf("expected native-only compact line, got:\n%s", output)
+	}
+	if strings.Contains(output, "ignore_attributes") {
+		t.Errorf("native-only line must not mention ignore_attributes, got:\n%s", output)
+	}
+	if strings.Contains(output, "rerun with -v") {
+		t.Errorf("native-only line must not suggest rerunning verbose, got:\n%s", output)
+	}
+}
+
+// Compact output must split the hidden count between ignore_attributes
+// downgrades and native no-ops, so CI logs surface the downgrade footprint
+// without being flooded with per-resource detail.
+func TestFormatText_HiddenCountSplitCompact(t *testing.T) {
+	result := &classify.Result{
+		Overall:         "minor",
+		OverallExitCode: 0,
+		NoChanges:       false,
+		ResourceDecisions: []classify.ResourceDecision{
+			{
+				Address:        "data.azapi_resource_action.keys[0]",
+				Actions:        []string{"read"},
+				Classification: "minor",
+			},
+			{
+				Address:         "azurerm_key_vault_key.cmk",
+				Actions:         []string{"no-op"},
+				OriginalActions: []string{"update"},
+				Classification:  "auto",
+			},
+			{
+				Address:        "azurerm_storage_account.refreshed",
+				Actions:        []string{"no-op"},
+				Classification: "auto",
+			},
+		},
+	}
+
+	var buf bytes.Buffer
+	formatter := NewFormatter(&buf, FormatText, false)
+	if err := formatter.Format(result); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := buf.String()
+	if !strings.Contains(output, "1 downgraded by ignore_attributes, 1 native") {
+		t.Errorf("expected compact count to split downgraded vs native, got:\n%s", output)
+	}
+	if !strings.Contains(output, "rerun with -v for detail") {
+		t.Errorf("expected hint to rerun with -v, got:\n%s", output)
 	}
 }
 
