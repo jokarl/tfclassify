@@ -171,7 +171,7 @@ func (f *Formatter) formatText(result *classify.Result) error {
 					byClassification[decision.Classification], decision)
 			}
 
-			totalNoOp := 0
+			noopByClassification := make(map[string]int)
 			for _, classification := range classificationOrder {
 				decisions := byClassification[classification]
 
@@ -184,7 +184,7 @@ func (f *Formatter) formatText(result *classify.Result) error {
 						active = append(active, d)
 					}
 				}
-				totalNoOp += len(noop)
+				noopByClassification[classification] = len(noop)
 
 				// Skip classifications that contain only no-op resources
 				if len(active) == 0 {
@@ -209,23 +209,23 @@ func (f *Formatter) formatText(result *classify.Result) error {
 				}
 				sb.WriteByte('\n')
 			}
-			if totalNoOp > 0 {
-				fmt.Fprintf(&sb, "(%d no-op resources hidden)\n", totalNoOp)
-			}
+			writeNoOpSummary(&sb, "", classificationOrder, noopByClassification)
 		} else {
 			// Compact output — skip no-op resources
-			noopCount := 0
+			noopByClassification := make(map[string]int)
+			classificationOrder := make([]string, 0)
 			for _, decision := range result.ResourceDecisions {
 				if isNoOpDecision(decision) {
-					noopCount++
+					if _, seen := noopByClassification[decision.Classification]; !seen {
+						classificationOrder = append(classificationOrder, decision.Classification)
+					}
+					noopByClassification[decision.Classification]++
 					continue
 				}
 				fmt.Fprintf(&sb, "  [%s] %s\n",
 					decision.Classification, decision.Address)
 			}
-			if noopCount > 0 {
-				fmt.Fprintf(&sb, "  (%d no-op resources hidden)\n", noopCount)
-			}
+			writeNoOpSummary(&sb, "  ", classificationOrder, noopByClassification)
 		}
 	}
 
@@ -241,6 +241,31 @@ func isNoOpDecision(d classify.ResourceDecision) bool {
 		}
 	}
 	return true
+}
+
+// writeNoOpSummary prints the "N no-op resources hidden" line with a per-classification
+// breakdown, so a reader can see what a config's ignore_attributes filtered out instead
+// of having to trust an opaque flat count.
+func writeNoOpSummary(sb *strings.Builder, indent string, order []string, counts map[string]int) {
+	total := 0
+	for _, c := range order {
+		total += counts[c]
+	}
+	if total == 0 {
+		return
+	}
+
+	var parts []string
+	for _, c := range order {
+		if n := counts[c]; n > 0 {
+			parts = append(parts, fmt.Sprintf("%s: %d", c, n))
+		}
+	}
+	if len(parts) > 1 {
+		fmt.Fprintf(sb, "%s(%d no-op resources hidden — %s)\n", indent, total, strings.Join(parts, ", "))
+	} else {
+		fmt.Fprintf(sb, "%s(%d no-op resources hidden)\n", indent, total)
+	}
 }
 
 func (f *Formatter) formatGitHub(result *classify.Result) error {

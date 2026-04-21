@@ -201,6 +201,55 @@ func TestFormatText_NoChangesWithDowngradedNonVerbose(t *testing.T) {
 	}
 }
 
+// Mixed real + no-op resources: the "hidden" line must break the no-op count
+// down by classification so the reader can see what ignore_attributes filtered
+// out. Without this, an output showing `Classification: minor` next to an opaque
+// "(95 no-op resources hidden)" forces the reader to guess what matched.
+func TestFormatText_MixedNoOpBreakdownVerbose(t *testing.T) {
+	result := &classify.Result{
+		Overall:         "minor",
+		OverallExitCode: 0,
+		NoChanges:       false,
+		ResourceDecisions: []classify.ResourceDecision{
+			{
+				Address:        "data.azapi_resource_action.keys[0]",
+				ResourceType:   "azapi_resource_action",
+				Actions:        []string{"read"},
+				Classification: "minor",
+				MatchedRules:   []string{"Data source reads"},
+			},
+			{
+				Address:           "azurerm_key_vault_key.cmk",
+				ResourceType:      "azurerm_key_vault_key",
+				Actions:           []string{"no-op"},
+				OriginalActions:   []string{"update"},
+				IgnoredAttributes: []string{"tags.tf-module-l2"},
+				Classification:    "major",
+			},
+			{
+				Address:           "azurerm_resource_group.rg",
+				ResourceType:      "azurerm_resource_group",
+				Actions:           []string{"no-op"},
+				OriginalActions:   []string{"update"},
+				IgnoredAttributes: []string{"tags.tf-module-l2"},
+				Classification:    "minor",
+			},
+		},
+	}
+
+	var buf bytes.Buffer
+	formatter := NewFormatter(&buf, FormatText, true)
+	if err := formatter.Format(result); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := buf.String()
+
+	if !strings.Contains(output, "(2 no-op resources hidden — minor: 1, major: 1)") {
+		t.Errorf("expected breakdown of hidden no-op resources by classification, got:\n%s", output)
+	}
+}
+
 func TestFormatGitHub(t *testing.T) {
 	result := &classify.Result{
 		Overall:         "critical",

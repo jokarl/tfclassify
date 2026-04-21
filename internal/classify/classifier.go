@@ -57,13 +57,19 @@ func (c *Classifier) Classify(changes []plan.ResourceChange) *Result {
 		return result
 	}
 
-	// Classify each resource
+	// Classify each resource. Resources downgraded to no-op by
+	// FilterCosmeticChanges keep their classification for per-resource visibility
+	// but do NOT contribute to Overall — otherwise Overall can report e.g. "major"
+	// while every major-classified resource is hidden from the text output.
 	highestPrecedence := -1
 	for _, change := range changes {
 		decision := c.classifyResource(change)
 		result.ResourceDecisions = append(result.ResourceDecisions, decision)
 
-		// Track highest precedence classification
+		if isNoOp(change.Actions) {
+			continue
+		}
+
 		precedence := c.precedenceMap[decision.Classification]
 		if highestPrecedence == -1 || precedence < highestPrecedence {
 			highestPrecedence = precedence
@@ -430,10 +436,15 @@ func (c *Classifier) AddPluginDecisions(result *Result, pluginDecisions []Resour
 		}
 	}
 
-	// Recalculate overall (but not if all resources are no-op)
+	// Recalculate overall (but not if all resources are no-op). Skip no-op
+	// decisions so cosmetic-only resources do not elevate Overall — same
+	// rationale as in Classify().
 	if !result.NoChanges && len(result.ResourceDecisions) > 0 {
 		highestPrecedence := -1
 		for _, decision := range result.ResourceDecisions {
+			if isNoOp(decision.Actions) {
+				continue
+			}
 			precedence, known := c.precedenceMap[decision.Classification]
 			if !known {
 				continue

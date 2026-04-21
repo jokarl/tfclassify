@@ -972,6 +972,64 @@ func TestClassify_MixedNoOpAndRealNotNoChanges(t *testing.T) {
 	}
 }
 
+// A no-op decision (post FilterCosmeticChanges) must not elevate Overall above
+// the real changes in the plan. Otherwise the text output says "major" while
+// all major-classified resources are hidden as no-op, forcing a rule author to
+// discover the `not_actions = ["no-op"]` workaround.
+func TestClassify_NoOpDoesNotElevateOverall(t *testing.T) {
+	cfg := &config.Config{
+		Classifications: []config.ClassificationConfig{
+			{
+				Name:        "major",
+				Description: "Core services",
+				Rules: []config.RuleConfig{
+					{Resource: []string{"azurerm_key_vault_key"}, Description: "Encryption keys"},
+				},
+			},
+			{
+				Name:        "minor",
+				Description: "Plumbing",
+				Rules: []config.RuleConfig{
+					{Resource: []string{"*"}, Actions: []string{"read"}, Description: "Data reads"},
+				},
+			},
+		},
+		Precedence: []string{"major", "minor"},
+		Defaults: &config.DefaultsConfig{
+			Unclassified: "major",
+			NoChanges:    "minor",
+		},
+	}
+
+	classifier, err := New(cfg)
+	if err != nil {
+		t.Fatalf("failed to create classifier: %v", err)
+	}
+
+	// A key_vault_key tag-only update that FilterCosmeticChanges downgraded to no-op,
+	// alongside a single data-source read.
+	changes := []plan.ResourceChange{
+		{
+			Address:           "azurerm_key_vault_key.cmk",
+			Type:              "azurerm_key_vault_key",
+			Actions:           []string{"no-op"},
+			OriginalActions:   []string{"update"},
+			IgnoredAttributes: []string{"tags.tf-module-l2"},
+		},
+		{
+			Address: "data.azapi_resource_action.account_keys[0]",
+			Type:    "azapi_resource_action",
+			Actions: []string{"read"},
+		},
+	}
+
+	result := classifier.Classify(changes)
+
+	if result.Overall != "minor" {
+		t.Errorf("expected Overall 'minor' (real change is the data read) — a no-op-downgraded resource should not elevate Overall; got %q", result.Overall)
+	}
+}
+
 func TestExplainClassify_AllNoOpReportsNoChanges(t *testing.T) {
 	cfg := newTestConfig()
 	classifier, err := New(cfg)
