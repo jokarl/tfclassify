@@ -156,6 +156,9 @@ fi
 echo ""
 
 # --- Discover scenarios ---
+# Scenarios with `"fixture_only": true` in expected.json have no main.tf and
+# only run in fixture mode. Auto-skip them when running live Terraform unless
+# the user named them explicitly via -t.
 if [[ ${#TESTS[@]} -gt 0 ]]; then
   SCENARIOS=("${TESTS[@]}")
   for t in "${SCENARIOS[@]}"; do
@@ -168,9 +171,14 @@ else
   SCENARIOS=()
   for dir in "$E2E_DIR"/*/; do
     name="$(basename "$dir")"
-    if [[ -f "$dir/expected.json" ]]; then
-      SCENARIOS+=("$name")
+    if [[ ! -f "$dir/expected.json" ]]; then
+      continue
     fi
+    if [[ "$FIXTURES" == false ]] \
+       && [[ "$(jq -r '.fixture_only // false' "$dir/expected.json")" == "true" ]]; then
+      continue
+    fi
+    SCENARIOS+=("$name")
   done
 fi
 

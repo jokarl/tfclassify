@@ -135,7 +135,10 @@ jobs:
       - name: Discover e2e scenarios
         id: discover
         run: |
-          matrix=$(jq -cn '[ inputs | {
+          # Scenarios marked fixture_only have no main.tf — they exercise the
+          # classifier against committed plan JSON only. Skip them in the
+          # live e2e matrix; the e2e-fixtures job above still classifies them.
+          matrix=$(jq -cn '[ inputs | select((.fixture_only // false) | not) | {
             "use-case": input_filename | split("/")[-2],
             "plan-only": (.plan_only // false),
             "evidence": (.evidence // false)
