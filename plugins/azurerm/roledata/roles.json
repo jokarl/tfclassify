@@ -3749,7 +3749,8 @@
           "Microsoft.Resources/deploymentStacks/write",
           "Microsoft.Resources/deploymentStacks/read",
           "Microsoft.Resources/deploymentStacks/validate/action",
-          "Microsoft.Resources/deploymentStacks/exportTemplate/action"
+          "Microsoft.Resources/deploymentStacks/exportTemplate/action",
+          "Microsoft.Resources/deploymentStacksWhatIfResults/*"
         ],
         "notActions": [],
         "dataActions": [],
@@ -3769,7 +3770,8 @@
           "Microsoft.Insights/alertRules/*",
           "Microsoft.Resources/deployments/*",
           "Microsoft.Resources/subscriptions/resourceGroups/read",
-          "Microsoft.Resources/deploymentStacks/*"
+          "Microsoft.Resources/deploymentStacks/*",
+          "Microsoft.Resources/deploymentStacksWhatIfResults/*"
         ],
         "notActions": [],
         "dataActions": [],
@@ -4306,6 +4308,29 @@
           "Microsoft.Resources/deployments/*",
           "Microsoft.Resources/subscriptions/resourceGroups/read",
           "Microsoft.Edge/sites/read"
+        ],
+        "notActions": [],
+        "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "852e55ca-96ce-48b0-abca-2cd74d9042ca",
+    "roleName": "Azure Kubernetes Application Network Contributor Role",
+    "description": "Grant read, write and delete access to Azure Kubernetes Application Network",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.AppLink/AppLinks/read",
+          "Microsoft.AppLink/AppLinks/write",
+          "Microsoft.AppLink/AppLinks/delete",
+          "Microsoft.AppLink/AppLinks/AppLinkMembers/read",
+          "Microsoft.AppLink/AppLinks/AppLinkMembers/write",
+          "Microsoft.AppLink/AppLinks/AppLinkMembers/delete",
+          "Microsoft.AppLink/locations/operationStatuses/read",
+          "Microsoft.AppLink/Locations/OperationStatuses/write"
         ],
         "notActions": [],
         "dataActions": [],
@@ -12292,6 +12317,7 @@
           "Microsoft.Security/defenderforstoragesettings/write",
           "Microsoft.Security/advancedThreatProtectionSettings/read",
           "Microsoft.Security/advancedThreatProtectionSettings/write",
+          "Microsoft.Security/securityOperators/read",
           "Microsoft.Storage/storageAccounts/write",
           "Microsoft.Storage/storageAccounts/read",
           "Microsoft.Storage/storageAccounts/blobServices/containers/read",
@@ -12462,6 +12488,7 @@
           "Microsoft.Security/defenderforstoragesettings/write",
           "Microsoft.Security/advancedThreatProtectionSettings/read",
           "Microsoft.Security/advancedThreatProtectionSettings/write",
+          "Microsoft.Security/securityOperators/read",
           "Microsoft.Storage/storageAccounts/write",
           "Microsoft.Storage/storageAccounts/read",
           "Microsoft.EventGrid/topics/read",
@@ -16699,7 +16726,6 @@
         "actions": [
           "Microsoft.Authorization/*/read",
           "Microsoft.Insights/alertRules/*",
-          "Microsoft.Resources/deployments/*",
           "Microsoft.Resources/subscriptions/resourceGroups/read",
           "Microsoft.Support/*",
           "Microsoft.KeyVault/checkNameAvailability/read",
@@ -18037,28 +18063,6 @@
     ]
   },
   {
-    "id": "852e55ca-96ce-48b0-abca-2cd74d9042ca",
-    "roleName": "Managed Mesh for AKS Contributor Role",
-    "description": "Grant read, write and delete access to Managed Mesh for AKS",
-    "roleType": "BuiltInRole",
-    "permissions": [
-      {
-        "actions": [
-          "Microsoft.AppLink/AppLinks/read",
-          "Microsoft.AppLink/AppLinks/write",
-          "Microsoft.AppLink/AppLinks/delete",
-          "Microsoft.AppLink/AppLinks/AppLinkMembers/read",
-          "Microsoft.AppLink/AppLinks/AppLinkMembers/write",
-          "Microsoft.AppLink/AppLinks/AppLinkMembers/delete",
-          "Microsoft.AppLink/locations/operationStatuses/read"
-        ],
-        "notActions": [],
-        "dataActions": [],
-        "notDataActions": []
-      }
-    ]
-  },
-  {
     "id": "91c1777a-f3dc-4fae-b103-61d183457e46",
     "roleName": "Managed Services Registration assignment Delete Role",
     "description": "Managed Services Registration Assignment Delete Role allows the managing tenant users to delete the registration assignment assigned to their tenant.",
@@ -18587,7 +18591,9 @@
           "Microsoft.HybridConnectivity/endpoints/serviceConfigurations/read",
           "Microsoft.HybridConnectivity/endpoints/serviceConfigurations/delete",
           "Microsoft.HybridConnectivity/endpoints/listCredentials/action",
-          "Microsoft.HybridCompute/machines/read"
+          "Microsoft.HybridCompute/machines/read",
+          "Microsoft.HybridCompute/machines/extensions/read",
+          "Microsoft.HybridCompute/machines/extensions/write"
         ],
         "notActions": [],
         "dataActions": [],
@@ -23223,6 +23229,9 @@
         "actions": [
           "Microsoft.AzureActiveDirectory/directories/write",
           "Microsoft.AzureActiveDirectory/directories/read",
+          "Microsoft.AzureActiveDirectory/entraTenants/write",
+          "Microsoft.AzureActiveDirectory/entraTenants/read",
+          "Microsoft.AzureActiveDirectory/entraTenants/delete",
           "Microsoft.AzureActiveDirectory/register/action",
           "Microsoft.Resources/subscriptions/resourceGroups/read",
           "Microsoft.Resources/subscriptions/read"

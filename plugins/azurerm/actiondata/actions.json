@@ -1155,6 +1155,7 @@
       "Microsoft.AppLink/AppLinks/delete",
       "Microsoft.AppLink/AppLinks/read",
       "Microsoft.AppLink/AppLinks/write",
+      "Microsoft.AppLink/Locations/OperationStatuses/write",
       "Microsoft.AppLink/locations/operationStatuses/read"
     ],
     "microsoft.appplatform": [
@@ -1968,6 +1969,9 @@
       "Microsoft.AzureActiveDirectory/directories/delete",
       "Microsoft.AzureActiveDirectory/directories/read",
       "Microsoft.AzureActiveDirectory/directories/write",
+      "Microsoft.AzureActiveDirectory/entraTenants/delete",
+      "Microsoft.AzureActiveDirectory/entraTenants/read",
+      "Microsoft.AzureActiveDirectory/entraTenants/write",
       "Microsoft.AzureActiveDirectory/guestUsages/delete",
       "Microsoft.AzureActiveDirectory/guestUsages/read",
       "Microsoft.AzureActiveDirectory/guestUsages/write",
@@ -6714,6 +6718,29 @@
       "Microsoft.ExtendedLocation/operations/read",
       "Microsoft.ExtendedLocation/register/action",
       "Microsoft.ExtendedLocation/unregister/action"
+    ],
+    "microsoft.fabric": [
+      "Microsoft.Fabric/capacities/delete",
+      "Microsoft.Fabric/capacities/read",
+      "Microsoft.Fabric/capacities/resume/action",
+      "Microsoft.Fabric/capacities/skus/read",
+      "Microsoft.Fabric/capacities/suspend/action",
+      "Microsoft.Fabric/capacities/write",
+      "Microsoft.Fabric/locations/checkNameAvailability/action",
+      "Microsoft.Fabric/locations/operationresults/read",
+      "Microsoft.Fabric/locations/operationstatuses/read",
+      "Microsoft.Fabric/operations/read",
+      "Microsoft.Fabric/privateLinkServicesForFabric/delete",
+      "Microsoft.Fabric/privateLinkServicesForFabric/operationResults/read",
+      "Microsoft.Fabric/privateLinkServicesForFabric/operationStatuses/read",
+      "Microsoft.Fabric/privateLinkServicesForFabric/privateEndpointConnections/delete",
+      "Microsoft.Fabric/privateLinkServicesForFabric/privateEndpointConnections/read",
+      "Microsoft.Fabric/privateLinkServicesForFabric/privateEndpointConnections/write",
+      "Microsoft.Fabric/privateLinkServicesForFabric/privateLinkResources/read",
+      "Microsoft.Fabric/privateLinkServicesForFabric/read",
+      "Microsoft.Fabric/privateLinkServicesForFabric/write",
+      "Microsoft.Fabric/register/action",
+      "Microsoft.Fabric/skus/read"
     ],
     "microsoft.features": [
       "Microsoft.Features/featureProviders/subscriptionFeatureRegistrations/delete",
