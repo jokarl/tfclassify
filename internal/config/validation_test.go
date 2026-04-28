@@ -739,3 +739,181 @@ func TestValidateWarnings_EmptyClassification_WithPlugin(t *testing.T) {
 		}
 	}
 }
+
+// TestValidateWarnings_ModuleGlobOverlap_PrefixCollision reproduces the
+// audit finding: `**.cognitive_account_foundry*` matches both
+// `module.cognitive_account_foundry["k"]` AND
+// `module.cognitive_account_foundry_kv_connection["k"]` because gobwas/glob
+// `*` greedily consumes the trailing chars after the literal prefix. When a
+// separate rule in another classification targets the connection module
+// specifically, both rules match and the higher-precedence one silently wins.
+func TestValidateWarnings_ModuleGlobOverlap_PrefixCollision(t *testing.T) {
+	cfg := &Config{
+		Classifications: []ClassificationConfig{
+			{
+				Name: "major",
+				Rules: []RuleConfig{{
+					Description: "Cognitive accounts",
+					Resource:    []string{"azapi_resource"},
+					Module:      []string{"**.cognitive_account_foundry*"},
+				}},
+			},
+			{
+				Name: "limited",
+				Rules: []RuleConfig{{
+					Description: "Foundry connections",
+					Resource:    []string{"azapi_resource"},
+					Module:      []string{"**.cognitive_account_foundry_kv_connection*"},
+				}},
+			},
+		},
+		Precedence: []string{"major", "limited"},
+		Defaults:   &DefaultsConfig{Unclassified: "major", NoChanges: "major"},
+	}
+
+	warnings := ValidateWarnings(cfg)
+
+	var found *Warning
+	for i, w := range warnings {
+		if strings.Contains(w.Message, "module glob overlap") {
+			found = &warnings[i]
+			break
+		}
+	}
+	if found == nil {
+		t.Fatalf("expected module glob overlap warning, got: %v", warnings)
+	}
+	for _, want := range []string{"major", "limited", "Cognitive accounts", "Foundry connections"} {
+		if !strings.Contains(found.Message, want) {
+			t.Errorf("expected warning to mention %q, got: %s", want, found.Message)
+		}
+	}
+}
+
+// TestValidateWarnings_ModuleGlobOverlap_EscapedFix verifies that the
+// recommended fix — `**.foo\[*` instead of `**.foo*` — does NOT trigger the
+// overlap warning because the escaped `[` requires a literal bracket suffix
+// that the sibling pattern cannot satisfy.
+func TestValidateWarnings_ModuleGlobOverlap_EscapedFix(t *testing.T) {
+	cfg := &Config{
+		Classifications: []ClassificationConfig{
+			{
+				Name: "major",
+				Rules: []RuleConfig{{
+					Resource: []string{"azapi_resource"},
+					Module:   []string{`**.cognitive_account_foundry\[*`},
+				}},
+			},
+			{
+				Name: "limited",
+				Rules: []RuleConfig{{
+					Resource: []string{"azapi_resource"},
+					Module:   []string{`**.cognitive_account_foundry_kv_connection\[*`},
+				}},
+			},
+		},
+		Precedence: []string{"major", "limited"},
+		Defaults:   &DefaultsConfig{Unclassified: "major", NoChanges: "major"},
+	}
+
+	for _, w := range ValidateWarnings(cfg) {
+		if strings.Contains(w.Message, "module glob overlap") {
+			t.Errorf("escaped patterns should not overlap, got warning: %s", w.Message)
+		}
+	}
+}
+
+// TestValidateWarnings_ModuleGlobOverlap_DisjointPatterns ensures patterns
+// that genuinely match different addresses are not flagged.
+func TestValidateWarnings_ModuleGlobOverlap_DisjointPatterns(t *testing.T) {
+	cfg := &Config{
+		Classifications: []ClassificationConfig{
+			{
+				Name:  "critical",
+				Rules: []RuleConfig{{Resource: []string{"*"}, Module: []string{"**.production"}}},
+			},
+			{
+				Name:  "standard",
+				Rules: []RuleConfig{{Resource: []string{"*"}, Module: []string{"**.staging"}}},
+			},
+		},
+		Precedence: []string{"critical", "standard"},
+		Defaults:   &DefaultsConfig{Unclassified: "standard", NoChanges: "standard"},
+	}
+
+	for _, w := range ValidateWarnings(cfg) {
+		if strings.Contains(w.Message, "module glob overlap") {
+			t.Errorf("expected no overlap for disjoint patterns, got: %s", w.Message)
+		}
+	}
+}
+
+// TestValidateWarnings_ModuleGlobOverlap_SameClassification: overlap between
+// two rules in the same classification is fine — they assign the same label,
+// so the user has no decision to make.
+func TestValidateWarnings_ModuleGlobOverlap_SameClassification(t *testing.T) {
+	cfg := &Config{
+		Classifications: []ClassificationConfig{
+			{
+				Name: "major",
+				Rules: []RuleConfig{
+					{Resource: []string{"*"}, Module: []string{"**.cognitive_account_foundry*"}},
+					{Resource: []string{"*"}, Module: []string{"**.cognitive_account_foundry_kv_connection*"}},
+				},
+			},
+		},
+		Precedence: []string{"major"},
+		Defaults:   &DefaultsConfig{Unclassified: "major", NoChanges: "major"},
+	}
+
+	for _, w := range ValidateWarnings(cfg) {
+		if strings.Contains(w.Message, "module glob overlap") {
+			t.Errorf("expected no overlap warning within a single classification, got: %s", w.Message)
+		}
+	}
+}
+
+// TestValidateWarnings_ModuleGlobOverlap_TrivialPatterns: catch-alls like
+// `**` or `*` overlap with everything by definition; the unreachable-rule
+// warning already covers them, so the overlap detector should skip them.
+func TestValidateWarnings_ModuleGlobOverlap_TrivialPatterns(t *testing.T) {
+	cfg := &Config{
+		Classifications: []ClassificationConfig{
+			{
+				Name:  "critical",
+				Rules: []RuleConfig{{Resource: []string{"*"}, Module: []string{"**"}}},
+			},
+			{
+				Name:  "standard",
+				Rules: []RuleConfig{{Resource: []string{"*"}, Module: []string{"**.foo*"}}},
+			},
+		},
+		Precedence: []string{"critical", "standard"},
+		Defaults:   &DefaultsConfig{Unclassified: "standard", NoChanges: "standard"},
+	}
+
+	for _, w := range ValidateWarnings(cfg) {
+		if strings.Contains(w.Message, "module glob overlap") {
+			t.Errorf("trivial pattern `**` should be skipped by overlap detector, got: %s", w.Message)
+		}
+	}
+}
+
+func TestConcretizeModulePattern(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"**.cognitive_account_foundry*", "x.cognitive_account_foundryx"},
+		{"**.cognitive_account_foundry_kv_connection*", "x.cognitive_account_foundry_kv_connectionx"},
+		{`**.cognitive_account_foundry\[*`, "x.cognitive_account_foundry[x"},
+		{"**.foo.*", "x.foo.x"},
+		{"**.foo", "x.foo"},
+		{"**.foo?bar", "x.fooxbar"},
+		{"**.foo[abc]bar", "x.fooxbar"},
+		{"**.foo{bar,baz}", "x.foox"},
+	}
+	for _, c := range cases {
+		got := concretizeModulePattern(c.in)
+		if got != c.want {
+			t.Errorf("concretizeModulePattern(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}

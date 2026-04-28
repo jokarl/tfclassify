@@ -413,6 +413,7 @@ func ValidateWarnings(cfg *Config) []Warning {
 	warnings = append(warnings, warnEmptyClassifications(cfg)...)
 	warnings = append(warnings, warnMissingPluginBinaries(cfg)...)
 	warnings = append(warnings, warnRedundantNotResource(cfg)...)
+	warnings = append(warnings, warnModuleGlobOverlap(cfg)...)
 	return warnings
 }
 
@@ -587,4 +588,214 @@ func warnRedundantNotResource(cfg *Config) []Warning {
 	}
 
 	return warnings
+}
+
+// warnModuleGlobOverlap warns when two rules in different classifications have
+// overlapping module globs. The author likely meant the patterns to be
+// disjoint; without that, the rule whose classification appears earlier in
+// `precedence` silently wins for the overlapping addresses.
+//
+// The classic case is a prefix-greedy `*` that consumes more than the author
+// intended — e.g. `**.foo*` matches both `module.foo["k"]` and
+// `module.foo_bar["k"]`. If `**.foo_bar*` is a separate rule in another
+// classification, both rules match `module.foo_bar["k"]` and the higher-
+// precedence one wins.
+func warnModuleGlobOverlap(cfg *Config) []Warning {
+	type rulePos struct {
+		classification string
+		ruleIdx        int
+		ruleDesc       string
+		pattern        string
+	}
+
+	// Collect every (classification, rule, pattern) triple, skipping rules
+	// without module patterns. Skip any pattern that is just "*" or "**"
+	// since those are already covered by warnUnreachableRules.
+	var triples []rulePos
+	for _, c := range cfg.Classifications {
+		for i, rule := range c.Rules {
+			for _, p := range rule.Module {
+				if isTrivialModulePattern(p) {
+					continue
+				}
+				triples = append(triples, rulePos{
+					classification: c.Name,
+					ruleIdx:        i + 1,
+					ruleDesc:       rule.Description,
+					pattern:        p,
+				})
+			}
+		}
+	}
+
+	// Walk every cross-classification pattern pair and emit a warning when
+	// they overlap. Use a sorted (a,b) key per emitted pair so the same
+	// overlap is not reported twice.
+	emitted := make(map[string]bool)
+	var warnings []Warning
+	for i := 0; i < len(triples); i++ {
+		for j := i + 1; j < len(triples); j++ {
+			a, b := triples[i], triples[j]
+			if a.classification == b.classification {
+				continue
+			}
+			sample, ok := patternsOverlap(a.pattern, b.pattern)
+			if !ok {
+				continue
+			}
+			key := overlapKey(a.classification, a.ruleIdx, a.pattern, b.classification, b.ruleIdx, b.pattern)
+			if emitted[key] {
+				continue
+			}
+			emitted[key] = true
+			warnings = append(warnings, Warning{
+				Message: fmt.Sprintf(
+					"module glob overlap: classification %q rule %d (%s) and classification %q rule %d (%s) both match %q; the classification listed first in precedence will win",
+					a.classification, a.ruleIdx, describePattern(a),
+					b.classification, b.ruleIdx, describePattern(b),
+					sample,
+				),
+			})
+		}
+	}
+	return warnings
+}
+
+// describePattern returns either the rule's user-provided description (if any)
+// or the raw module pattern, used to help the author find the overlap source.
+func describePattern(r struct {
+	classification string
+	ruleIdx        int
+	ruleDesc       string
+	pattern        string
+}) string {
+	if r.ruleDesc != "" {
+		return fmt.Sprintf("%q, module=%q", r.ruleDesc, r.pattern)
+	}
+	return fmt.Sprintf("module=%q", r.pattern)
+}
+
+// overlapKey returns a stable key for an unordered pair of (classification,
+// rule, pattern) tuples so the same overlap warning is not emitted twice.
+func overlapKey(ac string, ai int, ap, bc string, bi int, bp string) string {
+	left := fmt.Sprintf("%s|%d|%s", ac, ai, ap)
+	right := fmt.Sprintf("%s|%d|%s", bc, bi, bp)
+	if left < right {
+		return left + "<>" + right
+	}
+	return right + "<>" + left
+}
+
+// isTrivialModulePattern reports whether a module pattern is a catch-all
+// (matches every address). Trivial patterns are excluded from overlap
+// detection since they overlap with everything by definition; the
+// unreachable-rule warning covers that case.
+func isTrivialModulePattern(p string) bool {
+	switch p {
+	case "*", "**", "**.*", "*.**":
+		return true
+	}
+	return false
+}
+
+// patternsOverlap reports whether two module globs share at least one
+// matching address. When they do, it also returns a sample address that
+// matches both, suitable for surfacing in a warning. Both patterns are
+// compiled with '.' as the path separator (matching how the matcher
+// compiles module patterns).
+//
+// The check is approximate: it concretizes each pattern by substituting
+// wildcards with placeholder characters and tests whether the other
+// pattern matches that concrete form. If either direction matches,
+// overlap is confirmed. Misses are possible for exotic patterns
+// (e.g. character classes that exclude the placeholder) but the common
+// shapes used in real configs (`**.foo`, `**.foo*`, `**.foo.*`) are
+// caught reliably.
+func patternsOverlap(patternA, patternB string) (string, bool) {
+	gA, err := glob.Compile(patternA, '.')
+	if err != nil {
+		return "", false
+	}
+	gB, err := glob.Compile(patternB, '.')
+	if err != nil {
+		return "", false
+	}
+
+	candA := concretizeModulePattern(patternA)
+	if candA != "" && gB.Match(candA) {
+		return candA, true
+	}
+	candB := concretizeModulePattern(patternB)
+	if candB != "" && gA.Match(candB) {
+		return candB, true
+	}
+	return "", false
+}
+
+// concretizeModulePattern replaces glob wildcards in a module pattern with
+// literal placeholder characters, producing a sample address that the
+// pattern would match. Used to probe whether another pattern also matches
+// that address (overlap detection). Honors backslash escapes and skips
+// over character classes / brace alternations.
+func concretizeModulePattern(pattern string) string {
+	const placeholder = "x"
+	var b strings.Builder
+	for i := 0; i < len(pattern); {
+		c := pattern[i]
+		switch {
+		case c == '\\' && i+1 < len(pattern):
+			// Escaped char — emit the next byte as a literal.
+			b.WriteByte(pattern[i+1])
+			i += 2
+		case c == '*':
+			// `*` and `**` both collapse to a single placeholder char so the
+			// resulting string contains no separator characters from the wildcard
+			// itself. The rest of the pattern provides the structure.
+			b.WriteString(placeholder)
+			if i+1 < len(pattern) && pattern[i+1] == '*' {
+				i += 2
+			} else {
+				i++
+			}
+		case c == '?':
+			b.WriteString(placeholder)
+			i++
+		case c == '[':
+			// Character class: emit a placeholder and skip past the matching `]`.
+			j := i + 1
+			for j < len(pattern) && pattern[j] != ']' {
+				if pattern[j] == '\\' && j+1 < len(pattern) {
+					j += 2
+				} else {
+					j++
+				}
+			}
+			b.WriteString(placeholder)
+			if j < len(pattern) {
+				i = j + 1
+			} else {
+				i = len(pattern)
+			}
+		case c == '{':
+			// Brace alternation: emit a placeholder and skip past the matching `}`.
+			j := i + 1
+			for j < len(pattern) && pattern[j] != '}' {
+				if pattern[j] == '\\' && j+1 < len(pattern) {
+					j += 2
+				} else {
+					j++
+				}
+			}
+			b.WriteString(placeholder)
+			if j < len(pattern) {
+				i = j + 1
+			} else {
+				i = len(pattern)
+			}
+		default:
+			b.WriteByte(c)
+			i++
+		}
+	}
+	return b.String()
 }
