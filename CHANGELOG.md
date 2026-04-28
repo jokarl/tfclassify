@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.9.1](https://github.com/jokarl/tfclassify/compare/tfclassify-v0.9.0...tfclassify-v0.9.1) (2026-04-28)
+
+
+### Bug Fixes
+
+* refresh Azure role data and action registry ([#171](https://github.com/jokarl/tfclassify/issues/171)) ([2351b19](https://github.com/jokarl/tfclassify/commit/2351b191fde65c93b3fea47ffb3de7a6e030399c))
+* warn on module glob overlap and skip fixture-only verify scenarios ([#174](https://github.com/jokarl/tfclassify/issues/174)) ([94390da](https://github.com/jokarl/tfclassify/commit/94390dab62bdff590f1cac9308fb9814f0063635))
+
+
+### Dependencies
+
+* **deps:** bump github.com/zclconf/go-cty from 1.18.0 to 1.18.1 ([#169](https://github.com/jokarl/tfclassify/issues/169)) ([1306afe](https://github.com/jokarl/tfclassify/commit/1306afe6db00ddddd0aedcb2fbc5b2700cc43e65))
+
 ## [0.9.0](https://github.com/jokarl/tfclassify/compare/tfclassify-v0.8.1...tfclassify-v0.9.0) (2026-04-21)
 
 
