@@ -3,7 +3,7 @@ module github.com/jokarl/tfclassify/sdk
 go 1.25.9
 
 require (
-	github.com/hashicorp/go-plugin v1.7.0
+	github.com/hashicorp/go-plugin v1.8.0
 	google.golang.org/grpc v1.80.0
 	google.golang.org/protobuf v1.36.11
 )
