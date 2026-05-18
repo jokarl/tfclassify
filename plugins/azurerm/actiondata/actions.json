@@ -1,5 +1,10 @@
 {
   "actions": {
+    "anyscale.platform": [
+      "Anyscale.Platform/*/delete",
+      "Anyscale.Platform/*/read",
+      "Anyscale.Platform/*/write"
+    ],
     "arizeai.observabilityeval": [
       "ArizeAi.ObservabilityEval/checkNameAvailability/action",
       "ArizeAi.ObservabilityEval/locations/operationStatuses/read",
@@ -869,6 +874,10 @@
       "Microsoft.App/locations/sreagentoperationresults/read",
       "Microsoft.App/locations/sreagentoperationstatuses/read",
       "Microsoft.App/locations/supportedAgentModels/read",
+      "Microsoft.App/logicApps/*/action",
+      "Microsoft.App/logicApps/*/delete",
+      "Microsoft.App/logicApps/*/read",
+      "Microsoft.App/logicApps/*/write",
       "Microsoft.App/managedEnvironments/*/action",
       "Microsoft.App/managedEnvironments/*/delete",
       "Microsoft.App/managedEnvironments/*/read",
@@ -1321,12 +1330,14 @@
     ],
     "microsoft.approvals": [
       "Microsoft.Approvals/approvalSettings/delete",
+      "Microsoft.Approvals/approvalSettings/initialize/action",
       "Microsoft.Approvals/approvalSettings/read",
       "Microsoft.Approvals/approvalSettings/write",
       "Microsoft.Approvals/approvalWorkflowAssignments/delete",
       "Microsoft.Approvals/approvalWorkflowAssignments/read",
       "Microsoft.Approvals/approvalWorkflowAssignments/write",
       "Microsoft.Approvals/approvalWorkflowDefinitions/approvalWorkflowInstances/read",
+      "Microsoft.Approvals/approvalWorkflowDefinitions/approvalWorkflowInstances/syncPolicyStatus/action",
       "Microsoft.Approvals/approvalWorkflowDefinitions/approvalWorkflowInstances/write",
       "Microsoft.Approvals/approvalWorkflowDefinitions/delete",
       "Microsoft.Approvals/approvalWorkflowDefinitions/read",
@@ -3533,6 +3544,9 @@
       "Microsoft.Compute/virtualMachineScaleSets/reimageall/action",
       "Microsoft.Compute/virtualMachineScaleSets/restart/action",
       "Microsoft.Compute/virtualMachineScaleSets/start/action",
+      "Microsoft.Compute/virtualMachineScaleSets/virtualMachines/DiagnosticRunCommands/delete",
+      "Microsoft.Compute/virtualMachineScaleSets/virtualMachines/DiagnosticRunCommands/read",
+      "Microsoft.Compute/virtualMachineScaleSets/virtualMachines/DiagnosticRunCommands/write",
       "Microsoft.Compute/virtualMachineScaleSets/virtualMachines/instanceView/read",
       "Microsoft.Compute/virtualMachineScaleSets/virtualMachines/read",
       "Microsoft.Compute/virtualMachineScaleSets/virtualMachines/write",
@@ -6419,7 +6433,10 @@
       "Microsoft.EnterpriseSupport/enterpriseSupports/write",
       "Microsoft.EnterpriseSupport/register/action",
       "Microsoft.EnterpriseSupport/services/delete",
-      "Microsoft.EnterpriseSupport/services/write"
+      "Microsoft.EnterpriseSupport/services/write",
+      "Microsoft.EnterpriseSupport/supportPlans/delete",
+      "Microsoft.EnterpriseSupport/supportPlans/read",
+      "Microsoft.EnterpriseSupport/supportPlans/write"
     ],
     "microsoft.eventgrid": [
       "Microsoft.EventGrid/*/read",
@@ -7084,6 +7101,8 @@
       "Microsoft.HybridCompute/validateLicense/action"
     ],
     "microsoft.hybridconnectivity": [
+      "Microsoft.HybridConnectivity/GenerateAWSTemplate/action",
+      "Microsoft.HybridConnectivity/GenerateGCPTemplate/action",
       "Microsoft.HybridConnectivity/Locations/OperationStatuses/read",
       "Microsoft.HybridConnectivity/Locations/OperationStatuses/write",
       "Microsoft.HybridConnectivity/Operations/read",
@@ -7170,6 +7189,11 @@
       "Microsoft.IndustryDataLifecycle/custodianCollaboratives/auditLogs/action",
       "Microsoft.IndustryDataLifecycle/custodianCollaboratives/rejectDataPackage/action",
       "Microsoft.IndustryDataLifecycle/memberCollaboratives/*/read"
+    ],
+    "microsoft.inferenceservice": [
+      "Microsoft.InferenceService/inferenceAccounts/delete",
+      "Microsoft.InferenceService/inferenceAccounts/read",
+      "Microsoft.InferenceService/inferenceAccounts/write"
     ],
     "microsoft.insights": [
       "Microsoft.Insights/ActionGroups/Delete",
@@ -7701,6 +7725,7 @@
       "Microsoft.Insights/privatelinkscopes/privateEndpointConnectionsApproval/action",
       "Microsoft.Insights/privatelinkscopes/privateLinkResources/read",
       "Microsoft.Insights/privatelinkscopes/read",
+      "Microsoft.Insights/register/action",
       "Microsoft.Insights/snapshots/read",
       "Microsoft.Insights/topology/Read",
       "Microsoft.Insights/topology/read",
@@ -12471,6 +12496,9 @@
       "Microsoft.SaaS/resources/write"
     ],
     "microsoft.saashub": [
+      "Microsoft.SaaSHub/cloudServices/delete",
+      "Microsoft.SaaSHub/cloudServices/read",
+      "Microsoft.SaaSHub/cloudServices/write",
       "Microsoft.SaaSHub/cloudservices/delete",
       "Microsoft.SaaSHub/cloudservices/read",
       "Microsoft.SaaSHub/cloudservices/write",
@@ -13278,6 +13306,7 @@
     ],
     "microsoft.softwareplan": [
       "Microsoft.SoftwarePlan/register/action",
+      "Microsoft.SoftwarePlan/softwareBenefits/read",
       "Microsoft.SoftwarePlan/softwareLicenses/productDownloadOptions/generateDownloadLinks/action",
       "Microsoft.SoftwarePlan/softwareLicenses/productDownloadOptions/read",
       "Microsoft.SoftwarePlan/softwareLicenses/productKeys/read",
@@ -15471,9 +15500,18 @@
       "Pinecone.VectorDb/register/action",
       "Pinecone.VectorDb/registeredSubscriptions/read",
       "Pinecone.VectorDb/unregister/action"
+    ],
+    "purestorage.block": [
+      "PureStorage.Block/storagePools/volumeGroups/listConnectionParameters/action"
     ]
   },
   "dataActions": {
+    "anyscale.platform": [
+      "Anyscale.Platform/*/delete",
+      "Anyscale.Platform/*/read",
+      "Anyscale.Platform/*/write",
+      "Anyscale.Platform/admin/action"
+    ],
     "microsoft.agfoodplatform": [
       "Microsoft.AgFoodPlatform/*/action",
       "Microsoft.AgFoodPlatform/*/checkConsent/action",
@@ -16635,6 +16673,8 @@
       "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/analyzers/results/images/read",
       "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/analyzers/results/read",
       "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/analyzers/write",
+      "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/analyzers:analyze/action",
+      "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/analyzers:analyzebinary/action",
       "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/batchAnalysisJobs/delete",
       "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/batchAnalysisJobs/read",
       "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/batchAnalysisJobs/write",
@@ -16644,9 +16684,13 @@
       "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/classifiers/operations/read",
       "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/classifiers/read",
       "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/classifiers/write",
+      "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/classifiers:classify/action",
+      "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/classifiers:classifybinary/action",
       "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/defaults/read",
       "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/defaults/write",
       "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/faces",
+      "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/faces:compare/action",
+      "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/faces:detect/action",
       "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/labelingProjects",
       "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/labelingProjects/datasets/files/read",
       "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/labelingProjects/delete",
@@ -16658,6 +16702,7 @@
       "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/labelingProjects/labels/operations/read",
       "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/labelingProjects/labels/read",
       "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/labelingProjects/labels/write",
+      "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/labelingProjects/labels:analyze/action",
       "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/labelingProjects/migration/operations/read",
       "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/labelingProjects/read",
       "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/labelingProjects/reference/files",
@@ -16680,10 +16725,13 @@
       "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/persondirectories/faces/delete",
       "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/persondirectories/faces/read",
       "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/persondirectories/faces/write",
+      "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/persondirectories/faces:find/action",
       "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/persondirectories/persons",
       "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/persondirectories/persons/delete",
       "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/persondirectories/persons/read",
       "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/persondirectories/persons/write",
+      "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/persondirectories/persons:identify/action",
+      "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/persondirectories/persons:verify/action",
       "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/persondirectories/read",
       "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/persondirectories/write",
       "Microsoft.CognitiveServices/accounts/NewsSearch/categorysearch/action",
@@ -18090,6 +18138,9 @@
       "Microsoft.HybridCompute/machines/WACloginAsAdmin/action",
       "Microsoft.HybridCompute/machines/login/action",
       "Microsoft.HybridCompute/machines/loginAsAdmin/action"
+    ],
+    "microsoft.inferenceservice": [
+      "Microsoft.InferenceService/inferenceAccounts/invoke/semanticReranker/action"
     ],
     "microsoft.insights": [
       "Microsoft.Insights/DataCollectionRules/Data/Write",
