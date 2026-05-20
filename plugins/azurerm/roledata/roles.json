@@ -111,7 +111,7 @@
           "Microsoft.Authorization/*/read",
           "Microsoft.Insights/alertRules/*",
           "Microsoft.ResourceHealth/availabilityStatuses/read",
-          "Microsoft.Resources/deployments/*",
+          "Microsoft.Resources/deployments/read",
           "Microsoft.Resources/subscriptions/resourceGroups/read",
           "Microsoft.Support/*"
         ],
@@ -690,6 +690,74 @@
         "dataActions": [
           "Microsoft.AnyBuild/clusters/build/write",
           "Microsoft.AnyBuild/clusters/build/read"
+        ],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "3e9f3756-203e-4734-a0b8-4b68691ffae3",
+    "roleName": "Anyscale Platform Administrator Role",
+    "description": "Provides full access to Anyscale Cloud and resources as well as admin features such as usage and resource notifications.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.Authorization/roleAssignments/write",
+          "Microsoft.Authorization/roleAssignments/delete",
+          "Microsoft.Authorization/*/read",
+          "Anyscale.Platform/*/read",
+          "Anyscale.Platform/*/write",
+          "Anyscale.Platform/*/delete"
+        ],
+        "notActions": [],
+        "dataActions": [
+          "Anyscale.Platform/admin/action",
+          "Anyscale.Platform/*/read",
+          "Anyscale.Platform/*/write",
+          "Anyscale.Platform/*/delete"
+        ],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "6d461258-d39c-46cc-8ca1-cab4120979d8",
+    "roleName": "Anyscale Platform Contributor Role",
+    "description": "Grants read/write access to Anyscale Cloud and resources",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.Authorization/*/read",
+          "Anyscale.Platform/*/read",
+          "Anyscale.Platform/*/write",
+          "Anyscale.Platform/*/delete"
+        ],
+        "notActions": [],
+        "dataActions": [
+          "Anyscale.Platform/*/read",
+          "Anyscale.Platform/*/write",
+          "Anyscale.Platform/*/delete"
+        ],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "ab24b16e-fd5d-41b5-839e-6c6d2ad32363",
+    "roleName": "Anyscale Platform Reader Role",
+    "description": "Read access to Anyscale Cloud and resources",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.Authorization/*/read",
+          "Anyscale.Platform/*/read"
+        ],
+        "notActions": [],
+        "dataActions": [
+          "Anyscale.Platform/*/read"
         ],
         "notDataActions": []
       }
@@ -1710,41 +1778,6 @@
     ]
   },
   {
-    "id": "e47c6f54-e4a2-4754-9501-8e0985b135e1",
-    "roleName": "Azure AI Account Owner",
-    "description": "Grants full access to manage AI projects and accounts. Grants conditional assignment of the Azure AI User role to other user principles.",
-    "roleType": "BuiltInRole",
-    "permissions": [
-      {
-        "actions": [
-          "Microsoft.Authorization/*/read",
-          "Microsoft.Authorization/roleAssignments/write",
-          "Microsoft.Authorization/roleAssignments/delete",
-          "Microsoft.CognitiveServices/*",
-          "Microsoft.Features/features/read",
-          "Microsoft.Features/providers/features/read",
-          "Microsoft.Features/providers/features/register/action",
-          "Microsoft.Insights/alertRules/*",
-          "Microsoft.Insights/diagnosticSettings/*",
-          "Microsoft.Insights/logDefinitions/read",
-          "Microsoft.Insights/metricdefinitions/read",
-          "Microsoft.Insights/metrics/read",
-          "Microsoft.ResourceHealth/availabilityStatuses/read",
-          "Microsoft.Resources/deployments/*",
-          "Microsoft.Resources/deployments/operations/read",
-          "Microsoft.Resources/subscriptions/operationresults/read",
-          "Microsoft.Resources/subscriptions/read",
-          "Microsoft.Resources/subscriptions/resourcegroups/deployments/*",
-          "Microsoft.Resources/subscriptions/resourceGroups/read",
-          "Microsoft.Support/*"
-        ],
-        "notActions": [],
-        "dataActions": [],
-        "notDataActions": []
-      }
-    ]
-  },
-  {
     "id": "b78c5d69-af96-48a3-bf8d-a8b4d589de94",
     "roleName": "Azure AI Administrator",
     "description": "A Built-In Role that has all control plane permissions to work with Azure AI and its dependencies.",
@@ -1801,7 +1834,7 @@
   {
     "id": "64702f94-c441-49e6-a78b-ef80e0188fee",
     "roleName": "Azure AI Developer",
-    "description": "Can perform all actions within an Azure AI resource besides managing the resource itself.",
+    "description": "Can perform all actions within an Azure Machine Learning workspace besides managing the workspace itself. For Foundry project access, use the Foundry User or Foundry Owner roles instead.",
     "roleType": "BuiltInRole",
     "permissions": [
       {
@@ -1980,67 +2013,6 @@
     ]
   },
   {
-    "id": "c883944f-8b7b-4483-af10-35834be79c4a",
-    "roleName": "Azure AI Owner",
-    "description": "Grants full to manage AI project and accounts. Grants reader access to AI projects, reader access to AI accounts, and data actions for an AI project.",
-    "roleType": "BuiltInRole",
-    "permissions": [
-      {
-        "actions": [
-          "Microsoft.AlertsManagement/actionRules/*",
-          "Microsoft.AlertsManagement/alerts/*",
-          "Microsoft.AlertsManagement/issues/*",
-          "Microsoft.AlertsManagement/prometheusRuleGroups/*",
-          "Microsoft.AlertsManagement/smartDetectorAlertRules/*",
-          "Microsoft.Authorization/*/read",
-          "Microsoft.CognitiveServices/*",
-          "Microsoft.Insights/activityLogAlerts/*",
-          "Microsoft.Insights/metricalerts/*",
-          "Microsoft.Insights/scheduledqueryrules/*",
-          "Microsoft.ResourceHealth/availabilityStatuses/read",
-          "Microsoft.Resources/deployments/*",
-          "Microsoft.Resources/deployments/operations/read",
-          "Microsoft.Resources/subscriptions/operationresults/read",
-          "Microsoft.Resources/subscriptions/read",
-          "Microsoft.Resources/subscriptions/resourcegroups/deployments/*",
-          "Microsoft.Resources/subscriptions/resourceGroups/read",
-          "Microsoft.Support/*"
-        ],
-        "notActions": [],
-        "dataActions": [
-          "Microsoft.CognitiveServices/*"
-        ],
-        "notDataActions": []
-      }
-    ]
-  },
-  {
-    "id": "eadc314b-1a2d-4efa-be10-5d325db5065e",
-    "roleName": "Azure AI Project Manager",
-    "description": "Lets you perform developer actions and management actions on Azure AI Foundry Projects. Allows for making role assignments, but limited to Cognitive Service User role.",
-    "roleType": "BuiltInRole",
-    "permissions": [
-      {
-        "actions": [
-          "Microsoft.Authorization/roleAssignments/write",
-          "Microsoft.Authorization/roleAssignments/delete",
-          "Microsoft.CognitiveServices/accounts/*/read",
-          "Microsoft.CognitiveServices/accounts/projects/*",
-          "Microsoft.CognitiveServices/locations/*/read",
-          "Microsoft.Authorization/*/read",
-          "Microsoft.Insights/alertRules/*",
-          "Microsoft.Resources/deployments/*",
-          "Microsoft.Resources/subscriptions/resourceGroups/read"
-        ],
-        "notActions": [],
-        "dataActions": [
-          "Microsoft.CognitiveServices/*"
-        ],
-        "notDataActions": []
-      }
-    ]
-  },
-  {
     "id": "11102f94-c441-49e6-a78b-ef80e0188abc",
     "roleName": "Azure AI Safety Evaluator",
     "description": "This role can perform all actions under workspace evaluations and simulations.",
@@ -2053,37 +2025,6 @@
         ],
         "notActions": [],
         "dataActions": [],
-        "notDataActions": []
-      }
-    ]
-  },
-  {
-    "id": "53ca6127-db72-4b80-b1b0-d745d6d5456d",
-    "roleName": "Azure AI User",
-    "description": "Grants reader access to AI projects, reader access to AI accounts, and data actions for an AI project.",
-    "roleType": "BuiltInRole",
-    "permissions": [
-      {
-        "actions": [
-          "Microsoft.Authorization/*/read",
-          "Microsoft.CognitiveServices/*/read",
-          "Microsoft.CognitiveServices/accounts/listkeys/action",
-          "Microsoft.Insights/alertRules/read",
-          "Microsoft.Insights/diagnosticSettings/read",
-          "Microsoft.Insights/logDefinitions/read",
-          "Microsoft.Insights/metricdefinitions/read",
-          "Microsoft.Insights/metrics/read",
-          "Microsoft.ResourceHealth/availabilityStatuses/read",
-          "Microsoft.Resources/deployments/*",
-          "Microsoft.Resources/subscriptions/operationresults/read",
-          "Microsoft.Resources/subscriptions/read",
-          "Microsoft.Resources/subscriptions/resourceGroups/read",
-          "Microsoft.Support/*"
-        ],
-        "notActions": [],
-        "dataActions": [
-          "Microsoft.CognitiveServices/*"
-        ],
         "notDataActions": []
       }
     ]
@@ -6572,6 +6513,7 @@
       {
         "actions": [
           "Microsoft.Authorization/roleAssignments/write",
+          "Microsoft.Authorization/roleAssignments/delete",
           "Microsoft.Authorization/*/read",
           "Microsoft.AzureResilienceManagement/drills/*/action",
           "Microsoft.AzureResilienceManagement/drills/*/delete",
@@ -6603,6 +6545,7 @@
       {
         "actions": [
           "Microsoft.Authorization/roleAssignments/write",
+          "Microsoft.Authorization/roleAssignments/delete",
           "Microsoft.Authorization/*/read",
           "Microsoft.Automation/automationAccounts/delete",
           "Microsoft.Automation/automationAccounts/read",
@@ -6610,6 +6553,7 @@
           "Microsoft.Automation/automationAccounts/runbooks/delete",
           "Microsoft.Automation/automationAccounts/runbooks/read",
           "Microsoft.Automation/automationAccounts/runbooks/write",
+          "Microsoft.Automation/register/action",
           "Microsoft.Chaos/experiments/delete",
           "Microsoft.Chaos/experiments/read",
           "Microsoft.Chaos/experiments/write",
@@ -6630,6 +6574,7 @@
           "Microsoft.Chaos/workspaces/scenarios/configurations/execute/action",
           "Microsoft.Chaos/workspaces/scenarios/configurations/validate/action",
           "Microsoft.Chaos/workspaces/scenarios/runs/read",
+          "Microsoft.Chaos/register/action",
           "Microsoft.Insights/dataCollectionEndpoints/read",
           "Microsoft.Insights/dataCollectionEndpoints/write",
           "Microsoft.Insights/dataCollectionRules/read",
@@ -6639,6 +6584,7 @@
           "Microsoft.OperationalInsights/workspaces/tables/write",
           "Microsoft.OperationalInsights/workspaces/read",
           "Microsoft.OperationalInsights/workspaces/write",
+          "Microsoft.OperationalInsights/register/action",
           "Microsoft.Resources/subscriptions/resourceGroups/delete",
           "Microsoft.Resources/subscriptions/resourceGroups/read",
           "Microsoft.Resources/subscriptions/resourceGroups/write"
@@ -6664,6 +6610,7 @@
           "Microsoft.Automation/automationAccounts/runbooks/delete",
           "Microsoft.Automation/automationAccounts/runbooks/read",
           "Microsoft.Automation/automationAccounts/runbooks/write",
+          "Microsoft.Automation/register/action",
           "Microsoft.Chaos/experiments/delete",
           "Microsoft.Chaos/experiments/read",
           "Microsoft.Chaos/experiments/write",
@@ -6684,6 +6631,8 @@
           "Microsoft.Chaos/workspaces/scenarios/runs/read",
           "Microsoft.Chaos/locations/operationResults/read",
           "Microsoft.Chaos/locations/operationStatuses/read",
+          "Microsoft.Chaos/register/action",
+          "Microsoft.Insights/register/action",
           "Microsoft.Insights/dataCollectionEndpoints/read",
           "Microsoft.Insights/dataCollectionEndpoints/write",
           "Microsoft.Insights/dataCollectionRules/read",
@@ -6798,6 +6747,7 @@
       {
         "actions": [
           "Microsoft.Authorization/roleAssignments/write",
+          "Microsoft.Authorization/roleAssignments/delete",
           "*/read",
           "Microsoft.Authorization/*/read",
           "Microsoft.Chaos/locations/targetTypes/capabilityTypes/read",
@@ -8558,6 +8508,7 @@
           "Microsoft.Authorization/*/read",
           "Microsoft.RecoveryServices/locations/allocatedStamp/read",
           "Microsoft.RecoveryServices/Vaults/backupFabrics/operationResults/read",
+          "Microsoft.RecoveryServices/Vaults/backupFabrics/operationsStatus/read",
           "Microsoft.RecoveryServices/Vaults/backupFabrics/protectionContainers/operationResults/read",
           "Microsoft.RecoveryServices/Vaults/backupFabrics/protectionContainers/protectedItems/operationResults/read",
           "Microsoft.RecoveryServices/Vaults/backupFabrics/protectionContainers/protectedItems/operationsStatus/read",
@@ -9355,6 +9306,109 @@
         "dataActions": [
           "Microsoft.CognitiveSearch/indexes/schema/read",
           "Microsoft.CognitiveSearch/indexes/documents/read"
+        ],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "59a2dba3-6303-4fd8-9a2e-8cbb4bdda972",
+    "roleName": "Cognitive Services Content Understanding Contributor",
+    "description": "Has access to read, create, update, analyze, and test operations for Azure AI Content Understanding. Can manage analyzers, classifiers, labeling projects, and person directories, but cannot delete analyzers or classifiers, manage role assignments, or list account keys.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.CognitiveServices/*/read",
+          "Microsoft.Authorization/roleAssignments/read",
+          "Microsoft.Authorization/roleDefinitions/read"
+        ],
+        "notActions": [],
+        "dataActions": [
+          "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/*"
+        ],
+        "notDataActions": [
+          "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/analyzers/delete",
+          "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/classifiers/delete",
+          "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/persondirectories/delete",
+          "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/labelingProjects/delete"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "4b42bd01-da42-4c92-9b07-15ea5bd6a602",
+    "roleName": "Cognitive Services Content Understanding Owner",
+    "description": "Has full access to all Azure AI Content Understanding operations including read, create, update, delete, analyze, and test. Can manage all analyzers, classifiers, labeling projects, and person directories.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.CognitiveServices/*/read",
+          "Microsoft.CognitiveServices/accounts/listkeys/action",
+          "Microsoft.Authorization/roleAssignments/read",
+          "Microsoft.Authorization/roleDefinitions/read"
+        ],
+        "notActions": [],
+        "dataActions": [
+          "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/*"
+        ],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "379c52cb-64de-498c-8b5b-c6170d6c49d4",
+    "roleName": "Cognitive Services Content Understanding Reader",
+    "description": "Has access to read, list, and analyze operations for Azure AI Content Understanding. Can list and view analyzers, classifiers, and person directories, and run analysis and classification jobs, but cannot create, update, or delete resources.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.CognitiveServices/*/read",
+          "Microsoft.Authorization/roleAssignments/read",
+          "Microsoft.Authorization/roleDefinitions/read"
+        ],
+        "notActions": [],
+        "dataActions": [
+          "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/analyzers/read",
+          "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/analyzers/operations/read",
+          "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/analyzers/results/read",
+          "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/analyzers/results/images/read",
+          "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/analyzers:analyze/action",
+          "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/analyzers:analyzebinary/action",
+          "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/classifiers/read",
+          "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/classifiers/operations/read",
+          "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/classifiers:classify/action",
+          "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/classifiers:classifybinary/action",
+          "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/classifierresults/read",
+          "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/analyzerresults/read",
+          "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/analyzerresults/files/read",
+          "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/batchAnalysisJobs/read",
+          "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/defaults/read",
+          "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/faces:compare/action",
+          "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/faces:detect/action",
+          "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/labelingProjects/read",
+          "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/labelingProjects/labels/read",
+          "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/labelingProjects/labels/ocr/read",
+          "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/labelingProjects/labels/document/read",
+          "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/labelingProjects/labels/operations/read",
+          "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/labelingProjects/labels:analyze/action",
+          "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/labelingProjects/schema/read",
+          "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/labelingProjects/schema/operations/read",
+          "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/labelingProjects/stats/read",
+          "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/labelingProjects/test/files/read",
+          "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/labelingProjects/test/files/operations/read",
+          "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/labelingProjects/reference/files/read",
+          "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/labelingProjects/reference/files/operations/read",
+          "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/labelingProjects/datasets/files/read",
+          "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/labelingProjects/migration/operations/read",
+          "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/persondirectories/read",
+          "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/persondirectories/faces/read",
+          "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/persondirectories/persons/read",
+          "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/persondirectories/faces:find/action",
+          "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/persondirectories/persons:verify/action",
+          "Microsoft.CognitiveServices/accounts/MultiModalIntelligence/persondirectories/persons:identify/action"
         ],
         "notDataActions": []
       }
@@ -10800,6 +10854,25 @@
           "Microsoft.App/containerApps/logstream/action",
           "Microsoft.App/containerApps/exec/action",
           "Microsoft.App/containerApps/debug/action"
+        ],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "c24cf47c-5077-412d-a19c-45202126392c",
+    "roleName": "Container Apps SandboxGroup Data Owner",
+    "description": "Ownership of all Container Apps SandboxGroup data.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [],
+        "notActions": [],
+        "dataActions": [
+          "Microsoft.App/sandboxGroups/*/read",
+          "Microsoft.App/sandboxGroups/*/write",
+          "Microsoft.App/sandboxGroups/*/delete",
+          "Microsoft.App/sandboxGroups/*/action"
         ],
         "notDataActions": []
       }
@@ -13280,25 +13353,6 @@
     ]
   },
   {
-    "id": "c24cf47c-5077-412d-a19c-45202126392c",
-    "roleName": "Dev Compute SandboxGroup Data Owner",
-    "description": "Ownership of all SandboxGroup data.",
-    "roleType": "BuiltInRole",
-    "permissions": [
-      {
-        "actions": [],
-        "notActions": [],
-        "dataActions": [
-          "Microsoft.App/sandboxGroups/*/read",
-          "Microsoft.App/sandboxGroups/*/write",
-          "Microsoft.App/sandboxGroups/*/delete",
-          "Microsoft.App/sandboxGroups/*/action"
-        ],
-        "notDataActions": []
-      }
-    ]
-  },
-  {
     "id": "45d50f46-0b78-4001-a660-4198cbe8cd05",
     "roleName": "DevCenter Dev Box User",
     "description": "Provides access to create and manage dev boxes.",
@@ -13687,14 +13741,17 @@
   {
     "id": "64375caa-ac3e-48b3-9492-da4d60aba7bb",
     "roleName": "Diagnostics Operator",
-    "description": "Role allows users to collect diagnostic information regarding their Virtual Machine",
+    "description": "Collect diagnostic information regarding Virtual Machine and Virtual Machine Scale Sets",
     "roleType": "BuiltInRole",
     "permissions": [
       {
         "actions": [
           "Microsoft.Compute/virtualMachines/DiagnosticRunCommands/write",
           "Microsoft.Compute/virtualMachines/DiagnosticRunCommands/read",
-          "Microsoft.Compute/virtualMachines/DiagnosticRunCommands/delete"
+          "Microsoft.Compute/virtualMachines/DiagnosticRunCommands/delete",
+          "Microsoft.Compute/virtualMachineScaleSets/virtualMachines/DiagnosticRunCommands/write",
+          "Microsoft.Compute/virtualMachineScaleSets/virtualMachines/DiagnosticRunCommands/read",
+          "Microsoft.Compute/virtualMachineScaleSets/virtualMachines/DiagnosticRunCommands/delete"
         ],
         "notActions": [],
         "dataActions": [],
@@ -14397,8 +14454,8 @@
           "Microsoft.Mission/virtualEnclaves/endpoints/read",
           "Microsoft.Mission/virtualEnclaves/workloads/read",
           "Microsoft.Authorization/*/read",
-          "Microsoft.Insights/alertRules/*",
-          "Microsoft.Resources/deployments/*",
+          "Microsoft.Insights/alertRules/read",
+          "Microsoft.Resources/deployments/read",
           "Microsoft.Resources/subscriptions/read",
           "Microsoft.Resources/subscriptions/resourceGroups/read",
           "Microsoft.Resources/subscriptions/resourcegroups/deployments/read",
@@ -15085,6 +15142,133 @@
         ],
         "notActions": [],
         "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "e47c6f54-e4a2-4754-9501-8e0985b135e1",
+    "roleName": "Foundry Account Owner",
+    "description": "Grants full access to manage Foundry projects and accounts. Grants conditional assignment of the Foundry User role to other user principles.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.Authorization/*/read",
+          "Microsoft.Authorization/roleAssignments/write",
+          "Microsoft.Authorization/roleAssignments/delete",
+          "Microsoft.CognitiveServices/*",
+          "Microsoft.Features/features/read",
+          "Microsoft.Features/providers/features/read",
+          "Microsoft.Features/providers/features/register/action",
+          "Microsoft.Insights/alertRules/*",
+          "Microsoft.Insights/diagnosticSettings/*",
+          "Microsoft.Insights/logDefinitions/read",
+          "Microsoft.Insights/metricdefinitions/read",
+          "Microsoft.Insights/metrics/read",
+          "Microsoft.ResourceHealth/availabilityStatuses/read",
+          "Microsoft.Resources/deployments/*",
+          "Microsoft.Resources/deployments/operations/read",
+          "Microsoft.Resources/subscriptions/operationresults/read",
+          "Microsoft.Resources/subscriptions/read",
+          "Microsoft.Resources/subscriptions/resourcegroups/deployments/*",
+          "Microsoft.Resources/subscriptions/resourceGroups/read",
+          "Microsoft.Support/*"
+        ],
+        "notActions": [],
+        "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "c883944f-8b7b-4483-af10-35834be79c4a",
+    "roleName": "Foundry Owner",
+    "description": "Grants full to manage Foundry project and accounts. Grants reader access to Foundry projects, reader access to Foundry accounts, and data actions for a Foundry project.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.AlertsManagement/actionRules/*",
+          "Microsoft.AlertsManagement/alerts/*",
+          "Microsoft.AlertsManagement/issues/*",
+          "Microsoft.AlertsManagement/prometheusRuleGroups/*",
+          "Microsoft.AlertsManagement/smartDetectorAlertRules/*",
+          "Microsoft.Authorization/*/read",
+          "Microsoft.CognitiveServices/*",
+          "Microsoft.Insights/activityLogAlerts/*",
+          "Microsoft.Insights/metricalerts/*",
+          "Microsoft.Insights/scheduledqueryrules/*",
+          "Microsoft.ResourceHealth/availabilityStatuses/read",
+          "Microsoft.Resources/deployments/*",
+          "Microsoft.Resources/deployments/operations/read",
+          "Microsoft.Resources/subscriptions/operationresults/read",
+          "Microsoft.Resources/subscriptions/read",
+          "Microsoft.Resources/subscriptions/resourcegroups/deployments/*",
+          "Microsoft.Resources/subscriptions/resourceGroups/read",
+          "Microsoft.Support/*"
+        ],
+        "notActions": [],
+        "dataActions": [
+          "Microsoft.CognitiveServices/*"
+        ],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "eadc314b-1a2d-4efa-be10-5d325db5065e",
+    "roleName": "Foundry Project Manager",
+    "description": "Lets you perform developer actions and management actions on Microsoft Foundry Projects. Allows for making role assignments, but limited to Cognitive Service User role.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.Authorization/roleAssignments/write",
+          "Microsoft.Authorization/roleAssignments/delete",
+          "Microsoft.CognitiveServices/accounts/*/read",
+          "Microsoft.CognitiveServices/accounts/projects/*",
+          "Microsoft.CognitiveServices/locations/*/read",
+          "Microsoft.Authorization/*/read",
+          "Microsoft.Insights/alertRules/*",
+          "Microsoft.Resources/deployments/*",
+          "Microsoft.Resources/subscriptions/resourceGroups/read"
+        ],
+        "notActions": [],
+        "dataActions": [
+          "Microsoft.CognitiveServices/*"
+        ],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "53ca6127-db72-4b80-b1b0-d745d6d5456d",
+    "roleName": "Foundry User",
+    "description": "Grants reader access to Foundry projects, reader access to Foundry accounts, and data actions for an Foundry project.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.Authorization/*/read",
+          "Microsoft.CognitiveServices/*/read",
+          "Microsoft.CognitiveServices/accounts/listkeys/action",
+          "Microsoft.Insights/alertRules/read",
+          "Microsoft.Insights/diagnosticSettings/read",
+          "Microsoft.Insights/logDefinitions/read",
+          "Microsoft.Insights/metricdefinitions/read",
+          "Microsoft.Insights/metrics/read",
+          "Microsoft.ResourceHealth/availabilityStatuses/read",
+          "Microsoft.Resources/deployments/*",
+          "Microsoft.Resources/subscriptions/operationresults/read",
+          "Microsoft.Resources/subscriptions/read",
+          "Microsoft.Resources/subscriptions/resourceGroups/read",
+          "Microsoft.Support/*"
+        ],
+        "notActions": [],
+        "dataActions": [
+          "Microsoft.CognitiveServices/*"
+        ],
         "notDataActions": []
       }
     ]
@@ -16196,7 +16380,9 @@
           "Microsoft.HybridConnectivity/solutionConfigurations/delete",
           "Microsoft.HybridConnectivity/solutionConfigurations/read",
           "Microsoft.HybridConnectivity/solutionConfigurations/syncNow/action",
-          "Microsoft.HybridConnectivity/solutionConfigurations/write"
+          "Microsoft.HybridConnectivity/solutionConfigurations/write",
+          "Microsoft.HybridConnectivity/GenerateAWSTemplate/action",
+          "Microsoft.HybridConnectivity/GenerateGCPTemplate/action"
         ],
         "notActions": [],
         "dataActions": [],
@@ -16305,6 +16491,46 @@
         ],
         "notActions": [],
         "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "360cab3d-4340-4c96-816d-682fbd52b3e2",
+    "roleName": "Inference Account Operator",
+    "description": "Create, read, modify, and delete inference accounts. This role should be assigned to users who can only manage inference accounts but can't perform inference operations.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.InferenceService/inferenceAccounts/write",
+          "Microsoft.InferenceService/inferenceAccounts/read",
+          "Microsoft.InferenceService/inferenceAccounts/delete"
+        ],
+        "notActions": [],
+        "dataActions": [],
+        "notDataActions": [
+          "Microsoft.InferenceService/inferenceAccounts/invoke/*"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "76315a85-9e6b-4514-9780-868b1977b64e",
+    "roleName": "Inference Account Owner",
+    "description": "Create, read, modify, and delete inference accounts; as well as running inference workloads against those accounts. This role should be assigned to users who need full management capabilities over inference accounts, including the ability to run workloads.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.InferenceService/inferenceAccounts/write",
+          "Microsoft.InferenceService/inferenceAccounts/read",
+          "Microsoft.InferenceService/inferenceAccounts/delete"
+        ],
+        "notActions": [],
+        "dataActions": [
+          "Microsoft.InferenceService/inferenceAccounts/invoke/*"
+        ],
         "notDataActions": []
       }
     ]
@@ -17791,6 +18017,39 @@
     ]
   },
   {
+    "id": "32109304-a0e2-4d64-bd07-b23ac5efbe43",
+    "roleName": "Logic Apps Hybrid Contributor",
+    "description": "Full management of Logic Apps Hybrid, including creation, deletion, and updates.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.Authorization/*/read",
+          "Microsoft.Insights/alertRules/*",
+          "Microsoft.App/containerApps/*/read",
+          "Microsoft.App/containerApps/*/write",
+          "Microsoft.App/containerApps/*/delete",
+          "Microsoft.App/containerApps/*/action",
+          "Microsoft.App/logicApps/*/read",
+          "Microsoft.App/logicApps/*/write",
+          "Microsoft.App/logicApps/*/delete",
+          "Microsoft.App/logicApps/*/action",
+          "Microsoft.App/managedEnvironments/read",
+          "Microsoft.App/managedEnvironments/*/read",
+          "Microsoft.App/managedEnvironments/join/action",
+          "Microsoft.App/managedEnvironments/checknameavailability/action",
+          "Microsoft.App/connectedEnvironments/read",
+          "Microsoft.App/connectedEnvironments/*/read",
+          "Microsoft.App/connectedEnvironments/join/action",
+          "Microsoft.App/connectedEnvironments/checknameavailability/action"
+        ],
+        "notActions": [],
+        "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
     "id": "ad710c24-b039-4e85-a019-deb4a06e8570",
     "roleName": "Logic Apps Standard Contributor (Preview)",
     "description": "You can manage all aspects of a Standard logic app and workflows. You can't change access or ownership.",
@@ -18174,6 +18433,7 @@
           "Microsoft.Approvals/approvalSettings/read",
           "Microsoft.Approvals/approvalSettings/write",
           "Microsoft.Approvals/approvalSettings/delete",
+          "Microsoft.Approvals/approvalSettings/initialize/action",
           "Microsoft.Approvals/approvalWorkflowDefinitions/read",
           "Microsoft.Approvals/approvalWorkflowDefinitions/approvalWorkflowInstances/read",
           "Microsoft.Approvals/approvalWorkflowAssignments/read"
@@ -18198,6 +18458,7 @@
           "Microsoft.Approvals/approvalWorkflowDefinitions/delete",
           "Microsoft.Approvals/approvalWorkflowDefinitions/approvalWorkflowInstances/read",
           "Microsoft.Approvals/approvalWorkflowDefinitions/approvalWorkflowInstances/write",
+          "Microsoft.Approvals/approvalWorkflowDefinitions/approvalWorkflowInstances/syncPolicyStatus/action",
           "Microsoft.Approvals/approvalWorkflowAssignments/read",
           "Microsoft.Approvals/approvalWorkflowAssignments/write",
           "Microsoft.Approvals/approvalWorkflowAssignments/delete",
@@ -20145,6 +20406,94 @@
     ]
   },
   {
+    "id": "469a0cf0-3794-4627-838e-39d04f27b306",
+    "roleName": "Procurement Contributor with Resource Group Permissions",
+    "description": "Manage procurement of products and services, and create, update, and delete resource groups.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.Resources/subscriptions/resourceGroups/read",
+          "Microsoft.Resources/subscriptions/resourceGroups/write",
+          "Microsoft.BillingBenefits/register/action",
+          "Microsoft.BillingBenefits/maccs/read",
+          "Microsoft.BillingBenefits/maccs/write",
+          "Microsoft.BillingBenefits/maccs/delete",
+          "Microsoft.BillingBenefits/maccs/cancel/action",
+          "Microsoft.BillingBenefits/maccs/chargeShortfall/action",
+          "Microsoft.BillingBenefits/maccs/writeOff/action",
+          "Microsoft.BillingBenefits/maccs/contributors/read",
+          "Microsoft.BillingBenefits/credits/read",
+          "Microsoft.BillingBenefits/credits/write",
+          "Microsoft.BillingBenefits/credits/cancel/action",
+          "Microsoft.BillingBenefits/credits/sources/read",
+          "Microsoft.BillingBenefits/credits/sources/write",
+          "Microsoft.BillingBenefits/credits/sources/delete",
+          "Microsoft.BillingBenefits/discounts/read",
+          "Microsoft.BillingBenefits/discounts/write",
+          "Microsoft.BillingBenefits/discounts/delete",
+          "Microsoft.BillingBenefits/discounts/cancel/action",
+          "Microsoft.BillingBenefits/conditionalCredits/read",
+          "Microsoft.BillingBenefits/conditionalCredits/write",
+          "Microsoft.BillingBenefits/conditionalCredits/delete",
+          "Microsoft.BillingBenefits/conditionalCredits/cancel/action",
+          "Microsoft.BillingBenefits/conditionalCredits/contributors/read",
+          "Microsoft.EnterpriseSupport/enterpriseSupports/read",
+          "Microsoft.EnterpriseSupport/enterpriseSupports/write",
+          "Microsoft.EnterpriseSupport/enterpriseSupports/delete",
+          "Microsoft.EnterpriseSupport/supportPlans/read",
+          "Microsoft.EnterpriseSupport/supportPlans/write",
+          "Microsoft.EnterpriseSupport/supportPlans/delete",
+          "Microsoft.EnterpriseSupport/register/action",
+          "Microsoft.Hardware/register/action",
+          "Microsoft.Hardware/orderPreview/action",
+          "Microsoft.Hardware/orders/read",
+          "Microsoft.Hardware/orders/write",
+          "Microsoft.Hardware/orders/delete",
+          "Microsoft.Hardware/returnPreview/action",
+          "Microsoft.Hardware/returns/read",
+          "Microsoft.Hardware/returns/write",
+          "Microsoft.Hardware/returns/delete",
+          "Microsoft.SaaS/resources/read",
+          "Microsoft.SaaS/resources/write",
+          "Microsoft.SaaS/resources/delete",
+          "Microsoft.SaaS/register/action",
+          "Microsoft.SaaSHub/cloudServices/read",
+          "Microsoft.SaaSHub/cloudServices/write",
+          "Microsoft.SaaSHub/cloudServices/delete",
+          "Microsoft.SaaSHub/register/action",
+          "Microsoft.ProfessionalService/resources/read",
+          "Microsoft.ProfessionalService/resources/write",
+          "Microsoft.ProfessionalService/resources/delete",
+          "Microsoft.ProfessionalService/register/action",
+          "Microsoft.SoftwarePlan/register/action",
+          "Microsoft.SoftwarePlan/softwareSubscriptions/read",
+          "Microsoft.SoftwarePlan/softwareSubscriptions/write",
+          "Microsoft.SoftwarePlan/softwareSubscriptions/delete",
+          "Microsoft.SoftwarePlan/softwareSubscriptions/cancel/action",
+          "Microsoft.SoftwarePlan/softwareSubscriptions/listKeys/action",
+          "Microsoft.SoftwarePlan/softwareSubscriptions/refreshFulfillment/action",
+          "Microsoft.SoftwarePlan/softwareSubscriptions/productKeys/read",
+          "Microsoft.SoftwarePlan/softwareSubscriptions/productKeys/showFullKey/action",
+          "Microsoft.SoftwarePlan/softwareSubscriptions/productDownloadOptions/read",
+          "Microsoft.SoftwarePlan/softwareSubscriptions/productDownloadOptions/generateDownloadLinks/action",
+          "Microsoft.SoftwarePlan/validateSoftwareSubscriptionCreate/action",
+          "Microsoft.SoftwarePlan/softwareLicenses/read",
+          "Microsoft.SoftwarePlan/softwareLicenses/write",
+          "Microsoft.SoftwarePlan/softwareLicenses/productKeys/read",
+          "Microsoft.SoftwarePlan/softwareLicenses/productKeys/showFullKey/action",
+          "Microsoft.SoftwarePlan/softwareLicenses/productDownloadOptions/read",
+          "Microsoft.SoftwarePlan/softwareLicenses/productDownloadOptions/generateDownloadLinks/action",
+          "Microsoft.SoftwarePlan/validateSoftwareLicenseCreate/action",
+          "Microsoft.SoftwarePlan/softwareBenefits/read"
+        ],
+        "notActions": [],
+        "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
     "id": "9ef4ef9c-a049-46b0-82ab-dd8ac094c889",
     "roleName": "Project Babylon Data Curator",
     "description": "The Microsoft.ProjectBabylon data curator can create, read, modify and delete catalog data objects and establish relationships between objects. This role is in preview and subject to change.",
@@ -20233,6 +20582,22 @@
           "Microsoft.Authorization/*/read",
           "Microsoft.Resources/subscriptions/resourceGroups/read",
           "Microsoft.ResourceHealth/availabilityStatuses/read"
+        ],
+        "notActions": [],
+        "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "a2425b74-61f3-4bff-97cb-d0e3bc906777",
+    "roleName": "Pure Storage Cloud VM Volume Group Mount Reader",
+    "description": "A special role for mount operation (e.g VM extension) only - enables to read connection endpoints.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "PureStorage.Block/storagePools/volumeGroups/listConnectionParameters/action"
         ],
         "notActions": [],
         "dataActions": [],
@@ -21561,6 +21926,27 @@
         ],
         "notActions": [],
         "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "6c74a7c5-4a87-40f9-bb03-61e49aecbc78",
+    "roleName": "Semantic Reranker User",
+    "description": "Execute semantic reranking operations against registered inference accounts. This role should be assigned to users who need to run semantic reranking workloads but do not need to manage the accounts themselves.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.InferenceService/inferenceAccounts/read"
+        ],
+        "notActions": [
+          "Microsoft.InferenceService/inferenceAccounts/write",
+          "Microsoft.InferenceService/inferenceAccounts/delete"
+        ],
+        "dataActions": [
+          "Microsoft.InferenceService/inferenceAccounts/invoke/semanticReranker/action"
+        ],
         "notDataActions": []
       }
     ]
