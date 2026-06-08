@@ -530,7 +530,8 @@
         "actions": [
           "Microsoft.Advisor/recommendations/read",
           "Microsoft.Advisor/recommendations/write",
-          "Microsoft.Advisor/recommendations/available/action"
+          "Microsoft.Advisor/recommendations/available/action",
+          "Microsoft.Advisor/conversations/*"
         ],
         "notActions": [],
         "dataActions": [],
@@ -4193,6 +4194,8 @@
           "Microsoft.AzureArcData/*/read",
           "Microsoft.AzureArcData/sqlServerInstances/getTelemetry/action",
           "Microsoft.AzureArcData/sqlServerInstances/availabilityGroups/getDetailView/action",
+          "Microsoft.AzureArcData/sqlServerInstances/getBestPracticesAssessment/action",
+          "Microsoft.AzureArcData/sqlServerInstances/getJobsStatus/action",
           "Microsoft.HybridCompute/machines/read",
           "Microsoft.HybridCompute/machines/extensions/read",
           "Microsoft.Resources/subscriptions/resourceGroups/read"
@@ -5521,7 +5524,7 @@
   {
     "id": "f287ba2f-f923-4464-a5bd-721c3951d32d",
     "roleName": "Azure Managed Redis Reader",
-    "description": "Lets you view Azure Managed Redis resources, but not modify them or access keys or access to the data stored in them.",
+    "description": "Read Azure Managed Redis resources and their configuration. Cannot modify resources, retrieve access keys, or read data stored in the cache.",
     "roleType": "BuiltInRole",
     "permissions": [
       {
@@ -5988,6 +5991,31 @@
         "actions": [
           "Microsoft.KubernetesConfiguration/extensions/write",
           "Microsoft.KubernetesConfiguration/extensions/read"
+        ],
+        "notActions": [],
+        "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "bafa5965-3211-483c-a7b7-027648c789e9",
+    "roleName": "Azure NetApp Files Reader",
+    "description": "Allows read-only discovery operations for Azure NetApp Files resources",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.NetApp/*/read",
+          "Microsoft.NetApp/locations/checkfilepathavailability/action",
+          "Microsoft.NetApp/locations/checknameavailability/action",
+          "Microsoft.NetApp/locations/checkquotaavailability/action",
+          "Microsoft.NetApp/locations/queryNetworkSiblingSet/action",
+          "Microsoft.NetApp/netAppAccounts/getKeyVaultStatus/action",
+          "Microsoft.NetApp/netAppAccounts/capacityPools/volumes/listQuotaReport/action",
+          "Microsoft.NetApp/netAppAccounts/capacityPools/volumes/listReplications/action",
+          "Microsoft.NetApp/netAppAccounts/capacityPools/volumes/getGroupIdListForLdapUser/action",
+          "Microsoft.NetApp/netAppAccounts/capacityPools/volumes/subvolumes/getMetadata/action"
         ],
         "notActions": [],
         "dataActions": [],
@@ -10598,6 +10626,77 @@
     ]
   },
   {
+    "id": "e7560e73-ee25-4ed7-94f9-666cca24b501",
+    "roleName": "Connector Namespace Contributor",
+    "description": "You can manage all aspects of a Connector Namespace and its sub-resources. You can't change access or ownership.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.Authorization/*/read",
+          "Microsoft.Insights/alertRules/*",
+          "Microsoft.Resources/deployments/operations/read",
+          "Microsoft.Resources/subscriptions/operationresults/read",
+          "Microsoft.Resources/subscriptions/resourceGroups/read",
+          "Microsoft.Web/connectorGateways/read",
+          "Microsoft.Web/connectorGateways/write",
+          "Microsoft.Web/connectorGateways/delete",
+          "Microsoft.Web/connectorGateways/action",
+          "Microsoft.Web/connectorGateways/*/read",
+          "Microsoft.Web/connectorGateways/*/write",
+          "Microsoft.Web/connectorGateways/*/delete",
+          "Microsoft.Web/connectorGateways/*/action"
+        ],
+        "notActions": [],
+        "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "93ef01d8-7600-4956-9f82-b924cb66bfc6",
+    "roleName": "Connector Namespace Developer",
+    "description": "You can create and manage connections, custom connectors, MCP server configurations, and trigger configurations within an existing Connector Namespace. You can't create, modify, or delete the Connector Namespace itself.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.Authorization/*/read",
+          "Microsoft.Insights/alertRules/*",
+          "Microsoft.Resources/deployments/operations/read",
+          "Microsoft.Resources/subscriptions/operationresults/read",
+          "Microsoft.Resources/subscriptions/resourceGroups/read",
+          "Microsoft.Web/connectorGateways/read",
+          "Microsoft.Web/connectorGateways/connections/*",
+          "Microsoft.Web/connectorGateways/customConnectors/*",
+          "Microsoft.Web/connectorGateways/mcpserverconfigs/*",
+          "Microsoft.Web/connectorGateways/triggerconfigs/*"
+        ],
+        "notActions": [],
+        "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "5d0402fa-1042-4603-9e01-7fea218a05af",
+    "roleName": "Connector Namespace Reader",
+    "description": "You have read-only access to all resources in a Connector Namespace and its sub-resources, including their configurations.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.Authorization/*/read",
+          "Microsoft.Web/connectorGateways/read",
+          "Microsoft.Web/connectorGateways/*/read"
+        ],
+        "notActions": [],
+        "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
     "id": "6cdbb904-5ff3-429d-8169-7d7818b91bd8",
     "roleName": "Connector Reader",
     "description": "Read connectors and their associated resources, such as impacts and insights.",
@@ -11292,6 +11391,48 @@
     ]
   },
   {
+    "id": "b0ffeab8-d678-4570-b532-ce96bf97b032",
+    "roleName": "Context Cache Administrator",
+    "description": "Provides full to manage all Azure Context Cache resources. This role is in preview and subject to change.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.Authorization/*/read",
+          "Microsoft.Insights/alertRules/*",
+          "Microsoft.Resources/deployments/*",
+          "Microsoft.Resources/subscriptions/resourceGroups/read",
+          "Microsoft.AzureContextCache/*"
+        ],
+        "notActions": [],
+        "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "646a9378-973f-42fd-927f-62d1c4381f50",
+    "roleName": "Context Cache Container Contributor",
+    "description": "Allows creating and managing Azure Context Cache Container resource. This role is in preview and subject to change.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.Authorization/*/read",
+          "Microsoft.Insights/alertRules/*",
+          "Microsoft.Resources/deployments/*",
+          "Microsoft.Resources/subscriptions/resourceGroups/read",
+          "Microsoft.AzureContextCache/locations/*",
+          "Microsoft.AzureContextCache/accounts/read",
+          "Microsoft.AzureContextCache/accounts/containers/*"
+        ],
+        "notActions": [],
+        "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
     "id": "b24988ac-6180-42a0-ab88-20f7382dd24c",
     "roleName": "Contributor",
     "description": "Grants full access to manage all resources, but does not allow you to assign roles in Azure RBAC, manage assignments in Azure Blueprints, or share image galleries.",
@@ -11425,7 +11566,23 @@
           "Microsoft.DocumentDB/databaseAccounts/mongodbRoleDefinitions/write",
           "Microsoft.DocumentDB/databaseAccounts/mongodbRoleDefinitions/delete",
           "Microsoft.DocumentDB/databaseAccounts/mongodbUserDefinitions/write",
-          "Microsoft.DocumentDB/databaseAccounts/mongodbUserDefinitions/delete"
+          "Microsoft.DocumentDB/databaseAccounts/mongodbUserDefinitions/delete",
+          "Microsoft.DocumentDB/databaseAccounts/tableRoleAssignments/write",
+          "Microsoft.DocumentDB/databaseAccounts/tableRoleAssignments/delete",
+          "Microsoft.DocumentDB/databaseAccounts/tableRoleDefinitions/write",
+          "Microsoft.DocumentDB/databaseAccounts/tableRoleDefinitions/delete",
+          "Microsoft.DocumentDB/databaseAccounts/gremlinRoleAssignments/write",
+          "Microsoft.DocumentDB/databaseAccounts/gremlinRoleAssignments/delete",
+          "Microsoft.DocumentDB/databaseAccounts/gremlinRoleDefinitions/write",
+          "Microsoft.DocumentDB/databaseAccounts/gremlinRoleDefinitions/delete",
+          "Microsoft.DocumentDB/databaseAccounts/cassandraRoleAssignments/write",
+          "Microsoft.DocumentDB/databaseAccounts/cassandraRoleAssignments/delete",
+          "Microsoft.DocumentDB/databaseAccounts/cassandraRoleDefinitions/write",
+          "Microsoft.DocumentDB/databaseAccounts/cassandraRoleDefinitions/delete",
+          "Microsoft.DocumentDB/databaseAccounts/mongoMIRoleAssignments/write",
+          "Microsoft.DocumentDB/databaseAccounts/mongoMIRoleAssignments/delete",
+          "Microsoft.DocumentDB/databaseAccounts/mongoMIRoleDefinitions/write",
+          "Microsoft.DocumentDB/databaseAccounts/mongoMIRoleDefinitions/delete"
         ],
         "dataActions": [],
         "notDataActions": []
@@ -15195,6 +15352,8 @@
           "Microsoft.AlertsManagement/prometheusRuleGroups/*",
           "Microsoft.AlertsManagement/smartDetectorAlertRules/*",
           "Microsoft.Authorization/*/read",
+          "Microsoft.Authorization/roleAssignments/write",
+          "Microsoft.Authorization/roleAssignments/delete",
           "Microsoft.CognitiveServices/*",
           "Microsoft.Insights/activityLogAlerts/*",
           "Microsoft.Insights/metricalerts/*",
@@ -17903,7 +18062,9 @@
           "Microsoft.Support/*"
         ],
         "notActions": [],
-        "dataActions": [],
+        "dataActions": [
+          "Microsoft.OperationalInsights/workspaces/jobs/export/action"
+        ],
         "notDataActions": []
       }
     ]
@@ -17943,7 +18104,9 @@
         "notActions": [
           "Microsoft.OperationalInsights/workspaces/sharedKeys/read"
         ],
-        "dataActions": [],
+        "dataActions": [
+          "Microsoft.OperationalInsights/workspaces/jobs/export/action"
+        ],
         "notDataActions": []
       }
     ]
@@ -18520,7 +18683,8 @@
         "actions": [],
         "notActions": [],
         "dataActions": [
-          "Microsoft.Discovery/bookshelf/knowledgeBaseVersions/query/action"
+          "Microsoft.Discovery/bookshelf/knowledgeBaseVersions/query/action",
+          "Microsoft.Discovery/bookshelf/knowledgebases/operations/read"
         ],
         "notDataActions": []
       }
@@ -20307,6 +20471,27 @@
     ]
   },
   {
+    "id": "dbc9c667-e97f-4491-aee6-90b9cf960190",
+    "roleName": "Privileged Monitoring Data Reader",
+    "description": "Privileged Monitoring Data Reader can query and search the logs it is allowed to view over Log Analytics workspaces and tables, including protected tables",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.OperationalInsights/workspaces/query/read",
+          "Microsoft.OperationalInsights/workspaces/read",
+          "Microsoft.Insights/Logs/Read"
+        ],
+        "notActions": [],
+        "dataActions": [
+          "Microsoft.OperationalInsights/workspaces/tables/data/read",
+          "Microsoft.Insights/logs/data/read"
+        ],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
     "id": "d622af9a-030e-4f32-8267-419abfd54702",
     "roleName": "Pro Active Coding Data User",
     "description": "Allows processing of health data in Pro Active Coding",
@@ -20389,6 +20574,16 @@
           "Microsoft.SoftwarePlan/softwareLicenses/productDownloadOptions/read",
           "Microsoft.SoftwarePlan/softwareLicenses/productDownloadOptions/generateDownloadLinks/action",
           "Microsoft.SoftwarePlan/validateSoftwareLicenseCreate/action",
+          "Microsoft.SoftwarePlan/softwarePerpetualProducts/read",
+          "Microsoft.SoftwarePlan/softwarePerpetualProducts/write",
+          "Microsoft.SoftwarePlan/softwarePerpetualProducts/delete",
+          "Microsoft.SoftwarePlan/softwarePerpetualProducts/cancel/action",
+          "Microsoft.SoftwarePlan/softwarePerpetualProducts/productKeys/read",
+          "Microsoft.SoftwarePlan/softwarePerpetualProducts/productKeys/showFullKey/action",
+          "Microsoft.SoftwarePlan/softwarePerpetualProducts/productDownloadOptions/read",
+          "Microsoft.SoftwarePlan/softwarePerpetualProducts/productDownloadOptions/generateDownloadLinks/action",
+          "Microsoft.SoftwarePlan/validateSoftwarePerpetualProductCreate/action",
+          "Microsoft.SoftwarePlan/softwareBenefits/read",
           "Microsoft.Hardware/register/action",
           "Microsoft.Hardware/orderPreview/action",
           "Microsoft.Hardware/orders/read",
@@ -20485,7 +20680,16 @@
           "Microsoft.SoftwarePlan/softwareLicenses/productDownloadOptions/read",
           "Microsoft.SoftwarePlan/softwareLicenses/productDownloadOptions/generateDownloadLinks/action",
           "Microsoft.SoftwarePlan/validateSoftwareLicenseCreate/action",
-          "Microsoft.SoftwarePlan/softwareBenefits/read"
+          "Microsoft.SoftwarePlan/softwareBenefits/read",
+          "Microsoft.SoftwarePlan/softwarePerpetualProducts/read",
+          "Microsoft.SoftwarePlan/softwarePerpetualProducts/write",
+          "Microsoft.SoftwarePlan/softwarePerpetualProducts/delete",
+          "Microsoft.SoftwarePlan/softwarePerpetualProducts/cancel/action",
+          "Microsoft.SoftwarePlan/softwarePerpetualProducts/productKeys/read",
+          "Microsoft.SoftwarePlan/softwarePerpetualProducts/productKeys/showFullKey/action",
+          "Microsoft.SoftwarePlan/softwarePerpetualProducts/productDownloadOptions/read",
+          "Microsoft.SoftwarePlan/softwarePerpetualProducts/productDownloadOptions/generateDownloadLinks/action",
+          "Microsoft.SoftwarePlan/validateSoftwarePerpetualProductCreate/action"
         ],
         "notActions": [],
         "dataActions": [],
@@ -20598,6 +20802,22 @@
       {
         "actions": [
           "PureStorage.Block/storagePools/volumeGroups/listConnectionParameters/action"
+        ],
+        "notActions": [],
+        "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "c9ba051b-aad6-42fd-92dc-e48780abee75",
+    "roleName": "Pure Storage Cloud VM Volume Group Owner",
+    "description": "To manage anything within the volume group resource.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "PureStorage.Block/storagePools/volumeGroups/*"
         ],
         "notActions": [],
         "dataActions": [],
@@ -20783,7 +21003,7 @@
   {
     "id": "e0f68234-74aa-48ed-b826-c38b57376e17",
     "roleName": "Redis Cache Contributor",
-    "description": "Lets you manage Redis caches, but not access to them.",
+    "description": "Create and manage Azure Cache for Redis resources. Cannot read or write data stored in the cache.",
     "roleType": "BuiltInRole",
     "permissions": [
       {
