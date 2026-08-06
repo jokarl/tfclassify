@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.4.6](https://github.com/jokarl/tfclassify/compare/tfclassify-plugin-azurerm-v0.4.5...tfclassify-plugin-azurerm-v0.4.6) (2026-05-20)
+
+
+### Bug Fixes
+
+* refresh Azure role data and action registry ([#177](https://github.com/jokarl/tfclassify/issues/177)) ([e43ec0d](https://github.com/jokarl/tfclassify/commit/e43ec0d5083c9d95013f370ceeddad88e6b9f269))
+
+
+### Dependencies
+
+* **deps:** bump github.com/hashicorp/go-plugin from 1.7.0 to 1.8.0 ([#180](https://github.com/jokarl/tfclassify/issues/180)) ([7644dcd](https://github.com/jokarl/tfclassify/commit/7644dcdf73ef6808dbced9d9ee398d323cdf25ba))
+
 ## [0.4.5](https://github.com/jokarl/tfclassify/compare/tfclassify-plugin-azurerm-v0.4.4...tfclassify-plugin-azurerm-v0.4.5) (2026-04-28)
 
 

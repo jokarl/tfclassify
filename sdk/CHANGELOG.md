@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.2](https://github.com/jokarl/tfclassify/compare/tfclassify-plugin-sdk-v0.4.1...tfclassify-plugin-sdk-v0.4.2) (2026-05-20)
+
+
+### Dependencies
+
+* **deps:** bump github.com/hashicorp/go-plugin from 1.7.0 to 1.8.0 ([#180](https://github.com/jokarl/tfclassify/issues/180)) ([7644dcd](https://github.com/jokarl/tfclassify/commit/7644dcdf73ef6808dbced9d9ee398d323cdf25ba))
+
 ## [0.4.1](https://github.com/jokarl/tfclassify/compare/tfclassify-plugin-sdk-v0.4.0...tfclassify-plugin-sdk-v0.4.1) (2026-04-21)
 
 
