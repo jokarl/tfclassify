@@ -26,10 +26,10 @@ func (r *CompiledIgnoreRules) Empty() bool {
 type compiledIgnoreRule struct {
 	name             string
 	description      string
-	resourceGlobs    []glob.Glob
-	notResourceGlobs []glob.Glob
-	moduleGlobs      []glob.Glob
-	notModuleGlobs   []glob.Glob
+	resourceGlobs    []*glob.Pattern
+	notResourceGlobs []*glob.Pattern
+	moduleGlobs      []*glob.Pattern
+	notModuleGlobs   []*glob.Pattern
 	patterns         []pathPattern
 }
 
@@ -49,12 +49,12 @@ func (r *compiledIgnoreRule) matches(resourceType, moduleAddress string) bool {
 // and every pattern segment matches the corresponding path segment.
 type pathPattern struct {
 	raw      string
-	segments []glob.Glob
+	segments []*glob.Pattern
 }
 
 func compilePathPattern(raw string) (pathPattern, error) {
 	parts := strings.Split(raw, ".")
-	segments := make([]glob.Glob, 0, len(parts))
+	segments := make([]*glob.Pattern, 0, len(parts))
 	for i, seg := range parts {
 		g, err := glob.Compile(seg)
 		if err != nil {
@@ -365,7 +365,7 @@ func mergedKeys(m1, m2 map[string]interface{}) []string {
 
 // matchResource mirrors classifier rule semantics: allow-list takes priority
 // over deny-list; absence of both means "match everything".
-func matchResource(resourceType string, allow, deny []glob.Glob) bool {
+func matchResource(resourceType string, allow, deny []*glob.Pattern) bool {
 	if len(allow) > 0 {
 		for _, g := range allow {
 			if g.Match(resourceType) {
@@ -386,7 +386,7 @@ func matchResource(resourceType string, allow, deny []glob.Glob) bool {
 }
 
 // matchModule mirrors classifier rule semantics for module filters.
-func matchModule(moduleAddress string, allow, deny []glob.Glob) bool {
+func matchModule(moduleAddress string, allow, deny []*glob.Pattern) bool {
 	if len(allow) > 0 {
 		for _, g := range allow {
 			if g.Match(moduleAddress) {
