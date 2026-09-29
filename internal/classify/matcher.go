@@ -12,10 +12,10 @@ import (
 type compiledRule struct {
 	classification            string
 	classificationDescription string
-	resourceGlobs             []glob.Glob
-	notResourceGlobs          []glob.Glob
-	moduleGlobs               []glob.Glob
-	notModuleGlobs            []glob.Glob
+	resourceGlobs             []*glob.Pattern
+	notResourceGlobs          []*glob.Pattern
+	moduleGlobs               []*glob.Pattern
+	notModuleGlobs            []*glob.Pattern
 	actions                   map[string]struct{} // pre-computed set for O(1) lookup
 	notActions                map[string]struct{} // pre-computed exclusion set for O(1) lookup
 	ruleDescription           string
