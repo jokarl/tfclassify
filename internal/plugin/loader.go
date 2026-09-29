@@ -289,12 +289,12 @@ func (h *Host) Shutdown() {
 type Runner struct {
 	host      *Host
 	mu        sync.Mutex
-	globCache map[string]glob.Glob
+	globCache map[string]*glob.Pattern
 }
 
 // NewRunner creates a new Runner for a host.
 func NewRunner(host *Host) *Runner {
-	return &Runner{host: host, globCache: make(map[string]glob.Glob)}
+	return &Runner{host: host, globCache: make(map[string]*glob.Pattern)}
 }
 
 // GetResourceChanges returns resource changes matching the given patterns.
@@ -303,7 +303,7 @@ func (r *Runner) GetResourceChanges(patterns []string) ([]*sdk.ResourceChange, e
 	defer r.mu.Unlock()
 
 	// Compile patterns (cached across calls within this Runner)
-	globs := make([]glob.Glob, 0, len(patterns))
+	globs := make([]*glob.Pattern, 0, len(patterns))
 	for _, pattern := range patterns {
 		g, ok := r.globCache[pattern]
 		if !ok {
@@ -359,7 +359,7 @@ func (r *Runner) EmitDecision(analyzer sdk.Analyzer, change *sdk.ResourceChange,
 }
 
 // matchesAny returns true if the resource type matches any of the patterns.
-func matchesAny(resourceType string, globs []glob.Glob) bool {
+func matchesAny(resourceType string, globs []*glob.Pattern) bool {
 	for _, g := range globs {
 		if g.Match(resourceType) {
 			return true

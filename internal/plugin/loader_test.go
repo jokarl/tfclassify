@@ -249,7 +249,7 @@ func TestMatchesAny(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var globs []glob.Glob
+			var globs []*glob.Pattern
 			for _, p := range tt.patterns {
 				g, err := glob.Compile(p)
 				if err != nil {
