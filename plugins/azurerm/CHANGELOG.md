@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.4.6](https://github.com/jokarl/tfclassify/compare/tfclassify-plugin-azurerm-v0.4.5...tfclassify-plugin-azurerm-v0.4.6) (2026-09-29)
+
+
+### Bug Fixes
+
+* **ci:** bump Go to 1.25.14, pin govulncheck, sync generated protobuf headers ([6bd7ec4](https://github.com/jokarl/tfclassify/commit/6bd7ec4c8697ebbbfa9c6e957a6d394c252dae02))
+* refresh Azure role data and action registry ([#177](https://github.com/jokarl/tfclassify/issues/177)) ([e43ec0d](https://github.com/jokarl/tfclassify/commit/e43ec0d5083c9d95013f370ceeddad88e6b9f269))
+
+
+### Dependencies
+
+* **deps:** bump github.com/gobwas/glob from 0.2.3 to 1.0.0 ([#229](https://github.com/jokarl/tfclassify/issues/229)) ([b525a37](https://github.com/jokarl/tfclassify/commit/b525a3798e44aaddf990220ea77037f49335939a))
+* **deps:** bump github.com/hashicorp/go-plugin from 1.7.0 to 1.8.0 ([#180](https://github.com/jokarl/tfclassify/issues/180)) ([7644dcd](https://github.com/jokarl/tfclassify/commit/7644dcdf73ef6808dbced9d9ee398d323cdf25ba))
+* **deps:** bump google.golang.org/grpc from 1.80.0 to 1.81.0 ([#185](https://github.com/jokarl/tfclassify/issues/185)) ([1316c2c](https://github.com/jokarl/tfclassify/commit/1316c2c6b3e22cc74d042aa9e6f94b89a7a3ff6f))
+* **deps:** bump google.golang.org/grpc from 1.81.0 to 1.81.1 ([#189](https://github.com/jokarl/tfclassify/issues/189)) ([b37ff99](https://github.com/jokarl/tfclassify/commit/b37ff99ccffb1881d59008c9734ff09cd01c77c2))
+* **deps:** bump google.golang.org/grpc from 1.81.1 to 1.82.0 ([#203](https://github.com/jokarl/tfclassify/issues/203)) ([ab36fdf](https://github.com/jokarl/tfclassify/commit/ab36fdfebe6e15e37ce965e9cd887e0cdb2c1b5a))
+* **deps:** bump google.golang.org/grpc from 1.82.0 to 1.82.1 ([#209](https://github.com/jokarl/tfclassify/issues/209)) ([b253094](https://github.com/jokarl/tfclassify/commit/b253094455f8855a9d3d9439f19781b9470a665f))
+* **deps:** bump google.golang.org/grpc from 1.82.1 to 1.83.0 ([#217](https://github.com/jokarl/tfclassify/issues/217)) ([715a149](https://github.com/jokarl/tfclassify/commit/715a149a2c866e40f93aaa5eda1a999fbd952674))
+* **deps:** bump google.golang.org/grpc from 1.83.0 to 1.83.1 ([#223](https://github.com/jokarl/tfclassify/issues/223)) ([f2b513b](https://github.com/jokarl/tfclassify/commit/f2b513b74c761324fc9fd0f2b21040a04900e53f))
+* **deps:** bump google.golang.org/grpc from 1.83.1 to 1.83.2 ([#226](https://github.com/jokarl/tfclassify/issues/226)) ([77cf1cf](https://github.com/jokarl/tfclassify/commit/77cf1cf1e97051d918b90a0124c20373642c659e))
+* **deps:** bump google.golang.org/protobuf from 1.36.11 to 1.36.12 ([#219](https://github.com/jokarl/tfclassify/issues/219)) ([69e4444](https://github.com/jokarl/tfclassify/commit/69e44440edd404b999a5048255b1e53658c0db29))
+
 ## [0.4.5](https://github.com/jokarl/tfclassify/compare/tfclassify-plugin-azurerm-v0.4.4...tfclassify-plugin-azurerm-v0.4.5) (2026-04-28)
 
 
