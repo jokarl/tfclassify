@@ -1,6 +1,6 @@
 module github.com/jokarl/tfclassify
 
-go 1.25.9
+go 1.25.14
 
 require (
 	github.com/gobwas/glob v1.0.0

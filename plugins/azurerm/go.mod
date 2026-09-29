@@ -1,6 +1,6 @@
 module github.com/jokarl/tfclassify-plugin-azurerm
 
-go 1.25.9
+go 1.25.14
 
 require github.com/jokarl/tfclassify/sdk v0.0.0
 
