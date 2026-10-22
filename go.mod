@@ -6,7 +6,7 @@ require (
 	github.com/gobwas/glob v1.0.0
 	github.com/hashicorp/go-plugin v1.8.0
 	github.com/hashicorp/go-version v1.9.0
-	github.com/hashicorp/hcl/v2 v2.24.0
+	github.com/hashicorp/hcl/v2 v2.25.0
 	github.com/hashicorp/terraform-json v0.28.0
 	github.com/jokarl/tfclassify/sdk v0.0.0
 	github.com/spf13/cobra v1.10.2
