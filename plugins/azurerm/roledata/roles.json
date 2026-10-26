@@ -9372,7 +9372,8 @@
           "Microsoft.DataProtection/backupVaults/backupResourceGuardProxies/unlockDelete/action",
           "Microsoft.DataProtection/backupVaults/backupInstances/validateForModifyBackup/action",
           "Microsoft.DataProtection/backupVaults/backupInstances/SuspendBackups/action",
-          "Microsoft.DataProtection/backupVaults/backupInstances/resumeProtection/action"
+          "Microsoft.DataProtection/backupVaults/backupInstances/resumeProtection/action",
+          "Microsoft.DataProtection/backupVaults/crossTenantVaultMappingStatus/action"
         ],
         "notActions": [],
         "dataActions": [],
@@ -10130,9 +10131,16 @@
     "roleType": "BuiltInRole",
     "permissions": [
       {
-        "actions": [],
+        "actions": [
+          "Microsoft.KubernetesConfiguration/extensions/read",
+          "Microsoft.ContainerService/managedClusters/read",
+          "Microsoft.ContainerService/deploymentSafeguards/read"
+        ],
         "notActions": [],
-        "dataActions": [],
+        "dataActions": [
+          "Microsoft.ContainerService/managedClusters/serviceaccounts/impersonate/action",
+          "Microsoft.ContainerService/managedClusters/pods/read"
+        ],
         "notDataActions": []
       }
     ]
