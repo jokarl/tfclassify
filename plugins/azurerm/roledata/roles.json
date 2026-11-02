@@ -11,7 +11,49 @@
           "Microsoft.ApiManagement/service/apis/read",
           "Microsoft.ApiManagement/service/apis/write",
           "Microsoft.ApiManagement/service/workspaces/toolServers/read",
-          "Microsoft.ApiManagement/service/workspaces/toolServers/write"
+          "Microsoft.ApiManagement/service/workspaces/toolServers/write",
+          "Microsoft.ApiManagement/aigateways/read",
+          "Microsoft.ApiManagement/aigateways/workspaces/toolServers/read",
+          "Microsoft.ApiManagement/aigateways/workspaces/toolServers/write"
+        ],
+        "notActions": [],
+        "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "7c27cbcc-1723-4201-8fbc-50f2e2c24ee5",
+    "roleName": "AI Gateway Contributor",
+    "description": "Manage gateway AI artifacts and assignments of AI Gateway Developer and the three runtime User roles at the assigned scope. Grants no runtime access.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.Authorization/permissions/read",
+          "Microsoft.Authorization/roleDefinitions/read",
+          "Microsoft.Authorization/roleAssignments/read",
+          "Microsoft.ApiManagement/aigateways/workspaces/modelProviders/*",
+          "Microsoft.ApiManagement/aigateways/workspaces/aliases/*",
+          "Microsoft.ApiManagement/aigateways/workspaces/toolServers/*"
+        ],
+        "notActions": [],
+        "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "e71899cc-9858-44a9-a0e3-7b95f671540f",
+    "roleName": "AI Gateway Developer",
+    "description": "Read model alias and MCP server configuration and inspect own permissions at the assigned scope. Grants no runtime access.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [
+          "Microsoft.Authorization/permissions/read",
+          "Microsoft.ApiManagement/aigateways/workspaces/aliases/read",
+          "Microsoft.ApiManagement/aigateways/workspaces/toolServers/read"
         ],
         "notActions": [],
         "dataActions": [],
@@ -4755,7 +4797,8 @@
           "Microsoft.Network/trafficManagerProfiles/delete",
           "Microsoft.Network/trafficManagerProfiles/azureEndpoints/read",
           "Microsoft.Network/trafficManagerProfiles/azureEndpoints/write",
-          "Microsoft.Network/trafficManagerProfiles/azureEndpoints/delete"
+          "Microsoft.Network/trafficManagerProfiles/azureEndpoints/delete",
+          "Microsoft.Network/publicIPAddresses/write"
         ],
         "notActions": [],
         "dataActions": [],
@@ -6120,7 +6163,7 @@
   {
     "id": "3015e5ed-6856-4ab3-b2f0-b8492aa30ca6",
     "roleName": "Azure Managed Redis Contributor",
-    "description": "Lets you manage Azure Managed Redis resources, but not access the data stored in them.",
+    "description": "Permits management of Azure Managed Redis resources. Provides access to cache access keys and permits managing access policy assignments; these capabilities can grant read and write data access to cache. Also permits importing and exporting cache data.",
     "roleType": "BuiltInRole",
     "permissions": [
       {
@@ -9372,7 +9415,8 @@
           "Microsoft.DataProtection/backupVaults/backupResourceGuardProxies/unlockDelete/action",
           "Microsoft.DataProtection/backupVaults/backupInstances/validateForModifyBackup/action",
           "Microsoft.DataProtection/backupVaults/backupInstances/SuspendBackups/action",
-          "Microsoft.DataProtection/backupVaults/backupInstances/resumeProtection/action"
+          "Microsoft.DataProtection/backupVaults/backupInstances/resumeProtection/action",
+          "Microsoft.DataProtection/backupVaults/crossTenantVaultMappingStatus/action"
         ],
         "notActions": [],
         "dataActions": [],
@@ -10130,9 +10174,16 @@
     "roleType": "BuiltInRole",
     "permissions": [
       {
-        "actions": [],
+        "actions": [
+          "Microsoft.KubernetesConfiguration/extensions/read",
+          "Microsoft.ContainerService/managedClusters/read",
+          "Microsoft.ContainerService/deploymentSafeguards/read"
+        ],
         "notActions": [],
-        "dataActions": [],
+        "dataActions": [
+          "Microsoft.ContainerService/managedClusters/serviceaccounts/impersonate/action",
+          "Microsoft.ContainerService/managedClusters/pods/read"
+        ],
         "notDataActions": []
       }
     ]
@@ -12065,6 +12116,23 @@
         ],
         "notActions": [],
         "dataActions": [],
+        "notDataActions": []
+      }
+    ]
+  },
+  {
+    "id": "dc12e0a0-00bc-4af0-adf0-b8c90236ba03",
+    "roleName": "Container Apps Artifact App Operator",
+    "description": "Grants permissions for operators of Artifact Apps, including viewing application logs and running exec commands in a running Artifact App.",
+    "roleType": "BuiltInRole",
+    "permissions": [
+      {
+        "actions": [],
+        "notActions": [],
+        "dataActions": [
+          "Microsoft.App/artifactApps/exec/action",
+          "Microsoft.App/artifactApps/logstream/action"
+        ],
         "notDataActions": []
       }
     ]
@@ -22369,6 +22437,10 @@
           "Microsoft.BillingBenefits/conditionalCredits/delete",
           "Microsoft.BillingBenefits/conditionalCredits/cancel/action",
           "Microsoft.BillingBenefits/conditionalCredits/contributors/read",
+          "Microsoft.BillingBenefits/flexPlans/read",
+          "Microsoft.BillingBenefits/flexPlans/write",
+          "Microsoft.BillingBenefits/flexPlans/cancel/action",
+          "Microsoft.BillingBenefits/flexPlans/terms/read",
           "Microsoft.BillingBenefits/spendPlans/read",
           "Microsoft.BillingBenefits/spendPlans/write",
           "Microsoft.BillingBenefits/spendPlans/cancel/action",
@@ -22470,6 +22542,10 @@
           "Microsoft.BillingBenefits/conditionalCredits/delete",
           "Microsoft.BillingBenefits/conditionalCredits/cancel/action",
           "Microsoft.BillingBenefits/conditionalCredits/contributors/read",
+          "Microsoft.BillingBenefits/flexPlans/read",
+          "Microsoft.BillingBenefits/flexPlans/write",
+          "Microsoft.BillingBenefits/flexPlans/cancel/action",
+          "Microsoft.BillingBenefits/flexPlans/terms/read",
           "Microsoft.BillingBenefits/spendPlans/read",
           "Microsoft.BillingBenefits/spendPlans/write",
           "Microsoft.BillingBenefits/spendPlans/cancel/action",
@@ -22927,7 +23003,7 @@
   {
     "id": "e0f68234-74aa-48ed-b826-c38b57376e17",
     "roleName": "Redis Cache Contributor",
-    "description": "Create and manage Azure Cache for Redis resources. Cannot read or write data stored in the cache.",
+    "description": "Permits management of Azure Cache for Redis resources. Provides access to cache access keys and permits managing access policies and assignments; these capabilities can grant read and write data access to cache. Also permits importing and exporting cache data.",
     "roleType": "BuiltInRole",
     "permissions": [
       {
@@ -26439,13 +26515,14 @@
   {
     "id": "edbce4e0-c70f-4f11-94ea-eb5f338fc09e",
     "roleName": "Windows 365 Service Connector Administrator",
-    "description": "Provides access to create, read, and update service connectors and attach them to Windows 365 resources.",
+    "description": "Provides access to create, read, update, and delete service connectors and attach them to Windows 365 resources.",
     "roleType": "BuiltInRole",
     "permissions": [
       {
         "actions": [
           "Microsoft.Windows365/serviceConnectors/read",
-          "Microsoft.Windows365/serviceConnectors/write"
+          "Microsoft.Windows365/serviceConnectors/write",
+          "Microsoft.Windows365/serviceConnectors/delete"
         ],
         "notActions": [],
         "dataActions": [

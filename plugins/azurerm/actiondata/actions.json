@@ -397,6 +397,10 @@
       "Microsoft.ApiCenter/unregister/action"
     ],
     "microsoft.apimanagement": [
+      "Microsoft.ApiManagement/aigateways/read",
+      "Microsoft.ApiManagement/aigateways/workspaces/aliases/read",
+      "Microsoft.ApiManagement/aigateways/workspaces/toolServers/read",
+      "Microsoft.ApiManagement/aigateways/workspaces/toolServers/write",
       "Microsoft.ApiManagement/checkNameAvailability/read",
       "Microsoft.ApiManagement/deletedservices/read",
       "Microsoft.ApiManagement/gateways/configConnections/delete",
@@ -2793,6 +2797,10 @@
       "Microsoft.BillingBenefits/discounts/delete",
       "Microsoft.BillingBenefits/discounts/read",
       "Microsoft.BillingBenefits/discounts/write",
+      "Microsoft.BillingBenefits/flexPlans/cancel/action",
+      "Microsoft.BillingBenefits/flexPlans/read",
+      "Microsoft.BillingBenefits/flexPlans/terms/read",
+      "Microsoft.BillingBenefits/flexPlans/write",
       "Microsoft.BillingBenefits/freeServices/delete",
       "Microsoft.BillingBenefits/freeServices/read",
       "Microsoft.BillingBenefits/freeServices/write",
@@ -15657,6 +15665,7 @@
       "Microsoft.WeightsAndBiases/unregister/action"
     ],
     "microsoft.windows365": [
+      "Microsoft.Windows365/serviceConnectors/delete",
       "Microsoft.Windows365/serviceConnectors/read",
       "Microsoft.Windows365/serviceConnectors/write"
     ],
@@ -15961,7 +15970,9 @@
       "Microsoft.App/agents/threads/delete",
       "Microsoft.App/agents/threads/read",
       "Microsoft.App/agents/threads/write",
+      "Microsoft.App/artifactApps/exec/action",
       "Microsoft.App/artifactApps/listSecrets/action",
+      "Microsoft.App/artifactApps/logstream/action",
       "Microsoft.App/artifactApps/start/action",
       "Microsoft.App/artifactApps/stop/action",
       "Microsoft.App/artifacts/listSecrets/action",
