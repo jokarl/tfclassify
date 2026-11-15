@@ -3,7 +3,7 @@ module github.com/jokarl/tfclassify
 go 1.25.14
 
 require (
-	github.com/gobwas/glob v1.0.0
+	github.com/gobwas/glob v1.1.0
 	github.com/hashicorp/go-plugin v1.8.0
 	github.com/hashicorp/go-version v1.9.0
 	github.com/hashicorp/hcl/v2 v2.25.0
